@@ -9,25 +9,24 @@
 #include "cuda.h"
 
 #include "model.h"
-#include "engine.h"
 #include "variable.h"
 
-Model::Model(ConfigData *pConfigData, int instance_id) {
-	this->pConfigData = pConfigData;
+Model::Model(ConfigData *config_data, int instance_id) {
+	this->config_data = config_data;
 	this->instance_id = instance_id;
 }
 
 void Model::getModelFileName(int curr, char *fileName) {
 	char cut_points_name[STRING_SIZE];
 	char device_name[STRING_SIZE];
-	int device = pConfigData->instances.at(instance_id).devices.at(curr);
-	int batch = pConfigData->instances.at(instance_id).batch;
+	int device = config_data->instances.at(instance_id).devices.at(curr);
+	int batch = config_data->instances.at(instance_id).batch;
 	int prev_cut_point = 0, curr_cut_point = 0;
 	
 	if(curr > 0) {
-		prev_cut_point = pConfigData->instances.at(instance_id).cut_points.at(curr-1);
+		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr-1);
 	}
-	curr_cut_point = pConfigData->instances.at(instance_id).cut_points.at(curr);
+	curr_cut_point = config_data->instances.at(instance_id).cut_points.at(curr);
 
 	snprintf(cut_points_name, STRING_SIZE, "%d.%d", prev_cut_point, curr_cut_point);
 
@@ -38,11 +37,11 @@ void Model::getModelFileName(int curr, char *fileName) {
 		snprintf(device_name, STRING_SIZE, "GPU");
 	}
 
-	snprintf(fileName, STRING_SIZE, "%smodel_%s_%s_FP16_%d.model", pConfigData->instances.at(instance_id).model_dir.c_str(), cut_points_name, device_name, batch);
+	snprintf(fileName, STRING_SIZE, "%smodel_%s_%s_FP16_%d.model", config_data->instances.at(instance_id).model_dir.c_str(), cut_points_name, device_name, batch);
 }
 
 void Model::setDevice(int curr) {
-	int device = pConfigData->instances.at(instance_id).devices.at(curr);
+	int device = config_data->instances.at(instance_id).devices.at(curr);
 
 	if(device == DEVICE_DLA) {
 		net->dla = true;	
@@ -53,18 +52,18 @@ void Model::setDevice(int curr) {
 }
 
 void Model::setMaxBatchSize() {
-	int batch = pConfigData->instances.at(instance_id).batch;
+	int batch = config_data->instances.at(instance_id).batch;
 
 	net->maxBatchSize = batch;
 }
 
 void Model::initializeModel() {
-	std::string bin_path(pConfigData->instances.at(instance_id).bin_path);
+	std::string bin_path(config_data->instances.at(instance_id).bin_path);
     std::string wgs_path  = bin_path + "/layers";
-    std::string cfg_path(pConfigData->instances.at(instance_id).cfg_path);
-    std::string name_path(pConfigData->instances.at(instance_id).name_path); 
-	int device_num = pConfigData->instances.at(instance_id).device_num;
-	int buffer_num = pConfigData->instances.at(instance_id).buffer_num;
+    std::string cfg_path(config_data->instances.at(instance_id).cfg_path);
+    std::string name_path(config_data->instances.at(instance_id).name_path); 
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 	int start_index = 0;
 
 	// parse a network using tkDNN darknetParser
@@ -73,8 +72,8 @@ void Model::initializeModel() {
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		char fileName[2 * STRING_SIZE];
-		int cut_point = pConfigData->instances.at(instance_id).cut_points[iter1];
-		int dla_core = pConfigData->instances.at(instance_id).dla_cores[iter1];
+		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
+		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 
 		getModelFileName(iter1, fileName);
 
@@ -120,7 +119,7 @@ void Model::setBindingsNum(int curr, int &input_binding_num, int &output_binding
 }
 
 void Model::initializeBindingVariables() {
-	int device_num = pConfigData->instances.at(instance_id).device_num;
+	int device_num = config_data->instances.at(instance_id).device_num;
 
 	start_bindings.emplace_back(1);
 	for(int iter = 1; iter <= device_num; iter++) {
@@ -141,7 +140,7 @@ void Model::initializeBindingVariables() {
 }
 
 void Model::setBufferIndexing() {
-	int device_num = pConfigData->instances.at(instance_id).device_num;
+	int device_num = config_data->instances.at(instance_id).device_num;
 	int input_binding_num = 0, output_binding_num = 0, curr_binding_num = 0;
 	
 	initializeBindingVariables();
@@ -178,8 +177,8 @@ void Model::setBufferIndexing() {
 }
 
 void Model::allocateStream() {
-	int device_num = pConfigData->instances.at(instance_id).device_num;
-	int buffer_num = pConfigData->instances.at(instance_id).buffer_num;
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::vector<cudaStream_t> stream_vec;
@@ -194,8 +193,8 @@ void Model::allocateStream() {
 }
 
 void Model::deallocateStream() {
-	int device_num = pConfigData->instances.at(instance_id).device_num;
-	int buffer_num = pConfigData->instances.at(instance_id).buffer_num;
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
@@ -208,8 +207,8 @@ void Model::deallocateStream() {
 }
 
 void Model::setStreamBuffer() {
-	int device_num = pConfigData->instances.at(instance_id).device_num;
-	int buffer_num = pConfigData->instances.at(instance_id).buffer_num;
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	for(int iter1 = 0; iter1 < device_num + total_binding_num; iter1++) {
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
@@ -220,8 +219,8 @@ void Model::setStreamBuffer() {
 }
 
 void Model::allocateBuffer() {
-	int batch = pConfigData->instances.at(instance_id).batch;
-	int buffer_num = pConfigData->instances.at(instance_id).buffer_num;
+	int batch = config_data->instances.at(instance_id).batch;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	for(int iter1 = 0; iter1 < buffer_num; iter1++) {
 		float *input_buffer = cuda_make_array_host(batch * binding_size[0]);

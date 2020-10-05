@@ -16,7 +16,7 @@ typedef struct _YoloData {
 
 class Model {
 	public:
-		ConfigData *pConfigData;
+		ConfigData *config_data;
 		int instance_id;
 		std::vector<int> start_bindings;
 		int total_binding_num;
@@ -33,7 +33,7 @@ class Model {
 		std::vector<float *> input_buffers;
 		std::vector<float *> output_buffers;
 
-		Model(ConfigData *pConfigData, int instance_id);
+		Model(ConfigData *config_data, int instance_id);
 		void getModelFileName(int curr, char *fileName);
 		void setDevice(int curr);
 		void setMaxBatchSize();
