@@ -126,21 +126,17 @@ void Model::initializeBindingVariables() {
 		start_bindings.push_back(-1);
 	}
 
-	int count = 0;
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		int curr_binding_num = netRTs[iter1]->engineRT->getNbBindings();
 		for(int iter2 = 0; iter2 < curr_binding_num; iter2++) {
 			is_net_output.push_back(false);
 			binding_size.push_back(0);
-			count++;
 		}	
 	}
-	is_net_output.push_back(false);
-
-	fprintf(stderr, "count: %d\n", count);
+	binding_size.at(0) = INPUT_SIZE;
 
 	yolo_num = 0;
-	total_binding_num = 0;
+	total_binding_num = 1;
 	output_num = 0;
 }
 
@@ -157,7 +153,8 @@ void Model::setBufferIndexing() {
 		start_bindings[iter1] = start_bindings[iter1] - input_binding_num;
 		start_bindings[iter1+1] = start_bindings[iter1] + curr_binding_num;
 
-		for(int iter2 = 0; iter2 < curr_binding_num; iter2++) {
+
+		for(int iter2 = input_binding_num; iter2 < curr_binding_num; iter2++) {
 			nvinfer1::Dims dim = netRTs[iter1]->engineRT->getBindingDimensions(iter2);	
 			int index = start_bindings[iter1];
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
@@ -236,8 +233,6 @@ void Model::allocateBuffer() {
 		cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num]), input_buffer, 0);
 		input_buffers.push_back(input_buffer);
 
-		// fprintf(stderr, "%s:%d iter1: %d, total_binding_num: %d\n", __func__, __LINE__, iter1, total_binding_num);
-		
 		if(total_binding_num > 2) {
 			for(int iter2 = 1; iter2 < total_binding_num-1; iter2++) {
 				if(!is_net_output[iter2]) {
@@ -246,7 +241,6 @@ void Model::allocateBuffer() {
 				else {
 					float *middle_buffer = cuda_make_array_host(batch * binding_size[iter2]);
 					cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num + iter2]), middle_buffer, 0);
-					// fprintf(stderr, "%s:%d buffer_num: %d, middle_buffer: %p\n", __func__, __LINE__, iter1, middle_buffer);
 					output_buffers.push_back(middle_buffer);
 				}
 			}	
@@ -254,7 +248,6 @@ void Model::allocateBuffer() {
 
 		float *output_buffer = cuda_make_array_host(batch * binding_size[total_binding_num - 1]);
 		cudaHostGetDevicePointer(&(stream_buffers[total_binding_num - 1 + iter1 * total_binding_num]), output_buffer, 0);
-		// fprintf(stderr, "%s:%d buffer_num: %d, output_buffer: %p\n", __func__, __LINE__, iter1, output_buffer);
 		output_buffers.push_back(output_buffer);
 	}
 }
@@ -278,11 +271,6 @@ void Model::initializeBuffers() {
 	allocateStream();
 	setStreamBuffer();
 	allocateBuffer();
-
-	fprintf(stderr, "instance_id: %d, total_binding_num: %d, yolo_num: %d\n", instance_id, total_binding_num, yolo_num);
-	for(unsigned int iter = 0; iter < binding_size.size(); iter++) {
-		fprintf(stderr, "binding_size[%d]: %d\n", iter, binding_size[iter]);	
-	}
 }
 
 void Model::finalizeBuffers() {
@@ -298,7 +286,6 @@ void Model::infer(int device_id, int buffer_id) {
 	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
 	int batch = config_data->instances.at(instance_id).batch;
 
-	// fprintf(stderr, "%s:%d device_id: %d, buffer_id: %d, start_binding: %d, batch: %d\n", __func__, __LINE__, device_id, buffer_id, start_binding, batch);
 	contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
 	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
 }
