@@ -103,7 +103,6 @@ extern "C" {
 
 void load_image_resize(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
-	Image out;
 	try {
 		cv::Mat loaded_image = load_image_mat(filename, c);
 

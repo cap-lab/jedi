@@ -8,12 +8,17 @@
 #include "thread.h"
 #include "config.h"
 #include "variable.h"
+#include "dataset.h"
+#include "model.h"
+#include "detector.h"
 
 typedef struct _PreProcessingThreadData {
 	ConfigData *config_data;
 	int instance_id;
 	int tid;
 	int *signals;
+	Model *model;
+	Dataset *dataset;
 } PreProcessingThreadData;
 
 typedef struct _PostProcessingThreadData {
@@ -21,15 +26,17 @@ typedef struct _PostProcessingThreadData {
 	int instance_id;
 	int tid;
 	int *signals;
+	Model *model;
+	Dataset *dataset;
 } PostProcessingThreadData;
 
 typedef struct _InferenceThreadData {
 	ConfigData *config_data;
 	int instance_id;
 	int tid;
-	int device_id;
 	int *curr_signals;
 	int *next_signals;
+	Model *model;
 } InferenceThreadData;
 
 class Thread {
@@ -40,7 +47,6 @@ class Thread {
 		std::vector<std::thread> threads;
 
 		Thread(ConfigData *config_data, int instance_id);
-		virtual void setThreadData(int *signals) = 0;
 		virtual void runThreads() = 0;
 		virtual void joinThreads() = 0;
 };
@@ -50,7 +56,7 @@ class PreProcessingThread : public Thread {
 		std::vector<PreProcessingThreadData> threads_data;
 
 		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
-		void setThreadData(int *signals);
+		void setThreadData(int *signals, Model *model, Dataset *dataset);
 		void runThreads();
 		void joinThreads();
 };
@@ -60,7 +66,7 @@ class PostProcessingThread : public Thread {
 		std::vector<PostProcessingThreadData> threads_data;
 
 		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
-		void setThreadData(int *signals);
+		void setThreadData(int *signals, Model *model, Dataset *dataset);
 		void runThreads();
 		void joinThreads();
 };
@@ -70,7 +76,7 @@ class InferenceThread : public Thread {
 		std::vector<InferenceThreadData> threads_data;
 
 		InferenceThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
-		void setThreadData(int *signals);
+		void setThreadData(int *signals, Model *model);
 		void runThreads();
 		void joinThreads();
 };

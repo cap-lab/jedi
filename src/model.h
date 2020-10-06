@@ -5,6 +5,8 @@
 #include <vector>
 #include <cassert>
 
+#include <tkDNN/tkdnn.h>
+
 #include "variable.h"
 #include "config.h"
 
@@ -48,6 +50,9 @@ class Model {
 		void deallocateBuffer();
 		void initializeBuffers();
 		void finalizeBuffers();
+		bool checkInferenceDone(int device_id, int buffer_id);
+		void infer(int device_id, int buffer_id);
+		void waitUntilInferenceDone(int device_id, int buffer_id);
 };
 
 #endif

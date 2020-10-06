@@ -48,16 +48,40 @@ int main(int argc, char *argv[]) {
 		device_num = config_data.instances.at(iter).device_num;
 
 		PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, iter);
-		pre_thread->setThreadData(signals[iter][0]);		
+		pre_thread->setThreadData(signals[iter][0], models[iter], datasets[iter]);		
 		preProcessingThreads.push_back(pre_thread);
 
 		PostProcessingThread *post_thread = new PostProcessingThread(&config_data, iter);
-		post_thread->setThreadData(signals[iter][device_num]);		
+		post_thread->setThreadData(signals[iter][device_num], models[iter], datasets[iter]);		
 		postProcessingThreads.push_back(post_thread);
 
 		InferenceThread *infer_thread = new InferenceThread(&config_data, iter);
-		infer_thread->setThreadData(signals[iter][0]);
+		infer_thread->setThreadData(signals[iter][0], models[iter]);
 		inferenceThreads.push_back(infer_thread);
+	}
+
+	// run threads
+	for(int iter = 0; iter < instance_num; iter++) {
+		PreProcessingThread *pre_thread = preProcessingThreads.at(iter);
+		pre_thread->runThreads();
+			
+		PostProcessingThread *post_thread = postProcessingThreads.at(iter);
+		post_thread->runThreads();
+
+		InferenceThread *infer_thread = inferenceThreads.at(iter);
+		infer_thread->runThreads();
+	}
+
+	// join threads
+	for(int iter = 0; iter < instance_num; iter++) {
+		PreProcessingThread *pre_thread = preProcessingThreads.at(iter);
+		pre_thread->joinThreads();
+			
+		PostProcessingThread *post_thread = postProcessingThreads.at(iter);
+		post_thread->joinThreads();
+
+		InferenceThread *infer_thread = inferenceThreads.at(iter);
+		infer_thread->joinThreads();
 	}
 
 	std::cout<<"End"<<std::endl;

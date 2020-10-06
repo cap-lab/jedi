@@ -271,3 +271,18 @@ void Model::finalizeBuffers() {
 	deallocateBuffer();
 	deallocateStream();
 }
+
+bool Model::checkInferenceDone(int device_id, int buffer_id) {
+	return cudaStreamQuery(streams[device_id][buffer_id]) == cudaSuccess;	
+}
+
+void Model::infer(int device_id, int buffer_id) {
+	int start_binding = start_bindings[device_id];
+	int batch = config_data->instances.at(instance_id).batch;
+
+	contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
+}
+
+void Model::waitUntilInferenceDone(int device_id, int buffer_id) {
+	cudaStreamSynchronize(streams[device_id][buffer_id]);
+}
