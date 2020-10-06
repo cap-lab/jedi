@@ -135,6 +135,8 @@ int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int
 			if(objectness <= thresh) continue;
 			int box_index  = entry_yolo_index(0, n*lw*lh + i, 0, lw, lh, lc);
 
+			// fprintf(stderr, "%s:%d yolo.mask[%d]: %f, yolo.n_masks: %d\n", __func__, __LINE__, n, yolo.mask[n], yolo.n_masks);
+
 			dets[count].bbox = get_yolo_box(predictions, yolo.bias, yolo.mask[n], box_index, col, row, lw, lh, INPUT_WIDTH, INPUT_HEIGHT, lw*lh);
 			dets[count].objectness = objectness;
 			dets[count].classes = NUM_CLASSES;
@@ -156,11 +158,10 @@ int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int
 }
 
 void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
-	double nms_thresh = 0.45;
 	int total = ndets;
-
 	int i, j, k;
 	k = total-1;
+
 	for(i = 0; i <= k; ++i){
 		if(dets[i].objectness == 0){
 			Detection swap = dets[i];
@@ -182,26 +183,25 @@ void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 			Box a = dets[i].bbox;
 			for(j = i+1; j < total; ++j){
 				Box b = dets[j].bbox;
-				if (yolo_box_iou(a, b) > nms_thresh){
+				if (yolo_box_iou(a, b) > NMS){
 					dets[j].prob[k] = 0;
 				}
 			}
 		}
 	}
-
 }
 
-void yoloLayerDetect(int batch, std::vector<float *> output_buffers, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
+void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
 	int detection_num = 0;
-	int output_num = output_buffers.size();
 	int output_size = 0;
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
 		detection_num = 0;
 
 		for(int iter2 = 0; iter2 < output_num; iter2++) {
+			int index = buffer_id * output_num + iter2;
 			output_size = yolo_values[iter2].w * yolo_values[iter2].h * yolo_values[iter2].c;
-			yolo_computeDetections(output_buffers[iter2] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, yolo_values[iter2].w, yolo_values[iter2].h, yolo_values[iter2].c, CONFIDENCE_THRESH, yolos[iter2]);
+			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, yolo_values[iter2].w, yolo_values[iter2].h, yolo_values[iter2].c, CONFIDENCE_THRESH, yolos[iter2]);
 		}
 
 		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, NUM_CLASSES);

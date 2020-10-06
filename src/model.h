@@ -25,6 +25,7 @@ class Model {
 		std::vector<int> binding_size;
 		int yolo_num;
 		std::vector<YoloData> yolos;
+		int output_num;
 
 		tk::dnn::Network *net;
 		std::vector<tk::dnn::NetworkRT *> netRTs;

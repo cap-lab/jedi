@@ -72,6 +72,8 @@ void print_coco_detections(Detection *dets, int nDets, int idx, int w, int h, ch
 
 	for (i = 0; i < nDets; ++i) {
 		if (dets[i].objectness >= 0) {
+			// fprintf(stderr, "%s:%d b.x: %f, b.y: %f, b.w: %f, b.h: %f\n", __func__, __LINE__, dets[i].bbox.x, dets[i].bbox.y, dets[i].bbox.w, dets[i].bbox.h);
+
 			float xmin = dets[i].bbox.x - dets[i].bbox.w / 2.;
 			float xmax = dets[i].bbox.x + dets[i].bbox.w / 2.;
 			float ymin = dets[i].bbox.y - dets[i].bbox.h / 2.;

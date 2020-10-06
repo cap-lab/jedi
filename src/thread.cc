@@ -32,7 +32,7 @@ void PreProcessingThread::setThreadData(int *signals, Model *model, Dataset *dat
 
 void PreProcessingThread::runThreads() {
 	for(int iter = 0; iter < thread_num; iter++) {
-		threads.push_back(std::thread(doPreProcessing, &(threads[iter])));
+		threads.push_back(std::thread(doPreProcessing, &(threads_data[iter])));
 	}
 }
 
@@ -60,7 +60,7 @@ void PostProcessingThread::setThreadData(int *signals, Model *model, Dataset *da
 
 void PostProcessingThread::runThreads() {
 	for(int iter = 0; iter < thread_num; iter++) {
-		threads.push_back(std::thread(doPostProcessing, &(threads[iter])));
+		threads.push_back(std::thread(doPostProcessing, &(threads_data[iter])));
 	}
 }
 
@@ -88,7 +88,7 @@ void InferenceThread::setThreadData(int *signals, Model *model) {
 
 void InferenceThread::runThreads() {
 	for(int iter = 0; iter < thread_num; iter++) {
-		threads.push_back(std::thread(doInference, &(threads[iter])));
+		threads.push_back(std::thread(doInference, &(threads_data[iter])));
 	}
 }
 

@@ -24,8 +24,9 @@ static int readImage(float *input_buffer, Dataset *dataset, int batch, int pre_t
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
 		load_image_resize((char *)(dataset->paths[index + iter].c_str()), INPUT_WIDTH, INPUT_HEIGHT, INPUT_CHANNEL, &orignal_width, &original_height, input_buffer + iter * INPUT_SIZE);	
-		dataset->w.emplace_back(orignal_width);
-		dataset->h.emplace_back(original_height);
+		dataset->w.at(index + iter) = orignal_width;
+		dataset->h.at(index + iter) = original_height;
+//		std::cerr<<__func__<<":"<<__LINE__<<": "<<input_buffer + iter * INPUT_SIZE<<std::endl;
 	}	
 
 	return index + batch * pre_thread_num;
@@ -46,26 +47,38 @@ void doPreProcessing(void *d) {
 	int pre_thread_num = config_data->instances.at(instance_id).pre_thread_num;
 	int sample_index = sample_offset + tid;
 	int index = (sample_offset + tid) * batch;
-	float *input_buffer = data->model->input_buffers.at(0);
+
+//	fprintf(stderr, "input_buffer address: %p\n", input_buffer);
+//	fprintf(stderr, "input_buffers[0] address: %p\n", data->model->input_buffers.at(0));
 
 	while(sample_index < sample_offset + sample_size) {
 		while(signals[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}
 
-		index = readImage(input_buffer, dataset, batch, pre_thread_num, index);
+		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, batch, pre_thread_num, index);
+//		fprintf(stderr, "%s:%d: %p\n", __func__, __LINE__, input_buffer);
+
+//		if(sample_index % buffer_num == 1) {
+//			FILE *fp;
+//			fp = fopen("pre.bin", "wb");
+//			fwrite(data->model->input_buffers.at(sample_index % buffer_num), sizeof(float), INPUT_SIZE, fp);
+//			fclose(fp);
+//		}
 
 		signals[sample_index % buffer_num] = 1;
 		sample_index += pre_thread_num;
 	}
 }
 
-static void detectBox(std::vector<float *> output_buffers, std::vector<YoloData> yolos, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
+static void detectBox(std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
 	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-		regionLayerDetect(batch, output_buffers.back(), dets, &(detections_num[0]));	
+		// fprintf(stderr, "%s:%d\n", __func__, __LINE__);
+		regionLayerDetect(batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
 	}
 	else {
-		yoloLayerDetect(batch, output_buffers, yolos, dets, detections_num);	
+		// fprintf(stderr, "%s:%d\n", __func__, __LINE__);
+		yoloLayerDetect(batch, output_buffers, buffer_id, output_num, yolos, dets, detections_num);	
 	}
 }
 
@@ -74,9 +87,11 @@ static void printBox(Dataset *dataset, int sample_index, int batch, std::string 
 		int index = sample_index * batch + iter1;
 
 		if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
+			// fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 			printDetector(&dets[iter1 * NBOXES], index, dataset, detections_num[0]);
 		}
 		else {
+			// fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 			printDetector(&dets[iter1 * NBOXES], index, dataset, detections_num[iter1]);
 		}
 	}
@@ -99,8 +114,13 @@ void doPostProcessing(void *d) {
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset + tid;
 	std::vector<YoloData> yolos = data->model->yolos;
+	int output_num = data->model->output_num;
+	int buffer_id = 0;
 	Detection *dets;
 	std::vector<int> detections_num(batch, 0);
+
+	buffer_id = sample_index % buffer_num;
+	// fprintf(stderr, "%s:%d model addr: %p, output_buffer addr: %p\n", __func__, __LINE__, data->model, data->model->output_buffers.at(buffer_id * output_num));
 
 	setYoloValues(network_name);
 	makeDetectionBox(batch, &dets);
@@ -110,14 +130,23 @@ void doPostProcessing(void *d) {
 			usleep(SLEEP_TIME);	
 		}	
 
-		detectBox(data->model->output_buffers, yolos, batch, network_name, dets, detections_num);
+		buffer_id = sample_index % buffer_num; // + output_num * buffer_num;
+//		if(sample_index == 0) {
+//			FILE *fp;
+//			fp = fopen("post.bin", "wb");
+//			fwrite(data->model->output_buffers.at(buffer_id), sizeof(float), 13*13*425, fp);
+//			fclose(fp);
+//		}
+//		fprintf(stderr, "%s:%d buffer_id: %d\n", __func__, __LINE__, buffer_id);
+
+		detectBox(data->model->output_buffers, buffer_id, output_num, yolos, batch, network_name, dets, detections_num);
 
 		signals[sample_index % buffer_num] = 0;
 
 		printBox(dataset, sample_index, batch, network_name, dets, detections_num);
 		
 		if(tid == (sample_index % post_thread_num) && instance_id == 0) {
-			std::cerr<<"[TEST | <<"<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
+			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
 		}
 
 		sample_index += post_thread_num;

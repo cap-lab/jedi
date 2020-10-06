@@ -7,6 +7,7 @@
 #include "model.h"
 #include "dataset.h"
 #include "thread.h"
+#include "coco.h"
 
 int main(int argc, char *argv[]) {
 	int instance_num = 0, device_num = 0;
@@ -60,6 +61,9 @@ int main(int argc, char *argv[]) {
 		inferenceThreads.push_back(infer_thread);
 	}
 
+	// TODO: make thread for each instance
+	// now, just handle with loop for test
+	
 	// run threads
 	for(int iter = 0; iter < instance_num; iter++) {
 		PreProcessingThread *pre_thread = preProcessingThreads.at(iter);
@@ -82,6 +86,16 @@ int main(int argc, char *argv[]) {
 
 		InferenceThread *infer_thread = inferenceThreads.at(iter);
 		infer_thread->joinThreads();
+	}
+
+	writeResultFile();
+
+	for(int iter = 0; iter < instance_num; iter++) {
+		Model *model = models.at(iter);
+		Dataset *dataset = datasets.at(iter);	
+
+		model->finalizeBuffers();
+		dataset->finalizeDataset();
 	}
 
 	std::cout<<"End"<<std::endl;

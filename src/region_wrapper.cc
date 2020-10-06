@@ -43,6 +43,8 @@ static void correct_region_boxes(Detection *dets, int n, int w, int h) {
         b.h *= h; 
         
         dets[i].bbox = b;
+
+		// fprintf(stderr, "%s:%d b.x: %f, b.y: %f, b.w: %f, b.h: %f\n", __func__, __LINE__, b.x, b.y, b.w, b.h);
     }
 }
 
@@ -82,6 +84,8 @@ static Box get_region_box(float *x, int n, int index, int i, int j) {
     b.y = (j + x[index + 1*stride]) / h;
     b.w = exp(x[index + 2*stride]) * pfBiases[2*n] / w;
     b.h = exp(x[index + 3*stride]) * pfBiases[2*n+1] / h;
+
+	// fprintf(stderr, "%s:%d b.x: %f, b.y: %f, b.w: %f, b.h: %f\n", __func__, __LINE__, b.x, b.y, b.w, b.h);
 
     return b;
 }

@@ -97,9 +97,6 @@ static void mat_to_data(cv::Mat mat, float *input)
 		}
 	}
 }
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 void load_image_resize(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
@@ -117,9 +114,3 @@ void load_image_resize(char *filename, int w, int h, int c, int *orig_width, int
 		cerr << " OpenCV exception: load_image_resize() can't load image %s " << filename << " \n";
 	}
 }
-
-#ifdef __cplusplus
-}
-#endif
-
-/* detector specific */
