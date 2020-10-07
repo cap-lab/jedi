@@ -2,10 +2,30 @@
 #include <math.h>
 #include <string.h>
 #include <float.h>
+#include <iostream>
+#include <algorithm>
 
 #include "cuda.h"
 #include "box.h"
 #include "region_wrapper.h"
+
+static float pfBiases[2 * NUM_ANCHOR];
+
+void setBiases(std::string network_name) {
+	static float yolov2_biases[2 * NUM_ANCHOR] = {0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828};
+	static float densenet_biases[2 * NUM_ANCHOR] = {1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892, 9.47112, 4.84053, 11.2364, 10.0071};
+
+	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY) {
+		for(int iter = 0; iter < 2 * NUM_ANCHOR; iter++) {
+			pfBiases[iter] = yolov2_biases[iter];	
+		}
+	}
+	else {
+		for(int iter = 0; iter < 2 * NUM_ANCHOR; iter++) {
+			pfBiases[iter] = densenet_biases[iter];	
+		}
+	}
+}
 
 int entry_index(int batch, int location, int entry) {
     int w = IN_WIDTH;
@@ -43,8 +63,6 @@ static void correct_region_boxes(Detection *dets, int n, int w, int h) {
         b.h *= h; 
         
         dets[i].bbox = b;
-
-		// fprintf(stderr, "%s:%d b.x: %f, b.y: %f, b.w: %f, b.h: %f\n", __func__, __LINE__, b.x, b.y, b.w, b.h);
     }
 }
 
@@ -72,7 +90,7 @@ void softmax(float *input, int n, float temp, int stride, float *output) {
 
 static Box get_region_box(float *x, int n, int index, int i, int j) {
 
-	static float pfBiases[2 * NUM_ANCHOR] = {0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828};
+	// static float pfBiases[2 * NUM_ANCHOR] = {0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828};
 	// static float pfBiases[2 * NUM_ANCHOR] = {1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892, 9.47112, 4.84053, 11.2364, 10.0071};
 		   
 	Box b;
@@ -84,8 +102,6 @@ static Box get_region_box(float *x, int n, int index, int i, int j) {
     b.y = (j + x[index + 1*stride]) / h;
     b.w = exp(x[index + 2*stride]) * pfBiases[2*n] / w;
     b.h = exp(x[index + 3*stride]) * pfBiases[2*n+1] / h;
-
-	// fprintf(stderr, "%s:%d b.x: %f, b.y: %f, b.w: %f, b.h: %f\n", __func__, __LINE__, b.x, b.y, b.w, b.h);
 
     return b;
 }

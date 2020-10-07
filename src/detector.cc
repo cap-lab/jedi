@@ -106,6 +106,7 @@ void doPostProcessing(void *d) {
 
 	buffer_id = sample_index % buffer_num;
 
+	setBiases(network_name);
 	makeDetectionBox(batch, &dets);
 
 	while(sample_index < sample_offset + sample_size) {

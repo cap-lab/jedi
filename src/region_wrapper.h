@@ -10,6 +10,7 @@
 #define IN_HEIGHT   (INPUT_HEIGHT / 32)
 #define COORDS      4
 
+void setBiases(std::string network_name);
 void regionLayerDetect(int batch, float *output, Detection *dets, int *detection_num);
 
 #endif 
