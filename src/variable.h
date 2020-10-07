@@ -17,6 +17,7 @@ enum DeviceType {
 
 #define STRING_SIZE 100
 #define SLEEP_TIME 100
+#define LOG_INTERVAL 100
 
 #define MAX_DEVICE_NUM 4
 #define MAX_BUFFER_NUM 8

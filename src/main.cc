@@ -1,9 +1,11 @@
 #include <iostream>
 #include <vector>
+#include <cstdlib>
 
 #include <tkDNN/tkdnn.h>
 
 #include "config.h"
+#include "variable.h"
 #include "model.h"
 #include "dataset.h"
 #include "thread.h"
@@ -15,7 +17,35 @@ typedef struct _InstanceThreadData {
 	InferenceThread *infer_thread;
 } InstanceThreadData;
 
-void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
+static void turnOnTegrastats(std::string log_file_name) {
+	int result = -1;
+	std::string cmd;
+
+	cmd = std::string("rm -f ") + log_file_name;
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+	}
+
+	cmd = "tegrastats --start --logfile " + log_file_name + " --interval " + std::to_string(LOG_INTERVAL);
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+	}
+}
+
+static void turnOffTegrastats() {
+	int result = -1;
+	std::string cmd;
+	
+	cmd = "tegrastats --stop";
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+	}
+}
+
+static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
 	for(int iter = 0; iter < instance_num; iter++) {
 		Model *model = new Model(&config_data, iter);
 
@@ -26,7 +56,7 @@ void generateModels(int instance_num, ConfigData &config_data, std::vector<Model
 	}
 }
 
-void generateDatasets(int instance_num, ConfigData &config_data, std::vector<Dataset *> &datasets) {
+static void generateDatasets(int instance_num, ConfigData &config_data, std::vector<Dataset *> &datasets) {
 	for(int iter = 0; iter < instance_num; iter++) {
 		Dataset *dataset = new Dataset(&config_data, iter);	
 
@@ -36,7 +66,7 @@ void generateDatasets(int instance_num, ConfigData &config_data, std::vector<Dat
 	}
 }
 
-void runInstanceThread(void *d) {
+static void runInstanceThread(void *d) {
 	InstanceThreadData *data = (InstanceThreadData *)d;
 	PreProcessingThread *pre_thread = data-> pre_thread;	
 	PostProcessingThread *post_thread = data-> post_thread;	
@@ -51,7 +81,7 @@ void runInstanceThread(void *d) {
 	infer_thread->joinThreads();
 }
 
-void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingThread *> &preProcessingThreads, std::vector<PostProcessingThread *> &postProcessingThreads, std::vector<InferenceThread *> &inferenceThreads) {
+static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingThread *> &preProcessingThreads, std::vector<PostProcessingThread *> &postProcessingThreads, std::vector<InferenceThread *> &inferenceThreads) {
 	for(int iter = 0; iter < instance_num; iter++) {
 		delete preProcessingThreads[iter];		
 		delete postProcessingThreads[iter];		
@@ -63,7 +93,7 @@ void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingThread *
 	inferenceThreads.clear();
 }
 
-void generateThreads(int instance_num, ConfigData &config_data, std::vector<Model *> models, std::vector<Dataset *> datasets) {
+static void generateThreads(int instance_num, ConfigData &config_data, char *log_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
@@ -93,6 +123,10 @@ void generateThreads(int instance_num, ConfigData &config_data, std::vector<Mode
 		instance_threads_data.push_back(instance_thread_data);
 	}
 
+	if(log_file_name) {
+		turnOnTegrastats(std::string(log_file_name));
+	}	
+
 	for(int iter = 0; iter < instance_num; iter++) {
 		instance_threads.push_back(std::thread(runInstanceThread, &(instance_threads_data[iter])));	
 	}
@@ -101,12 +135,15 @@ void generateThreads(int instance_num, ConfigData &config_data, std::vector<Mode
 		instance_threads[iter].join();	
 	}
 
+	if(log_file_name) {
+		turnOffTegrastats();
+	}	
 	writeResultFile();
 
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
 }
 
-void finalizeData(int instance_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
+static void finalizeData(int instance_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
 	for(int iter = 0; iter < instance_num; iter++) {
 		Model *model = models.at(iter);
 		Dataset *dataset = datasets.at(iter);	
@@ -137,7 +174,7 @@ int main(int argc, char *argv[]) {
 	generateDatasets(instance_num, config_data, datasets);
 
 	// make threads
-	generateThreads(instance_num, config_data, models, datasets);
+	generateThreads(instance_num, config_data, argv[2], models, datasets);
 
 	// clear data
 	finalizeData(instance_num, models, datasets);
