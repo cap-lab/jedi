@@ -8,7 +8,6 @@
 #include "model.h"
 #include "coco.h"
 
-void setYoloValues(std::string network_name);
-void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num);
+void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num);
 
 #endif

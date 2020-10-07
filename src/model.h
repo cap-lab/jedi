@@ -16,6 +16,12 @@ typedef struct _YoloData {
 	float *bias;
 } YoloData;
 
+typedef struct _YoloValue {
+	int height;
+	int width;
+	int channel;	
+} YoloValue;
+
 class Model {
 	public:
 		ConfigData *config_data;
@@ -25,6 +31,7 @@ class Model {
 		std::vector<int> binding_size;
 		int yolo_num;
 		std::vector<YoloData> yolos;
+		std::vector<YoloValue> yolo_values;
 		int output_num;
 
 		tk::dnn::Network *net;

@@ -175,6 +175,7 @@ void Model::setBufferIndexing() {
 	int input_binding_num = 0, output_binding_num = 0, curr_binding_num = 0;
 	
 	initializeBindingVariables();
+	std::vector<YoloValue> tmp_yolo_values(binding_size.size());
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		setBindingsNum(iter1, input_binding_num, output_binding_num);
@@ -188,8 +189,10 @@ void Model::setBufferIndexing() {
 			nvinfer1::Dims dim = netRTs[iter1]->engineRT->getBindingDimensions(iter2);	
 			int index = start_bindings[iter1];
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
-			fprintf(stderr, "dim.d[0]: %d, dim.d[1]: %d, dim.d[2]: %d\n", dim.d[0], dim.d[1], dim.d[2]);
 			total_binding_num++;
+
+			YoloValue yolo_value = {dim.d[2], dim.d[1], dim.d[0]};
+			tmp_yolo_values[index + iter2] = yolo_value;
 		}
 
 		for(int iter2 = 0; iter2 < netRTs[iter1]->pluginFactory->n_yolos; iter2++) {
@@ -205,9 +208,12 @@ void Model::setBufferIndexing() {
 		int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
 		for(int iter2 = index; iter2 < index + netRTs[iter1]->pluginFactory->n_yolos; iter2++) {
 			is_net_output[iter2] = true;
+			yolo_values.push_back(tmp_yolo_values.at(iter2));
 			output_num++;
 		}
 	}
+
+	tmp_yolo_values.clear();
 }
 
 void Model::allocateStream() {

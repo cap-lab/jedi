@@ -1,33 +1,5 @@
 #include "yolo_wrapper.h"
 
-int num_yolo_layer = 0;
-
-struct yolo_size {
-	int w;
-	int h;
-	int c;
-};
-
-struct yolo_size yolo_values[MAX_OUTPUT_NUM];
-
-void setYoloValues(std::string network_name) {
-	if(network_name == NETWORK_YOLOV4 || network_name == NETWORK_RESNEXT) {
-		yolo_values[0].w = 52; yolo_values[0].h = 52; yolo_values[0].c = 255;
-		yolo_values[1].w = 26; yolo_values[1].h = 26; yolo_values[1].c = 255;
-		yolo_values[2].w = 13; yolo_values[2].h = 13; yolo_values[2].c = 255;
-	}
-	if(network_name == NETWORK_YOLOV4TINY) {
-		yolo_values[0].w = 13; yolo_values[0].h = 13; yolo_values[0].c = 255;
-		yolo_values[1].w = 26; yolo_values[1].h = 26; yolo_values[1].c = 255;
-		yolo_values[2].w = 0; yolo_values[2].h = 0; yolo_values[2].c = 0;
-	}
-	else {
-		yolo_values[0].w = 13; yolo_values[0].h = 13; yolo_values[0].c = 255;
-		yolo_values[1].w = 26; yolo_values[1].h = 26; yolo_values[1].c = 255;
-		yolo_values[2].w = 52; yolo_values[2].h = 52; yolo_values[2].c = 255;
-	}
-}
-
 Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride)
 {
 	Box b;
@@ -191,7 +163,7 @@ void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 	}
 }
 
-void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
+void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num) {
 	int detection_num = 0;
 	int output_size = 0;
 
@@ -200,8 +172,12 @@ void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_
 
 		for(int iter2 = 0; iter2 < output_num; iter2++) {
 			int index = buffer_id * output_num + iter2;
-			output_size = yolo_values[iter2].w * yolo_values[iter2].h * yolo_values[iter2].c;
-			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, yolo_values[iter2].w, yolo_values[iter2].h, yolo_values[iter2].c, CONFIDENCE_THRESH, yolos[iter2]);
+			int w = yolo_values[iter2].width;
+			int h = yolo_values[iter2].height;
+			int c = yolo_values[iter2].channel;
+
+			output_size = w * h * c;
+			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, w, h, c, CONFIDENCE_THRESH, yolos[iter2]);
 		}
 
 		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, NUM_CLASSES);
