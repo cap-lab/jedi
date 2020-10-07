@@ -45,6 +45,15 @@ static void turnOffTegrastats() {
 	}
 }
 
+static long getTime() {
+	struct timespec time;
+	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
+		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
+		exit(-1);
+	}
+	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000;
+}
+
 static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
 	for(int iter = 0; iter < instance_num; iter++) {
 		Model *model = new Model(&config_data, iter);
@@ -100,6 +109,8 @@ static void generateThreads(int instance_num, ConfigData &config_data, char *log
 	int signals[instance_num][MAX_DEVICE_NUM][MAX_BUFFER_NUM] = {0};
 	std::vector<InstanceThreadData> instance_threads_data;
 	std::vector<std::thread> instance_threads;
+	long start_time = 0;
+	double inference_time = 0;
 	
 	for(int iter = 0; iter < instance_num; iter++) {
 		int device_num = config_data.instances.at(iter).device_num;
@@ -127,6 +138,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, char *log
 		turnOnTegrastats(std::string(log_file_name));
 	}	
 
+	start_time = getTime();
 	for(int iter = 0; iter < instance_num; iter++) {
 		instance_threads.push_back(std::thread(runInstanceThread, &(instance_threads_data[iter])));	
 	}
@@ -134,6 +146,8 @@ static void generateThreads(int instance_num, ConfigData &config_data, char *log
 	for(int iter = 0; iter < instance_num; iter++) {
 		instance_threads[iter].join();	
 	}
+	inference_time = (double)(getTime() - start_time) / 1000000;
+	std::cout<<"inference time: "<<inference_time<<std::endl;
 
 	if(log_file_name) {
 		turnOffTegrastats();
