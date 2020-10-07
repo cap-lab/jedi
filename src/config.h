@@ -32,6 +32,7 @@ class ConfigData {
 		std::vector<ConfigInstance> instances;
 
 		ConfigData(std::string config_file_path);
+		~ConfigData();
 	
 	private:
 		int readConfigFile(libconfig::Config *cfg, std::string config_file_path);

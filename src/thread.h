@@ -47,7 +47,7 @@ class Thread {
 		std::vector<std::thread> threads;
 
 		Thread(ConfigData *config_data, int instance_id);
-		virtual ~Thread() {};
+		virtual ~Thread();
 		virtual void runThreads() = 0;
 		virtual void joinThreads() = 0;
 };
@@ -57,6 +57,7 @@ class PreProcessingThread : public Thread {
 		std::vector<PreProcessingThreadData> threads_data;
 
 		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
+		~PreProcessingThread();
 		void setThreadData(int *signals, Model *model, Dataset *dataset);
 		void runThreads();
 		void joinThreads();
@@ -67,6 +68,7 @@ class PostProcessingThread : public Thread {
 		std::vector<PostProcessingThreadData> threads_data;
 
 		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
+		~PostProcessingThread();
 		void setThreadData(int *signals, Model *model, Dataset *dataset);
 		void runThreads();
 		void joinThreads();
@@ -77,6 +79,7 @@ class InferenceThread : public Thread {
 		std::vector<InferenceThreadData> threads_data;
 
 		InferenceThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
+		~InferenceThread();
 		void setThreadData(int *signals, Model *model);
 		void runThreads();
 		void joinThreads();

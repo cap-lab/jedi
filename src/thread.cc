@@ -14,6 +14,22 @@ Thread::Thread(ConfigData *config_data, int instance_id) {
 	thread_num = 0;
 }
 
+Thread::~Thread() {
+	threads.clear();
+}
+
+PreProcessingThread::~PreProcessingThread() {
+	threads_data.clear();
+}
+
+PostProcessingThread::~PostProcessingThread() {
+	threads_data.clear();
+}
+
+InferenceThread::~InferenceThread() {
+	threads_data.clear();
+}
+
 void PreProcessingThread::setThreadData(int *signals, Model *model, Dataset *dataset) {
 	thread_num = config_data->instances.at(instance_id).pre_thread_num;	
 
@@ -26,7 +42,7 @@ void PreProcessingThread::setThreadData(int *signals, Model *model, Dataset *dat
 		thread_data.dataset = dataset;
 		thread_data.model = model;
 
-		threads_data.emplace_back(thread_data);
+		threads_data.push_back(thread_data);
 	}
 }
 
@@ -54,7 +70,7 @@ void PostProcessingThread::setThreadData(int *signals, Model *model, Dataset *da
 		thread_data.model = model;
 		thread_data.dataset = dataset;
 
-		threads_data.emplace_back(thread_data);
+		threads_data.push_back(thread_data);
 	}
 }
 
@@ -82,7 +98,7 @@ void InferenceThread::setThreadData(int *signals, Model *model) {
 		thread_data.next_signals = signals + (iter + 1) * MAX_BUFFER_NUM;
 		thread_data.model = model;
 
-		threads_data.emplace_back(thread_data);
+		threads_data.push_back(thread_data);
 	}
 }
 

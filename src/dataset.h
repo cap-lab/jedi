@@ -20,6 +20,7 @@ class Dataset {
 		int m;
 
 		Dataset(ConfigData *config_data, int instance_id);
+		~Dataset();
 		void initializeDataset();
 		void finalizeDataset();
 };

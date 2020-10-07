@@ -37,10 +37,12 @@ class Model {
 		std::vector<float *> output_buffers;
 
 		Model(ConfigData *config_data, int instance_id);
+		~Model();
 		void getModelFileName(int curr, char *fileName);
 		void setDevice(int curr);
 		void setMaxBatchSize();
 		void initializeModel();
+		void finalizeModel();
 		void setBindingsNum(int curr, int &input_binding_num, int &output_binding_num);
 		void initializeBindingVariables();
 		void setBufferIndexing();

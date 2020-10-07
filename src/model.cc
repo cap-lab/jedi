@@ -16,6 +16,23 @@ Model::Model(ConfigData *config_data, int instance_id) {
 	this->instance_id = instance_id;
 }
 
+Model::~Model() {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	
+	start_bindings.clear();
+	binding_size.clear();
+	netRTs.clear();
+	is_net_output.clear();
+	stream_buffers.clear();
+	input_buffers.clear();
+	output_buffers.clear();
+
+	for(int iter1 = 0; iter1 < device_num; iter1++) {
+		contexts.at(iter1).clear();	
+		streams.at(iter1).clear();
+	}
+}
+
 void Model::getModelFileName(int curr, char *fileName) {
 	char cut_points_name[STRING_SIZE];
 	char device_name[STRING_SIZE];
@@ -104,6 +121,19 @@ void Model::initializeModel() {
 	}
 }
 
+void Model::finalizeModel() {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+
+	for(int iter1 = 0; iter1 < device_num; iter1++) {
+		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
+			nvinfer1::IExecutionContext *context = contexts[iter1][iter2];		
+			context->destroy();
+		}
+		delete netRTs[iter1];
+	}
+}
+
 void Model::setBindingsNum(int curr, int &input_binding_num, int &output_binding_num) {
 	input_binding_num = 0;
 	output_binding_num = 0;
@@ -158,6 +188,7 @@ void Model::setBufferIndexing() {
 			nvinfer1::Dims dim = netRTs[iter1]->engineRT->getBindingDimensions(iter2);	
 			int index = start_bindings[iter1];
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
+			fprintf(stderr, "dim.d[0]: %d, dim.d[1]: %d, dim.d[2]: %d\n", dim.d[0], dim.d[1], dim.d[2]);
 			total_binding_num++;
 		}
 
@@ -210,18 +241,14 @@ void Model::deallocateStream() {
 }
 
 void Model::setStreamBuffer() {
-	// int device_num = config_data->instances.at(instance_id).device_num;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
-	int count = 0;
 	for(int iter1 = 0; iter1 < total_binding_num; iter1++) {
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
 			void *tmp;
 			stream_buffers.push_back(tmp);	
-			count++;
 		}
 	}
-	// :fprintf(stderr, "%s:%d count: %d\n", __func__, __LINE__, count);
 }
 
 void Model::allocateBuffer() {

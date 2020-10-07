@@ -11,6 +11,12 @@ Dataset::Dataset(ConfigData *config_data, int instance_id) {
 	this->instance_id = instance_id;
 }
 
+Dataset::~Dataset() {
+	paths.clear();
+	h.clear();
+	w.clear();
+}
+
 void Dataset::initializeDataset() {
 	std::string image_path = config_data->instances.at(instance_id).image_path;
 

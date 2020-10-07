@@ -343,3 +343,13 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readDevices(&cfg);
 	readDlaCores(&cfg);
 }
+
+ConfigData::~ConfigData() {
+	for(int iter = 0; iter < instance_num; iter++) {
+		instances.at(iter).cut_points.clear();
+		instances.at(iter).devices.clear();
+		instances.at(iter).dla_cores.clear();
+	}
+
+	instances.clear();
+}

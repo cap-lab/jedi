@@ -163,6 +163,7 @@ static void finalizeData(int instance_num, std::vector<Model *> &models, std::ve
 		Dataset *dataset = datasets.at(iter);	
 
 		model->finalizeBuffers();
+		model->finalizeModel();
 		dataset->finalizeDataset();
 	}
 
