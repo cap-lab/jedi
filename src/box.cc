@@ -1,9 +1,13 @@
-#include <stdlib.h>
-
 #include "box.h"
-#include "variable.h"
 
-void free_detections(Detection *dets, int n) {
+void allocateDetectionBox(int batch, Detection **dets) {
+	*dets = (Detection *)calloc(batch * NBOXES, sizeof(Detection));
+	for(int iter = 0; iter < batch * NBOXES; iter++) {
+		(*dets)[iter].prob = (float *)calloc(NUM_CLASSES + 1, sizeof(float));	
+	}
+}
+
+void deallocateDetectionBox(int n, Detection *dets) {
 	int i;
 	for (i = 0; i < n; ++i) {
 		free(dets[i].prob);
@@ -13,7 +17,7 @@ void free_detections(Detection *dets, int n) {
 	free(dets);
 }
 
-float overlap(float x1, float w1, float x2, float w2) {
+static float overlap(float x1, float w1, float x2, float w2) {
 	float l1 = x1 - w1 / 2;
 	float l2 = x2 - w2 / 2;
 	float left = l1 > l2 ? l1 : l2;
@@ -23,7 +27,7 @@ float overlap(float x1, float w1, float x2, float w2) {
 	return right - left;
 }
 
-float box_intersection(Box a, Box b) {
+static float box_intersection(Box a, Box b) {
 	float w = overlap(a.x, a.w, b.x, b.w);
 	float h = overlap(a.y, a.h, b.y, b.h);
 	if (w < 0 || h < 0)
@@ -32,15 +36,15 @@ float box_intersection(Box a, Box b) {
 	return area;
 }
 
-float box_union(Box a, Box b) {
+static float box_union(Box a, Box b) {
 	float i = box_intersection(a, b);
 	float u = a.w * a.h + b.w * b.h - i;
 	return u;
 }
 
-float box_iou(Box a, Box b) { return box_intersection(a, b) / box_union(a, b); }
+static float box_iou(Box a, Box b) { return box_intersection(a, b) / box_union(a, b); }
 
-int nms_comparator(const void *pa, const void *pb) {
+static int nms_comparator(const void *pa, const void *pb) {
 	Detection a = *(Detection *)pa;
 	Detection b = *(Detection *)pb;
 	float diff = 0;

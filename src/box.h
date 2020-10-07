@@ -1,6 +1,10 @@
 #ifndef _BOX_H_
 #define _BOX_H_
 
+#include <cstdlib>
+
+#include "variable.h"
+
 typedef struct {
     float x, y, w, h;
 } Box;
@@ -14,10 +18,8 @@ typedef struct Detection {
     int sort_class;
 } Detection;
 
-int entry_index(int batch, int location, int entry);
-Detection *make_network_boxes(int *num);
-void free_detections(Detection *dets, int n);
-
+void allocateDetectionBox(int batch, Detection **dets);
+void deallocateDetectionBox(int n, Detection *dets);
 void do_nms_sort(Detection *dets, int total, float thresh);
 
 #endif 

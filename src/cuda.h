@@ -1,5 +1,5 @@
-#ifndef CUDA_H
-#define CUDA_H
+#ifndef CUDA_H_
+#define CUDA_H_
 
 #include <cublas_v2.h>
 #include <cuda.h>

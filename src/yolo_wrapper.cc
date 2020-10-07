@@ -10,7 +10,7 @@ Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw
 	return b;
 }
 
-void correct_yolo_boxes(Detection *dets, int n, int w, int h, int netw, int neth, int relative)
+static void correct_yolo_boxes(Detection *dets, int n, int w, int h, int netw, int neth, int relative)
 {
 	int i;
 	int new_w=0;
@@ -38,7 +38,7 @@ void correct_yolo_boxes(Detection *dets, int n, int w, int h, int netw, int neth
 	}
 }
 
-float yolo_overlap(float x1, float w1, float x2, float w2)
+static float yolo_overlap(float x1, float w1, float x2, float w2)
 {
 	float l1 = x1 - w1/2;
 	float l2 = x2 - w2/2;
@@ -49,7 +49,7 @@ float yolo_overlap(float x1, float w1, float x2, float w2)
 	return right - left;
 }
 
-float yolo_box_intersection(Box a, Box b)
+static float yolo_box_intersection(Box a, Box b)
 {
 	float w = yolo_overlap(a.x, a.w, b.x, b.w);
 	float h = yolo_overlap(a.y, a.h, b.y, b.h);
@@ -58,19 +58,19 @@ float yolo_box_intersection(Box a, Box b)
 	return area;
 }
 
-float yolo_box_union(Box a, Box b)
+static float yolo_box_union(Box a, Box b)
 {
 	float i = yolo_box_intersection(a, b);
 	float u = a.w*a.h + b.w*b.h - i;
 	return u;
 }
 
-float yolo_box_iou(Box a, Box b)
+static float yolo_box_iou(Box a, Box b)
 {
 	return yolo_box_intersection(a, b)/yolo_box_union(a, b);
 }
 
-int yolo_nms_comparator(const void *pa, const void *pb)
+static int yolo_nms_comparator(const void *pa, const void *pb)
 {
 	Detection a = *(Detection *)pa;
 	Detection b = *(Detection *)pb;
@@ -85,7 +85,7 @@ int yolo_nms_comparator(const void *pa, const void *pb)
 	return 0;
 }
 
-int entry_yolo_index(int b, int location, int entry, int width, int height, int channel) {
+static int entry_yolo_index(int b, int location, int entry, int width, int height, int channel) {
 	int n =   location / (width*height);
 	int loc = location % (width*height);
 
@@ -94,7 +94,7 @@ int entry_yolo_index(int b, int location, int entry, int width, int height, int 
 }
 
 
-int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo) {
+static int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo) {
 
 	int i,j,n;
 	int count = *ndets;
@@ -106,8 +106,6 @@ int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int
 			float objectness = predictions[obj_index];
 			if(objectness <= thresh) continue;
 			int box_index  = entry_yolo_index(0, n*lw*lh + i, 0, lw, lh, lc);
-
-			// fprintf(stderr, "%s:%d yolo.mask[%d]: %f, yolo.n_masks: %d\n", __func__, __LINE__, n, yolo.mask[n], yolo.n_masks);
 
 			dets[count].bbox = get_yolo_box(predictions, yolo.bias, yolo.mask[n], box_index, col, row, lw, lh, INPUT_WIDTH, INPUT_HEIGHT, lw*lh);
 			dets[count].objectness = objectness;
@@ -129,7 +127,7 @@ int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int
 	return count;
 }
 
-void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
+static void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 	int total = ndets;
 	int i, j, k;
 	k = total-1;

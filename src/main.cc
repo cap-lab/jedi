@@ -102,7 +102,7 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 	inferenceThreads.clear();
 }
 
-static void generateThreads(int instance_num, ConfigData &config_data, char *log_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
+static void generateThreads(int instance_num, ConfigData &config_data, std::string log_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
@@ -134,9 +134,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, char *log
 		instance_threads_data.push_back(instance_thread_data);
 	}
 
-	if(log_file_name) {
-		turnOnTegrastats(std::string(log_file_name));
-	}	
+	turnOnTegrastats(std::string(log_file_name));
 
 	start_time = getTime();
 	for(int iter = 0; iter < instance_num; iter++) {
@@ -149,10 +147,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, char *log
 	inference_time = (double)(getTime() - start_time) / 1000000;
 	std::cout<<"inference time: "<<inference_time<<std::endl;
 
-	if(log_file_name) {
-		turnOffTegrastats();
-	}	
-	writeResultFile();
+	turnOffTegrastats();
 
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
 }
@@ -173,8 +168,21 @@ static void finalizeData(int instance_num, std::vector<Model *> &models, std::ve
 
 int main(int argc, char *argv[]) {
 	int instance_num = 0;
+	std::string config_file_name = "config.cfg";
+	std::string result_file_name = "results/coco_results.json";
+	std::string log_file_name = "power.log";
 
 	std::cout<<"Start"<<std::endl;
+
+	if(argv[1]) {
+		config_file_name = std::string(argv[1]);	
+	}
+	else if(argv[2]) {
+		result_file_name = std::string(argv[2]);	
+	}
+	else if(argv[3]) {
+		log_file_name = std::string(argv[3]);	
+	}
 
 	// read configurations
 	ConfigData config_data(argv[1]);
@@ -189,7 +197,10 @@ int main(int argc, char *argv[]) {
 	generateDatasets(instance_num, config_data, datasets);
 
 	// make threads
-	generateThreads(instance_num, config_data, argv[2], models, datasets);
+	generateThreads(instance_num, config_data, log_file_name, models, datasets);
+
+	// write file
+	writeResultFile(result_file_name);
 
 	// clear data
 	finalizeData(instance_num, models, datasets);

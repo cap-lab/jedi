@@ -9,19 +9,17 @@
 
 using namespace libconfig;
 
-int ConfigData::readConfigFile(Config *cfg, std::string config_file_path) {
+void ConfigData::readConfigFile(Config *cfg, std::string config_file_path) {
 	try {
 		cfg->readFile(config_file_path.c_str());
-		return (EXIT_SUCCESS);
 	}
 	catch(const FileIOException &fioex) {
 		std::cerr << "I/O error while reading file." << std::endl;
-		return(EXIT_FAILURE);
+		exit(0);
 	}
 	catch(const ParseException &pex) {
-		std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()
-			<< " - " << pex.getError() << std::endl;
-		return(EXIT_FAILURE);
+		std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()<< " - " << pex.getError() << std::endl;
+		exit(-1);
 	}
 }
 
@@ -315,6 +313,31 @@ void ConfigData::readDlaCores(Config *cfg){
 	}
 }
 
+void ConfigData::readDataType(Config *cfg) {
+	try{	
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *tmp = settings[iter]["data_type"];
+			std::stringstream ss(tmp);
+			static std::string data;
+			ss >> data;
+
+			instances.at(iter).data_type = TYPE_FP16;
+			if(data == "INT8") {
+				instances.at(iter).data_type = TYPE_INT8;
+			}
+			else if(data == "FP32") {
+				instances.at(iter).data_type = TYPE_FP32;
+			}
+
+			std::cerr<<"data_type: "<<instances.at(iter).data_type<<std::endl;
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'data_type' setting in configuration file." << std::endl;
+	}
+}
+
 ConfigData::ConfigData(std::string config_file_path) {
 	Config cfg;
 
@@ -342,6 +365,7 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readCutPoints(&cfg);
 	readDevices(&cfg);
 	readDlaCores(&cfg);
+	readDataType(&cfg);
 }
 
 ConfigData::~ConfigData() {

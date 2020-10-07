@@ -33,28 +33,42 @@ Model::~Model() {
 	}
 }
 
-void Model::getModelFileName(int curr, char *fileName) {
-	char cut_points_name[STRING_SIZE];
-	char device_name[STRING_SIZE];
+void Model::getModelFileName(int curr, std::string &plan_file_name) {
+	std::string model_dir = config_data->instances.at(instance_id).model_dir;
+	std::string cut_points_name;
+	std::string device_name;
+	std::string data_type_name;
 	int device = config_data->instances.at(instance_id).devices.at(curr);
 	int batch = config_data->instances.at(instance_id).batch;
+	int data_type = config_data->instances.at(instance_id).data_type;
 	int prev_cut_point = 0, curr_cut_point = 0;
 	
 	if(curr > 0) {
-		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr-1);
+		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr-1) + 1;
 	}
 	curr_cut_point = config_data->instances.at(instance_id).cut_points.at(curr);
 
-	snprintf(cut_points_name, STRING_SIZE, "%d.%d", prev_cut_point, curr_cut_point);
+	cut_points_name = std::to_string(prev_cut_point) + "." + std::to_string(curr_cut_point);
 
 	if(device == DEVICE_DLA) {
-		snprintf(device_name, STRING_SIZE, "DLA");
+		device_name = "DLA";
 	}
 	else {
-		snprintf(device_name, STRING_SIZE, "GPU");
+		device_name = "GPU";
 	}
 
-	snprintf(fileName, STRING_SIZE, "%smodel_%s_%s_FP16_%d.model", config_data->instances.at(instance_id).model_dir.c_str(), cut_points_name, device_name, batch);
+	if(data_type == TYPE_FP32) {
+		data_type_name = "FP32";
+	}
+	else if(data_type == TYPE_FP16) {
+		data_type_name = "FP16";
+	}
+	else if(data_type == TYPE_INT8) {
+		data_type_name = "INT8";
+	}
+
+	plan_file_name = model_dir + "model_" + cut_points_name + "_" + device_name + "_" + data_type_name + "_" + std::to_string(batch) + ".model";
+	std::cerr<<"plan_file_name: "<<plan_file_name<<std::endl;
 }
 
 void Model::setDevice(int curr) {
@@ -74,6 +88,23 @@ void Model::setMaxBatchSize() {
 	net->maxBatchSize = batch;
 }
 
+void Model::setDataType() {
+	int data_type = config_data->instances.at(instance_id).data_type;
+
+	if(data_type == TYPE_FP32) {
+		net->fp16 = false;	
+		net->int8 = false;
+	}
+	else if(data_type == TYPE_FP16) {
+		net->fp16 = true;	
+		net->int8 = false;
+	}
+	else if(data_type == TYPE_INT8) {
+		net->fp16 = false;	
+		net->int8 = true;
+	}
+}
+
 void Model::initializeModel() {
 	std::string bin_path(config_data->instances.at(instance_id).bin_path);
     std::string wgs_path  = bin_path + "/layers";
@@ -88,18 +119,17 @@ void Model::initializeModel() {
 	net->print();
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		char fileName[2 * STRING_SIZE];
+		std::string plan_file_name;
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 
-		getModelFileName(iter1, fileName);
+		getModelFileName(iter1, plan_file_name);
 
 		setDevice(iter1);
-		net->fp16 = true;
-		net->int8 = false;
 		setMaxBatchSize();
+		setDataType();
 
-		tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, (const char*)fileName, start_index, cut_point, dla_core);
+		tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, dla_core);
 		assert(netRT->engineRT != nullptr);
 
 		netRTs.push_back(netRT);

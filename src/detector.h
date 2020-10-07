@@ -1,5 +1,5 @@
-#ifndef DETECTOR_H
-#define DETECTOR_H
+#ifndef DETECTOR_H_
+#define DETECTOR_H_
 
 #include <iostream>
 #include <thread>

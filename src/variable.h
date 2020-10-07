@@ -1,9 +1,15 @@
-#ifndef VARIABLE_H 
-#define VARIABLE_H
+#ifndef VARIABLE_H_
+#define VARIABLE_H_
 
 enum DeviceType {
 	DEVICE_GPU,
 	DEVICE_DLA,
+};
+
+enum DataType {
+	TYPE_FP32,
+	TYPE_FP16,
+	TYPE_INT8,
 };
 
 #define NETWORK_YOLOV2 "yolo2"

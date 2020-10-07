@@ -1,5 +1,5 @@
-#ifndef CONFIG_H 
-#define CONFIG_H            
+#ifndef CONFIG_H_
+#define CONFIG_H_         
 
 #include <iostream>
 #include <vector>
@@ -24,6 +24,7 @@ typedef struct _ConfigInstance {
 	std::vector<int> cut_points;
 	std::vector<int> devices;
 	std::vector<int> dla_cores;
+	int data_type;
 } ConfigInstance;
 
 class ConfigData {
@@ -35,7 +36,7 @@ class ConfigData {
 		~ConfigData();
 	
 	private:
-		int readConfigFile(libconfig::Config *cfg, std::string config_file_path);
+		void readConfigFile(libconfig::Config *cfg, std::string config_file_path);
 		void readInstanceNum(libconfig::Config *cfg);
 		void readNetworkName(libconfig::Config *cfg);
 		void readModelDir(libconfig::Config *cfg);
@@ -53,6 +54,7 @@ class ConfigData {
 		void readCutPoints(libconfig::Config *cfg);
 		void readDevices(libconfig::Config *cfg);
 		void readDlaCores(libconfig::Config *cfg);
+		void readDataType(libconfig::Config *cfg);
 };
 
 #endif

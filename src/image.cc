@@ -5,9 +5,7 @@
 #include "image_opencv.h"
 #include "variable.h"
 
-typedef void* mat_cv;
-
-char *fgetl(FILE *fp) {
+static char *fgetl(FILE *fp) {
 	if(feof(fp)) return 0;
 	size_t size = 512;
 	char *line = (char *)malloc(size*sizeof(char));

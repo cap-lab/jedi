@@ -13,17 +13,10 @@
 #include "yolo_wrapper.h"
 #include "coco.h"
 
-static void makeDetectionBox(int batch, Detection **dets) {
-	*dets = (Detection *)calloc(batch * NBOXES, sizeof(Detection));
-	for(int iter = 0; iter < batch * NBOXES; iter++) {
-		(*dets)[iter].prob = (float *)calloc(NUM_CLASSES + 1, sizeof(float));	
-	}
-}
-
 static int readImage(float *input_buffer, Dataset *dataset, int batch, int pre_thread_num, int index) {
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
-		load_image_resize((char *)(dataset->paths[index + iter].c_str()), INPUT_WIDTH, INPUT_HEIGHT, INPUT_CHANNEL, &orignal_width, &original_height, input_buffer + iter * INPUT_SIZE);	
+		loadImageResize((char *)(dataset->paths[index + iter].c_str()), INPUT_WIDTH, INPUT_HEIGHT, INPUT_CHANNEL, &orignal_width, &original_height, input_buffer + iter * INPUT_SIZE);	
 		dataset->w.at(index + iter) = orignal_width;
 		dataset->h.at(index + iter) = original_height;
 	}	
@@ -107,7 +100,7 @@ void doPostProcessing(void *d) {
 	buffer_id = sample_index % buffer_num;
 
 	setBiases(network_name);
-	makeDetectionBox(batch, &dets);
+	allocateDetectionBox(batch, &dets);
 
 	while(sample_index < sample_offset + sample_size) {
 		while(!signals[sample_index % buffer_num]) {
@@ -129,6 +122,7 @@ void doPostProcessing(void *d) {
 		sample_index += post_thread_num;
 	}
 
+	deallocateDetectionBox(batch * NBOXES, dets);
 }
 
 void doInference(void *d) {

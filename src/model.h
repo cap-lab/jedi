@@ -1,5 +1,5 @@
-#ifndef MODEL_H
-#define MODEL_H
+#ifndef MODEL_H_
+#define MODEL_H_
 
 #include <iostream>
 #include <vector>
@@ -45,9 +45,10 @@ class Model {
 
 		Model(ConfigData *config_data, int instance_id);
 		~Model();
-		void getModelFileName(int curr, char *fileName);
+		void getModelFileName(int curr, std::string &plan_file_name);
 		void setDevice(int curr);
 		void setMaxBatchSize();
+		void setDataType();
 		void initializeModel();
 		void finalizeModel();
 		void setBindingsNum(int curr, int &input_binding_num, int &output_binding_num);

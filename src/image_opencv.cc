@@ -17,14 +17,11 @@
 #ifdef CV_VERSION_EPOCH
 #include <opencv2/highgui/highgui_c.h>
 #include <opencv2/imgproc/imgproc_c.h>
-//#include <opencv2/core/types_c.h>
 #include <opencv2/core/version.hpp>
 #endif
 
 #include "variable.h"
 #include "image.h"
-
-using std::cerr;
 
 typedef void* mat_cv;
 
@@ -40,7 +37,7 @@ static mat_cv *load_image_mat_cv(const char *filename, int flag)
 				shrinked_filename.resize(1024);
 				shrinked_filename = std::string("name is too long: ") + shrinked_filename;
 			}
-			cerr << "Cannot load image " << shrinked_filename << std::endl;
+			std::cerr << "Cannot load image " << shrinked_filename << std::endl;
 
 			return NULL;
 		}
@@ -54,7 +51,7 @@ static mat_cv *load_image_mat_cv(const char *filename, int flag)
 		return (mat_cv *)mat_ptr;
 	}
 	catch (...) {
-		cerr << "OpenCV exception: load_image_mat_cv \n";
+		std::cerr << "OpenCV exception: load_image_mat_cv" << std::endl;
 	}
 	if (mat_ptr) delete mat_ptr;
 	return NULL;
@@ -67,9 +64,8 @@ static cv::Mat load_image_mat(char *filename, int channels)
 	else if (channels == 1) flag = cv::IMREAD_GRAYSCALE;
 	else if (channels == 3) flag = cv::IMREAD_COLOR;
 	else {
-		fprintf(stderr, "OpenCV can't force load with %d channels\n", channels);
+		std::cerr << "OpenCV can't force load with " << channels << " channels"<< std::endl;
 	}
-	//flag |= IMREAD_IGNORE_ORIENTATION;    // un-comment it if you want
 
 	cv::Mat *mat_ptr = (cv::Mat *)load_image_mat_cv(filename, flag);
 
@@ -98,7 +94,7 @@ static void mat_to_data(cv::Mat mat, float *input)
 	}
 }
 
-void load_image_resize(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
+void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
 	try {
 		cv::Mat loaded_image = load_image_mat(filename, c);
@@ -111,6 +107,6 @@ void load_image_resize(char *filename, int w, int h, int c, int *orig_width, int
 		mat_to_data(resized, input);
 	}
 	catch (...) {
-		cerr << " OpenCV exception: load_image_resize() can't load image %s " << filename << " \n";
+		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
 	}
 }

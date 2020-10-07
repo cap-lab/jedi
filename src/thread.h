@@ -1,5 +1,5 @@
-#ifndef THREAD_H 
-#define THREAD_H 
+#ifndef THREAD_H_
+#define THREAD_H_ 
 
 #include <iostream>
 #include <thread>

@@ -27,7 +27,7 @@ void setBiases(std::string network_name) {
 	}
 }
 
-int entry_index(int batch, int location, int entry) {
+static int entry_index(int batch, int location, int entry) {
     int w = IN_WIDTH;
     int h = IN_HEIGHT;
     int n = location / (w * h);
@@ -70,29 +70,7 @@ static inline float logistic_activate(float x){
 	return 1./(1. + exp(-x));
 }
 
-void softmax(float *input, int n, float temp, int stride, float *output) {
-    int i;
-    float sum = 0;
-    float largest = -FLT_MAX;
-    for (i = 0; i < n; ++i) {
-        if (input[i * stride] > largest)
-            largest = input[i * stride];
-    }
-    for (i = 0; i < n; ++i) {
-        float e = exp(input[i * stride] / temp - largest / temp);
-        sum += e;
-        output[i] = e;
-    }
-    for (i = 0; i < n; ++i) {
-        output[i] /= sum;
-    }
-}
-
 static Box get_region_box(float *x, int n, int index, int i, int j) {
-
-	// static float pfBiases[2 * NUM_ANCHOR] = {0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828};
-	// static float pfBiases[2 * NUM_ANCHOR] = {1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892, 9.47112, 4.84053, 11.2364, 10.0071};
-		   
 	Box b;
     int w = IN_WIDTH;
     int h = IN_HEIGHT;
@@ -106,7 +84,7 @@ static Box get_region_box(float *x, int n, int index, int i, int j) {
     return b;
 }
 
-void get_region_detections(float *last_data, int w, int h, float thresh, Detection *dets, int *nDets) {
+static void get_region_detections(float *last_data, int w, int h, float thresh, Detection *dets, int *nDets) {
     int lw = IN_WIDTH;
     int lh = IN_HEIGHT;
     int i, j, n;

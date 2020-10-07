@@ -35,11 +35,11 @@ std::map<int,std::list<std::string>> detected_map;
 std::mutex mu;
 int detected_num = 0;
 
-void writeResultFile() {
+void writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
 	std::ofstream result_file;
 
-	result_file.open("results/coco_results.json");
+	result_file.open(result_file_name);
 	result_file<<"["<<std::endl;
 	while(!detected_map.empty()) {
 		auto it = detected_map.find(idx);	
@@ -62,7 +62,7 @@ void writeResultFile() {
 	result_file.close();
 }
 
-void print_coco_detections(Detection *dets, int nDets, int idx, int w, int h, char *path) {
+static void print_coco_detections(Detection *dets, int nDets, int idx, int w, int h, char *path) {
 	int i, j;
 	int image_id = get_coco_image_id(path);
 	std::list<std::string> detected;
@@ -72,8 +72,6 @@ void print_coco_detections(Detection *dets, int nDets, int idx, int w, int h, ch
 
 	for (i = 0; i < nDets; ++i) {
 		if (dets[i].objectness >= 0) {
-			// fprintf(stderr, "%s:%d b.x: %f, b.y: %f, b.w: %f, b.h: %f\n", __func__, __LINE__, dets[i].bbox.x, dets[i].bbox.y, dets[i].bbox.w, dets[i].bbox.h);
-
 			float xmin = dets[i].bbox.x - dets[i].bbox.w / 2.;
 			float xmax = dets[i].bbox.x + dets[i].bbox.w / 2.;
 			float ymin = dets[i].bbox.y - dets[i].bbox.h / 2.;
