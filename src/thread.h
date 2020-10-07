@@ -47,6 +47,7 @@ class Thread {
 		std::vector<std::thread> threads;
 
 		Thread(ConfigData *config_data, int instance_id);
+		virtual ~Thread() {};
 		virtual void runThreads() = 0;
 		virtual void joinThreads() = 0;
 };
@@ -80,6 +81,5 @@ class InferenceThread : public Thread {
 		void runThreads();
 		void joinThreads();
 };
-
 
 #endif
