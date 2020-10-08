@@ -21,8 +21,8 @@ static char *fgetl(FILE *fp) {
 			size *= 2;
 			line = (char *)realloc(line, size*sizeof(char));
 			if(!line) {
-				printf("%ld\n", size);
-				fprintf(stderr, "Malloc error\n");
+				std::cerr<<size<<std::endl;
+				std::cerr<<"Malloc error"<<std::endl;
 				exit(-1);
 			}
 		}
@@ -40,7 +40,7 @@ void getPaths(char *filename, std::vector<std::string> &paths) {
 	char *path;
 	FILE *file = fopen(filename, "r");
 	if(!file) {
-		fprintf(stderr, "Couldn't open file: %s\n", filename);
+		std::cerr<<"Couldn't open file: "<<filename<<std::endl;
 		exit(0);
 	}
 

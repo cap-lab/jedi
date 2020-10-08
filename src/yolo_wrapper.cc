@@ -95,7 +95,6 @@ static int entry_yolo_index(int b, int location, int entry, int width, int heigh
 
 
 static int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo) {
-
 	int i,j,n;
 	int count = *ndets;
 	for (i = 0; i < lw*lh; ++i){
@@ -161,15 +160,15 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 	}
 }
 
-void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num) {
+void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num) {
 	int detection_num = 0;
 	int output_size = 0;
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
 		detection_num = 0;
 
-		for(int iter2 = 0; iter2 < output_num; iter2++) {
-			int index = buffer_id * output_num + iter2;
+		for(int iter2 = 0; iter2 < yolo_num; iter2++) {
+			int index = buffer_id * yolo_num + iter2;
 			int w = yolo_values[iter2].width;
 			int h = yolo_values[iter2].height;
 			int c = yolo_values[iter2].channel;

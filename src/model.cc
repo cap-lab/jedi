@@ -129,6 +129,7 @@ void Model::initializeModel() {
 		setMaxBatchSize();
 		setDataType();
 
+		std::cerr<<__func__<<":"<<__LINE__<<" start_index: "<<start_index<<" cut_point: "<<cut_point<<" dla_core: "<<dla_core<<std::endl;
 		tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, dla_core);
 		assert(netRT->engineRT != nullptr);
 
@@ -197,7 +198,6 @@ void Model::initializeBindingVariables() {
 
 	yolo_num = 0;
 	total_binding_num = 1;
-	output_num = 0;
 }
 
 void Model::setBufferIndexing() {
@@ -216,8 +216,9 @@ void Model::setBufferIndexing() {
 
 
 		for(int iter2 = input_binding_num; iter2 < curr_binding_num; iter2++) {
-			nvinfer1::Dims dim = netRTs[iter1]->engineRT->getBindingDimensions(iter2);	
 			int index = start_bindings[iter1];
+
+			nvinfer1::Dims dim = netRTs[iter1]->engineRT->getBindingDimensions(iter2);	
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
 			total_binding_num++;
 
@@ -227,6 +228,7 @@ void Model::setBufferIndexing() {
 
 		for(int iter2 = 0; iter2 < netRTs[iter1]->pluginFactory->n_yolos; iter2++) {
 			YoloData yolo;
+
 			yolo.n_masks = netRTs[iter1]->pluginFactory->yolos[yolo_num + iter2]->n_masks;	
 			yolo.bias = netRTs[iter1]->pluginFactory->yolos[yolo_num + iter2]->bias;	
 			yolo.mask = netRTs[iter1]->pluginFactory->yolos[yolo_num + iter2]->mask;	
@@ -239,8 +241,11 @@ void Model::setBufferIndexing() {
 		for(int iter2 = index; iter2 < index + netRTs[iter1]->pluginFactory->n_yolos; iter2++) {
 			is_net_output[iter2] = true;
 			yolo_values.push_back(tmp_yolo_values.at(iter2));
-			output_num++;
 		}
+	}
+
+	if(yolo_num == 0) {
+		is_net_output[total_binding_num - 1] = true;	
 	}
 
 	tmp_yolo_values.clear();
@@ -296,22 +301,16 @@ void Model::allocateBuffer() {
 		cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num]), input_buffer, 0);
 		input_buffers.push_back(input_buffer);
 
-		if(total_binding_num > 2) {
-			for(int iter2 = 1; iter2 < total_binding_num-1; iter2++) {
-				if(!is_net_output[iter2]) {
-					stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_16(NULL, batch * binding_size[iter2]);	
-				}
-				else {
-					float *middle_buffer = cuda_make_array_host(batch * binding_size[iter2]);
-					cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num + iter2]), middle_buffer, 0);
-					output_buffers.push_back(middle_buffer);
-				}
-			}	
-		}
-
-		float *output_buffer = cuda_make_array_host(batch * binding_size[total_binding_num - 1]);
-		cudaHostGetDevicePointer(&(stream_buffers[total_binding_num - 1 + iter1 * total_binding_num]), output_buffer, 0);
-		output_buffers.push_back(output_buffer);
+		for(int iter2 = 1; iter2 < total_binding_num; iter2++) {
+			if(!is_net_output[iter2]) {
+				stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_16(NULL, batch * binding_size[iter2]);	
+			}
+			else {
+				float *output_buffer = cuda_make_array_host(batch * binding_size[iter2]);
+				cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num + iter2]), output_buffer, 0);
+				output_buffers.push_back(output_buffer);
+			}
+		}	
 	}
 }
 

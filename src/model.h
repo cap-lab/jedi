@@ -32,7 +32,6 @@ class Model {
 		int yolo_num;
 		std::vector<YoloData> yolos;
 		std::vector<YoloValue> yolo_values;
-		int output_num;
 
 		tk::dnn::Network *net;
 		std::vector<tk::dnn::NetworkRT *> netRTs;

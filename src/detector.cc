@@ -52,12 +52,12 @@ void doPreProcessing(void *d) {
 	}
 }
 
-static void detectBox(std::vector<float *> output_buffers, int buffer_id, int output_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
+static void detectBox(std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
 	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
 		regionLayerDetect(batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
 	}
 	else {
-		yoloLayerDetect(batch, output_buffers, buffer_id, output_num, yolos, yolo_values, dets, detections_num);
+		yoloLayerDetect(batch, output_buffers, buffer_id, yolo_num, yolos, yolo_values, dets, detections_num);
 	}
 }
 
@@ -92,7 +92,7 @@ void doPostProcessing(void *d) {
 	int sample_index = sample_offset + tid;
 	std::vector<YoloData> yolos = data->model->yolos;
 	std::vector<YoloValue> yolo_values = data->model->yolo_values;
-	int output_num = data->model->output_num;
+	int yolo_num = data->model->yolo_num;
 	int buffer_id = 0;
 	Detection *dets;
 	std::vector<int> detections_num(batch, 0);
@@ -109,7 +109,7 @@ void doPostProcessing(void *d) {
 
 		buffer_id = sample_index % buffer_num; 
 
-		detectBox(data->model->output_buffers, buffer_id, output_num, yolos, yolo_values, batch, network_name, dets, detections_num);
+		detectBox(data->model->output_buffers, buffer_id, yolo_num, yolos, yolo_values, batch, network_name, dets, detections_num);
 
 		signals[sample_index % buffer_num] = 0;
 

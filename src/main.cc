@@ -106,7 +106,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
-	int signals[instance_num][MAX_DEVICE_NUM][MAX_BUFFER_NUM] = {0};
+	int signals[instance_num][MAX_DEVICE_NUM+1][MAX_BUFFER_NUM] = {0};
 	std::vector<InstanceThreadData> instance_threads_data;
 	std::vector<std::thread> instance_threads;
 	long start_time = 0;
