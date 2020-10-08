@@ -174,14 +174,16 @@ int main(int argc, char *argv[]) {
 
 	std::cout<<"Start"<<std::endl;
 
-	if(argv[1]) {
-		config_file_name = std::string(argv[1]);	
-	}
-	else if(argv[2]) {
-		result_file_name = std::string(argv[2]);	
-	}
-	else if(argv[3]) {
-		log_file_name = std::string(argv[3]);	
+	for(int iter = 1; iter < argc; iter++) {
+		if(iter == 1) {
+			config_file_name = std::string(argv[iter]);
+		}
+		else if(iter == 2) {
+			result_file_name = std::string(argv[iter]);
+		}
+		else if(iter == 3) {
+			log_file_name = std::string(argv[3]);
+		}
 	}
 
 	// read configurations
