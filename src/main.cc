@@ -45,6 +45,14 @@ static void turnOffTegrastats() {
 	}
 }
 
+static void writeTimeResultFile(std::string time_file_name, double inference_time) {
+	std::ofstream fp;
+
+	fp.open(time_file_name.c_str());
+	fp<<inference_time<<std::endl;
+	fp.close();
+}
+
 static long getTime() {
 	struct timespec time;
 	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
@@ -102,7 +110,7 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 	inferenceThreads.clear();
 }
 
-static void generateThreads(int instance_num, ConfigData &config_data, std::string log_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
+static void generateThreads(int instance_num, ConfigData &config_data, std::string log_file_name, std::string time_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
@@ -147,6 +155,8 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	inference_time = (double)(getTime() - start_time) / 1000000;
 	std::cout<<"inference time: "<<inference_time<<std::endl;
 
+	writeTimeResultFile(time_file_name, inference_time);
+
 	turnOffTegrastats();
 
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
@@ -171,6 +181,7 @@ int main(int argc, char *argv[]) {
 	std::string config_file_name = "config.cfg";
 	std::string result_file_name = "results/coco_results.json";
 	std::string log_file_name = "power.log";
+	std::string time_file_name = "latency.log";
 
 	std::cout<<"Start"<<std::endl;
 
@@ -183,6 +194,9 @@ int main(int argc, char *argv[]) {
 		}
 		else if(iter == 3) {
 			log_file_name = std::string(argv[3]);
+		}
+		else if(iter == 4) {
+			time_file_name = std::string(argv[4]);
 		}
 	}
 
@@ -199,7 +213,7 @@ int main(int argc, char *argv[]) {
 	generateDatasets(instance_num, config_data, datasets);
 
 	// make threads
-	generateThreads(instance_num, config_data, log_file_name, models, datasets);
+	generateThreads(instance_num, config_data, log_file_name, time_file_name, models, datasets);
 
 	// write file
 	writeResultFile(result_file_name);
