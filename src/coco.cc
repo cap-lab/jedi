@@ -41,10 +41,10 @@ void writeResultFile(std::string result_file_name) {
 
 	result_file.open(result_file_name);
 	result_file<<"["<<std::endl;
-	while(!detected_map.empty()) {
+	while(!detected_map.empty() && line_num < detected_num) {
 		auto it = detected_map.find(idx);	
 		if(it != detected_map.end()) {
-			for(auto it2 = it->second.begin(); it2 != it->second.end(); it2++) {	
+			for(auto it2 = it->second.begin(); it2 != it->second.end() && line_num < detected_num; it2++) {	
 				line_num++;
 				result_file<<*it2;
 				if(line_num != detected_num) {
