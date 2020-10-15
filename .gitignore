@@ -9,7 +9,6 @@ src/CMakeFiles/*
 external/CMakeFiles/*
 cmake_install.cmake
 Makefile
-cmake/*
 .*.*.sw*
 .*.sw*
 *.o
