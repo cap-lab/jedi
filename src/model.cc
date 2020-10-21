@@ -286,8 +286,7 @@ void Model::setStreamBuffer() {
 
 	for(int iter1 = 0; iter1 < total_binding_num; iter1++) {
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
-			void *tmp;
-			stream_buffers.push_back(tmp);	
+			stream_buffers.push_back(nullptr);	
 		}
 	}
 }

@@ -8,7 +8,7 @@
 static char *fgetl(FILE *fp) {
 	if(feof(fp)) return 0;
 	size_t size = 512;
-	char *line = (char *)malloc(size*sizeof(char));
+	char *line = (char *)calloc(sizeof(char), size);
 	if(!fgets(line, size, fp)){
 		free(line);
 		return 0;
@@ -28,7 +28,9 @@ static char *fgetl(FILE *fp) {
 		}
 		size_t readsize = size-curr;
 		if(readsize > INT_MAX) readsize = INT_MAX-1;
-		fgets(&line[curr], readsize, fp);
+		if(!fgets(&line[curr], readsize, fp)) {
+			continue;	
+		}
 		curr = strlen(line);
 	}
 	if(line[curr-1] == '\n') line[curr-1] = '\0';
@@ -46,7 +48,6 @@ void getPaths(char *filename, std::vector<std::string> &paths) {
 
 	while((path=fgetl(file))){
 		paths.emplace_back(std::string(path));
-		// std::cerr<<__func__<<":"<<__LINE__<<" path: "<<std::string(path)<<" "<<std::endl;
 	}
 	fclose(file);
 }
