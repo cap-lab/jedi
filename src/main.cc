@@ -1,6 +1,5 @@
 #include <iostream>
 #include <vector>
-#include <cstdlib>
 
 #include <tkDNN/tkdnn.h>
 
@@ -17,17 +16,25 @@ typedef struct _InstanceThreadData {
 	InferenceThread *infer_thread;
 } InstanceThreadData;
 
-static void turnOnTegrastats(std::string log_file_name) {
+static void printHelpMessage() {
+	std::cout<<"usage:"<<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-l power_log_file] [-t latency_log_file]" <<std::endl;
+	std::cout<<"example:"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -l power.log -t latency.log"<<std::endl;
+}
+
+static void turnOnTegrastats(std::string power_file_name) {
 	int result = -1;
 	std::string cmd;
 
-	cmd = std::string("rm -f ") + log_file_name;
+	cmd = std::string("rm -f ") + power_file_name;
 	result = system(cmd.c_str());
 	if(result == -1 || result == 127) {
 		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
 	}
 
-	cmd = "tegrastats --start --logfile " + log_file_name + " --interval " + std::to_string(LOG_INTERVAL);
+	cmd = "tegrastats --start --logfile " + power_file_name + " --interval " + std::to_string(LOG_INTERVAL);
 	result = system(cmd.c_str());
 	if(result == -1 || result == 127) {
 		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
@@ -110,7 +117,7 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 	inferenceThreads.clear();
 }
 
-static void generateThreads(int instance_num, ConfigData &config_data, std::string log_file_name, std::string time_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
+static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
@@ -142,7 +149,9 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 		instance_threads_data.push_back(instance_thread_data);
 	}
 
-	turnOnTegrastats(std::string(log_file_name));
+	if(power_file_name.length() != 0) {
+		turnOnTegrastats(std::string(power_file_name));
+	}
 
 	start_time = getTime();
 	for(int iter = 0; iter < instance_num; iter++) {
@@ -155,9 +164,13 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	inference_time = (double)(getTime() - start_time) / 1000000;
 	std::cout<<"inference time: "<<inference_time<<std::endl;
 
-	writeTimeResultFile(time_file_name, inference_time);
+	if(power_file_name.length() != 0) {
+		turnOffTegrastats();
+	}
 
-	turnOffTegrastats();
+	if(time_file_name.length() != 0) {
+		writeTimeResultFile(time_file_name, inference_time);
+	}
 
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
 }
@@ -177,31 +190,40 @@ static void finalizeData(int instance_num, std::vector<Model *> &models, std::ve
 }
 
 int main(int argc, char *argv[]) {
+	int option;
 	int instance_num = 0;
 	std::string config_file_name = "config.cfg";
 	std::string result_file_name = "results/coco_results.json";
-	std::string log_file_name = "power.log";
-	std::string time_file_name = "latency.log";
+	std::string power_file_name;
+	std::string time_file_name;
 
-	std::cout<<"Start"<<std::endl;
+	if(argc == 1) {
+		printHelpMessage();
+		return 0;
+	}
 
-	for(int iter = 1; iter < argc; iter++) {
-		if(iter == 1) {
-			config_file_name = std::string(argv[iter]);
-		}
-		else if(iter == 2) {
-			result_file_name = std::string(argv[iter]);
-		}
-		else if(iter == 3) {
-			log_file_name = std::string(argv[3]);
-		}
-		else if(iter == 4) {
-			time_file_name = std::string(argv[4]);
-		}
+	while((option = getopt(argc, argv, "c:r:p:t:h")) != -1) {
+		switch(option) {
+			case 'c':
+				config_file_name = std::string(optarg);	
+				break;
+			case 'r':
+				result_file_name = std::string(optarg);
+				break;
+			case 'p':
+				power_file_name = std::string(optarg);
+				break;
+			case 't':
+				time_file_name = std::string(optarg);
+				break;
+			case 'h':
+				printHelpMessage();
+				break;
+		}	
 	}
 
 	// read configurations
-	ConfigData config_data(argv[1]);
+	ConfigData config_data(config_file_name);
 	instance_num = config_data.instance_num;
 
 	// make models (engines, buffers)
@@ -213,15 +235,13 @@ int main(int argc, char *argv[]) {
 	generateDatasets(instance_num, config_data, datasets);
 
 	// make threads
-	generateThreads(instance_num, config_data, log_file_name, time_file_name, models, datasets);
+	generateThreads(instance_num, config_data, power_file_name, time_file_name, models, datasets);
 
 	// write file
 	writeResultFile(result_file_name);
 
 	// clear data
 	finalizeData(instance_num, models, datasets);
-
-	std::cout<<"End"<<std::endl;
 
 	return 0;
 }
