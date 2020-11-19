@@ -6,7 +6,7 @@ It is possible to pipeling networks by spliting networks and mapping on differen
 
 ## Prerequisite
 We use the forked version of tkDNN [1] since the original tkDNN library does not support the pipelining.
-So, please install the forked tkDNN on the [here](https://drive.google.com/file/d/1z_FXrien2twAH9Ic76Ep4pBfL4EsiUaq/view?usp=sharing, "tkdnn link")
+So, please install the forked tkDNN on the [here](https://drive.google.com/file/d/1z_FXrien2twAH9Ic76Ep4pBfL4EsiUaq/view?usp=sharing, "tkdnn link").
 The installation guide of the forked tkDNN is on the compressed file.
 
 ## Build
@@ -28,7 +28,7 @@ Data can be download by typing as below.
 $ pip install gdown                                                # we use gdown to download files
 $ ./setting.sh
 ```
-If you do not want to use gdown, then download in [here](https://drive.google.com/file/d/1tCZfUPkpY-TOUxIpcDo3XtM-SboHVxPr/view?usp=sharing, "data link")
+If you do not want to use gdown, then download in [here](https://drive.google.com/file/d/1tCZfUPkpY-TOUxIpcDo3XtM-SboHVxPr/view?usp=sharing, "data link").
 
 To run the program, just type as below.
 ```
@@ -38,7 +38,7 @@ $ ./build/bin/proc -c config.cfg -r result.json -p power.log       # an example 
 You can grasp about configuration file on sample configuration file.
 Please check the path of the files indicated in the configuration file.
 
-We are going to add further explanation after uploading the github.
+We are going to add further explanation after uploading the public github.
 
 [1] M. Verucchi, G. Brilli, D. Sapienza, M. Verasani, M. Arena, F. Gatti, A. Capotondi, R. Cavicchioli, M. Bertogna, M. Solieri
 "A Systematic Assessment of Embedded Neural Networks for Object Detection", in IEEE International Conference on Emerging Technologies and Factory Automation (2020)
