@@ -12,6 +12,12 @@ enum DataType {
 	TYPE_INT8,
 };
 
+typedef struct _InputDim {
+	int	width;
+	int	height;
+	int channel;
+} InputDim;
+
 #define NETWORK_YOLOV2 "yolo2"
 #define NETWORK_YOLOV2TINY "yolo2tiny"
 #define NETWORK_YOLOV3 "yolo3"
@@ -30,13 +36,6 @@ enum DataType {
 #define MAX_OUTPUT_NUM 4
 
 #define NUM_CLASSES 80
-#define INPUT_WIDTH 416
-#define INPUT_HEIGHT 416
-#define INPUT_CHANNEL 3
-#define INPUT_SIZE (INPUT_WIDTH * INPUT_HEIGHT * INPUT_CHANNEL)
-#define REGION_WIDTH (INPUT_WIDTH / 32)
-#define REGION_HEIGHT (INPUT_HEIGHT / 32)
-
 #define NMS 0.45
 #define PRINT_THRESH 0.3
 #define CONFIDENCE_THRESH 0.05

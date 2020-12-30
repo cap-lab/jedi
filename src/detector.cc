@@ -13,10 +13,13 @@
 #include "yolo_wrapper.h"
 #include "coco.h"
 
-static int readImage(float *input_buffer, Dataset *dataset, int batch, int pre_thread_num, int index) {
+static int readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int pre_thread_num, int index) {
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
-		loadImageResize((char *)(dataset->paths[index + iter].c_str()), INPUT_WIDTH, INPUT_HEIGHT, INPUT_CHANNEL, &orignal_width, &original_height, input_buffer + iter * INPUT_SIZE);	
+		int input_width = input_dim.width, input_height = input_dim.height, input_channel = input_dim.channel;
+		int input_size = input_width * input_height * input_channel;
+
+		loadImageResize((char *)(dataset->paths[index + iter].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);	
 		dataset->w.at(index + iter) = orignal_width;
 		dataset->h.at(index + iter) = original_height;
 	}	
@@ -45,31 +48,31 @@ void doPreProcessing(void *d) {
 			usleep(SLEEP_TIME);	
 		}
 
-		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, batch, pre_thread_num, index);
+		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, pre_thread_num, index);
 
 		signals[sample_index % buffer_num] = 1;
 		sample_index += pre_thread_num;
 	}
 }
 
-static void detectBox(std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
+static void detectBox(std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
 	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-		regionLayerDetect(batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
+		regionLayerDetect(input_dim, batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
 	}
 	else {
-		yoloLayerDetect(batch, output_buffers, buffer_id, yolo_num, yolos, yolo_values, dets, detections_num);
+		yoloLayerDetect(input_dim, batch, output_buffers, buffer_id, yolo_num, yolos, yolo_values, dets, detections_num);
 	}
 }
 
-static void printBox(Dataset *dataset, int sample_index, int batch, std::string network_name, Detection *dets, std::vector<int> detections_num) {
+static void printBox(Dataset *dataset, int sample_index, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> detections_num) {
 	for(int iter1 = 0; iter1 < batch; iter1++) {
 		int index = sample_index * batch + iter1;
 
 		if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-			printDetector(&dets[iter1 * NBOXES], index, dataset, detections_num[0]);
+			printDetector(input_dim, &dets[iter1 * NBOXES], index, dataset, detections_num[0]);
 		}
 		else {
-			printDetector(&dets[iter1 * NBOXES], index, dataset, detections_num[iter1]);
+			printDetector(input_dim, &dets[iter1 * NBOXES], index, dataset, detections_num[iter1]);
 		}
 	}
 }
@@ -109,11 +112,11 @@ void doPostProcessing(void *d) {
 
 		buffer_id = sample_index % buffer_num; 
 
-		detectBox(data->model->output_buffers, buffer_id, yolo_num, yolos, yolo_values, batch, network_name, dets, detections_num);
+		detectBox(data->model->output_buffers, buffer_id, yolo_num, yolos, yolo_values, data->model->input_dim, batch, network_name, dets, detections_num);
 
 		signals[sample_index % buffer_num] = 0;
 
-		printBox(dataset, sample_index, batch, network_name, dets, detections_num);
+		printBox(dataset, sample_index, data->model->input_dim, batch, network_name, dets, detections_num);
 		
 		if(tid == (sample_index % post_thread_num) && instance_id == 0) {
 			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	

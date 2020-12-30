@@ -62,13 +62,13 @@ void writeResultFile(std::string result_file_name) {
 	result_file.close();
 }
 
-static void print_coco_detections(Detection *dets, int nDets, int idx, int w, int h, char *path) {
+static void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path) {
 	int i, j;
 	int image_id = get_coco_image_id(path);
 	std::list<std::string> detected;
 
-	float x_ratio =  (float) w / (float) INPUT_WIDTH;
-	float y_ratio =  (float) h / (float) INPUT_HEIGHT;
+	float x_ratio =  (float) w / (float) iw;
+	float y_ratio =  (float) h / (float) ih;
 
 	for (i = 0; i < nDets; ++i) {
 		if (dets[i].objectness >= 0) {
@@ -112,10 +112,10 @@ static void print_coco_detections(Detection *dets, int nDets, int idx, int w, in
 	mu.unlock();
 }
 
-void printDetector(Detection *dets, int idx, Dataset *dataset, int nDets) {
+void printDetector(InputDim input_dim, Detection *dets, int idx, Dataset *dataset, int nDets) {
     int w = dataset->w[idx];
     int h = dataset->h[idx];
 	char *path = (char *)(dataset->paths[idx].c_str());
 
-	print_coco_detections(dets, nDets, idx, w, h, path);
+	detectCOCO(dets, nDets, idx, w, h, input_dim.width, input_dim.height, path);
 }

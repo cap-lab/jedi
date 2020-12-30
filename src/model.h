@@ -32,6 +32,7 @@ class Model {
 		int yolo_num;
 		std::vector<YoloData> yolos;
 		std::vector<YoloValue> yolo_values;
+		InputDim input_dim;
 
 		tk::dnn::Network *net;
 		std::vector<tk::dnn::NetworkRT *> netRTs;

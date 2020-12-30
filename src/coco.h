@@ -8,7 +8,7 @@
 #include "variable.h"
 #include "dataset.h"
 
-void printDetector(Detection *dets, int idx, Dataset *dataset, int nDets);
+void printDetector(InputDim input_dim, Detection *dets, int idx, Dataset *dataset, int nDets);
 void writeResultFile(std::string result_file_name);
 
 #endif 

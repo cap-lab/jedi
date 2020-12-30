@@ -11,6 +11,7 @@
 #include "model.h"
 #include "variable.h"
 
+
 Model::Model(ConfigData *config_data, int instance_id) {
 	this->config_data = config_data;
 	this->instance_id = instance_id;
@@ -38,6 +39,7 @@ void Model::getModelFileName(int curr, std::string &plan_file_name) {
 	std::string cut_points_name;
 	std::string device_name;
 	std::string data_type_name;
+	std::string image_size_name;
 	int device = config_data->instances.at(instance_id).devices.at(curr);
 	int batch = config_data->instances.at(instance_id).batch;
 	int data_type = config_data->instances.at(instance_id).data_type;
@@ -67,7 +69,9 @@ void Model::getModelFileName(int curr, std::string &plan_file_name) {
 		data_type_name = "INT8";
 	}
 
-	plan_file_name = model_dir + "model_" + cut_points_name + "_" + device_name + "_" + data_type_name + "_" + std::to_string(batch) + ".model";
+	image_size_name = std::to_string(input_dim.width) + "x" + std::to_string(input_dim.height);
+
+	plan_file_name = model_dir + "model" + image_size_name + "_" + cut_points_name + "_" + device_name + "_" + data_type_name + "_" + std::to_string(batch) + ".rt";
 	std::cerr<<"plan_file_name: "<<plan_file_name<<std::endl;
 }
 
@@ -117,6 +121,10 @@ void Model::initializeModel() {
 	// parse a network using tkDNN darknetParser
 	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
 	net->print();
+
+	input_dim.width = net->input_dim.w;
+	input_dim.height = net->input_dim.h;
+	input_dim.channel = net->input_dim.c;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::string plan_file_name;
@@ -194,7 +202,7 @@ void Model::initializeBindingVariables() {
 			binding_size.push_back(0);
 		}	
 	}
-	binding_size.at(0) = INPUT_SIZE;
+	binding_size.at(0) = input_dim.width * input_dim.height * input_dim.channel;
 
 	yolo_num = 0;
 	total_binding_num = 1;

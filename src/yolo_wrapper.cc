@@ -1,5 +1,7 @@
 #include "yolo_wrapper.h"
 
+static int input_width, input_height;
+
 Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride)
 {
 	Box b;
@@ -106,7 +108,7 @@ static int yolo_computeDetections(float *predictions,  Detection *dets, int *nde
 			if(objectness <= thresh) continue;
 			int box_index  = entry_yolo_index(0, n*lw*lh + i, 0, lw, lh, lc);
 
-			dets[count].bbox = get_yolo_box(predictions, yolo.bias, yolo.mask[n], box_index, col, row, lw, lh, INPUT_WIDTH, INPUT_HEIGHT, lw*lh);
+			dets[count].bbox = get_yolo_box(predictions, yolo.bias, yolo.mask[n], box_index, col, row, lw, lh, input_width, input_height, lw*lh);
 			dets[count].objectness = objectness;
 			dets[count].classes = NUM_CLASSES;
 			for(j = 0; j < NUM_CLASSES; ++j){
@@ -121,7 +123,7 @@ static int yolo_computeDetections(float *predictions,  Detection *dets, int *nde
 		}
 	}
 
-	correct_yolo_boxes(dets + *ndets, count, INPUT_WIDTH, INPUT_HEIGHT, INPUT_WIDTH, INPUT_HEIGHT, 0);
+	correct_yolo_boxes(dets + *ndets, count, input_width, input_height, input_width, input_height, 0);
 	*ndets = count;
 	return count;
 }
@@ -160,9 +162,12 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 	}
 }
 
-void yoloLayerDetect(int batch, std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num) {
+void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num) {
 	int detection_num = 0;
 	int output_size = 0;
+
+	input_width = input_dim.width;
+	input_height = input_dim.height;
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
 		detection_num = 0;

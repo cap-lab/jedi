@@ -10,6 +10,7 @@
 #include "region_wrapper.h"
 
 static float pfBiases[2 * NUM_ANCHOR];
+static int input_width, input_height, input_channel;
 
 void setBiases(std::string network_name) {
 	static float yolov2_biases[2 * NUM_ANCHOR] = {0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828};
@@ -28,8 +29,8 @@ void setBiases(std::string network_name) {
 }
 
 static int entry_index(int batch, int location, int entry) {
-    int w = IN_WIDTH;
-    int h = IN_HEIGHT;
+    int w = input_width / 32;
+    int h = input_height / 32;
     int n = location / (w * h);
     int outputs = h * w * NUM_ANCHOR * (NUM_CLASSES + COORDS + 1); 
     int loc = location % (w * h);
@@ -41,8 +42,8 @@ static void correct_region_boxes(Detection *dets, int n, int w, int h) {
     int i;
     int new_w = 0;
     int new_h = 0;
-    int netw = INPUT_WIDTH;
-    int neth = INPUT_HEIGHT;
+    int netw = input_width;
+    int neth = input_height;
     if (((float)netw / w) < ((float)neth / h)) {
         new_w = netw;
         new_h = (h * netw) / w;
@@ -72,9 +73,9 @@ static inline float logistic_activate(float x){
 
 static Box get_region_box(float *x, int n, int index, int i, int j) {
 	Box b;
-    int w = IN_WIDTH;
-    int h = IN_HEIGHT;
-    int stride = IN_WIDTH * IN_HEIGHT;
+    int w = input_width / 32;
+    int h = input_height / 32;
+    int stride = w * h;
 
 	b.x = (i + x[index + 0*stride]) / w;
     b.y = (j + x[index + 1*stride]) / h;
@@ -84,9 +85,11 @@ static Box get_region_box(float *x, int n, int index, int i, int j) {
     return b;
 }
 
-static void get_region_detections(float *last_data, int w, int h, float thresh, Detection *dets, int *nDets) {
-    int lw = IN_WIDTH;
-    int lh = IN_HEIGHT;
+static void get_region_detections(float *last_data, float thresh, Detection *dets, int *nDets) {
+	int w = input_width;
+	int h = input_height;
+    int lw = w / 32;
+    int lh = h / 32;
     int i, j, n;
     float *predictions = last_data;
 
@@ -118,11 +121,17 @@ static void get_region_detections(float *last_data, int w, int h, float thresh, 
 	*nDets = lw *lh * NUM_ANCHOR ;
 }
 
-void regionLayerDetect(int batch, float *output, Detection *dets, int *detection_num) {
-	int count = 0;
+void regionLayerDetect(InputDim input_dim, int batch, float *output, Detection *dets, int *detection_num) {
+	int count = 0, in_width = 0, in_height = 0;
+
+	input_width = input_dim.width;
+	input_height = input_dim.height;
+   	input_channel = input_dim.channel;
+	in_width = input_width / 32;
+	in_height = input_height / 32;
 
 	for(int i = 0; i < batch; i++) {
-		get_region_detections(&output[i * REGION_WIDTH * REGION_HEIGHT * NUM_ANCHOR * (NUM_CLASSES + 5)], INPUT_WIDTH, INPUT_HEIGHT, CONFIDENCE_THRESH, &dets[i * NBOXES], &count);
+		get_region_detections(&output[i * in_width * in_height * NUM_ANCHOR * (NUM_CLASSES + 5)], CONFIDENCE_THRESH, &dets[i * NBOXES], &count);
 		do_nms_sort(&dets[i * NBOXES], count, NMS);
 	}
 
