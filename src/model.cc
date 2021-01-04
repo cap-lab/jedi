@@ -18,8 +18,6 @@ Model::Model(ConfigData *config_data, int instance_id) {
 }
 
 Model::~Model() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-	
 	start_bindings.clear();
 	binding_size.clear();
 	netRTs.clear();
@@ -28,8 +26,11 @@ Model::~Model() {
 	input_buffers.clear();
 	output_buffers.clear();
 
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
+	for(unsigned int iter1 = 0; iter1 < contexts.size(); iter1++) {
 		contexts.at(iter1).clear();	
+	}
+
+	for(unsigned int iter1 = 0; iter1 < streams.size(); iter1++) {
 		streams.at(iter1).clear();
 	}
 }

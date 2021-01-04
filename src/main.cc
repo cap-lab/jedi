@@ -183,6 +183,9 @@ static void finalizeData(int instance_num, std::vector<Model *> &models, std::ve
 		model->finalizeBuffers();
 		model->finalizeModel();
 		dataset->finalizeDataset();
+
+		delete model;
+		delete dataset;
 	}
 
 	models.clear();
