@@ -334,6 +334,13 @@ void Model::deallocateBuffer() {
 		cudaFreeHost(buffer);
 		output_buffers.pop_back();
 	}
+
+	while(!stream_buffers.empty()) {
+		void *buffer = stream_buffers.back();
+		if(buffer != nullptr)
+			cudaFree(buffer);
+		stream_buffers.pop_back();
+	}
 }
 
 void Model::initializeBuffers() {

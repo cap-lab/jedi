@@ -48,6 +48,8 @@ void getPaths(char *filename, std::vector<std::string> &paths) {
 
 	while((path=fgetl(file))){
 		paths.emplace_back(std::string(path));
+		free(path);
+		path = nullptr;
 	}
 	fclose(file);
 }
