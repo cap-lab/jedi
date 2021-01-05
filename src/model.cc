@@ -191,6 +191,10 @@ void Model::setBindingsNum(int curr, int &input_binding_num, int &output_binding
 void Model::initializeBindingVariables() {
 	int device_num = config_data->instances.at(instance_id).device_num;
 
+	start_bindings.clear();
+	binding_size.clear();
+	is_net_output.clear();
+
 	start_bindings.push_back(1);
 	for(int iter = 1; iter <= device_num; iter++) {
 		start_bindings.push_back(-1);
@@ -264,6 +268,8 @@ void Model::allocateStream() {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
+	streams.clear();
+
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::vector<cudaStream_t> stream_vec;
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
@@ -287,7 +293,9 @@ void Model::deallocateStream() {
 
 			streams[iter1].pop_back();
 		}
+		streams[iter1].clear();
 	}
+	streams.clear();
 }
 
 void Model::setStreamBuffer() {
@@ -303,6 +311,9 @@ void Model::setStreamBuffer() {
 void Model::allocateBuffer() {
 	int batch = config_data->instances.at(instance_id).batch;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+
+	input_buffers.clear();
+	output_buffers.clear();
 
 	for(int iter1 = 0; iter1 < buffer_num; iter1++) {
 		float *input_buffer = cuda_make_array_host(batch * binding_size[0]);
