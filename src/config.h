@@ -12,6 +12,7 @@ typedef struct _ConfigInstance {
 	std::string bin_path;
 	std::string cfg_path;
 	std::string image_path;
+	std::string image_label_path;
 	std::string name_path;
 	int batch;
 	int offset;
@@ -43,6 +44,7 @@ class ConfigData {
 		void readBinPath(libconfig::Config *cfg);
 		void readCfgPath(libconfig::Config *cfg);
 		void readImagePath(libconfig::Config *cfg);
+		void readImageLabelPath(libconfig::Config *cfg);
 		void readNamePath(libconfig::Config *cfg);
 		void readBatch(libconfig::Config * cfg);
 		void readOffset(libconfig::Config * cfg);

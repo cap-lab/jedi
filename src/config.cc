@@ -125,6 +125,23 @@ void ConfigData::readImagePath(Config *cfg) {
 	}
 }
 
+void ConfigData::readImageLabelPath(Config *cfg) {
+	try{	
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *tmp = settings[iter]["image_label_path"];
+			std::stringstream ss(tmp);
+			static std::string data;
+			ss >> data;
+			instances.at(iter).image_label_path = data.c_str();
+			std::cerr<<"image_label_path: "<<instances.at(iter).image_label_path<<std::endl;
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'image_label_path' setting in configuration file." << std::endl;
+	}
+}
+
 void ConfigData::readNamePath(Config *cfg) {
 	try{	
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -354,6 +371,7 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readBinPath(&cfg);
 	readCfgPath(&cfg);
 	readImagePath(&cfg);
+	readImageLabelPath(&cfg);
 	readNamePath(&cfg);
 	readBatch(&cfg);
 	readOffset(&cfg);

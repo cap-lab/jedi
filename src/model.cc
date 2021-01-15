@@ -117,7 +117,12 @@ void Model::initializeModel() {
 	// parse a network using tkDNN darknetParser
 	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
 	net->print();
-
+	//set path for INT8 calibration
+	net->fileImgList= config_data->instances.at(instance_id).image_path;
+	net->fileLabelList = config_data->instances.at(instance_id).image_label_path;
+	//set sample_size for INT8 calibration
+	net->sample_size = config_data->instances.at(instance_id).sample_size;
+	
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::string plan_file_name;
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
@@ -132,7 +137,6 @@ void Model::initializeModel() {
 		std::cerr<<__func__<<":"<<__LINE__<<" start_index: "<<start_index<<" cut_point: "<<cut_point<<" dla_core: "<<dla_core<<std::endl;
 		tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, dla_core);
 		assert(netRT->engineRT != nullptr);
-
 		netRTs.push_back(netRT);
 	
 		start_index = cut_point + 1;
