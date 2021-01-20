@@ -123,7 +123,7 @@ static int yolo_computeDetections(float *predictions,  Detection *dets, int *nde
 		}
 	}
 
-	correct_yolo_boxes(dets + *ndets, count, input_width, input_height, input_width, input_height, 0);
+	correct_yolo_boxes(dets + *ndets, count - *ndets, input_width, input_height, input_width, input_height, 0);
 	*ndets = count;
 	return count;
 }
