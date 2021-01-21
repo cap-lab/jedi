@@ -35,7 +35,7 @@ class Model {
 		InputDim input_dim;
 
 		tk::dnn::Network *net;
-		std::vector<tk::dnn::NetworkRT *> netRTs;
+		std::vector<std::vector<tk::dnn::NetworkRT *>> netRTs;
 		std::vector<std::vector<nvinfer1::IExecutionContext *>> contexts;
 		std::vector<std::vector<cudaStream_t>> streams;
 		std::vector<bool> is_net_output;

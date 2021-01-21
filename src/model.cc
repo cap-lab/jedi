@@ -15,16 +15,25 @@
 Model::Model(ConfigData *config_data, int instance_id) {
 	this->config_data = config_data;
 	this->instance_id = instance_id;
+
+	int device_num = config_data->instances.at(instance_id).device_num;
+	for(int iter1 = 0; iter1 < device_num; iter1++) {
+		netRTs.push_back(std::vector<tk::dnn::NetworkRT *>());
+	}
 }
 
 Model::~Model() {
 	start_bindings.clear();
 	binding_size.clear();
-	netRTs.clear();
 	is_net_output.clear();
 	stream_buffers.clear();
 	input_buffers.clear();
 	output_buffers.clear();
+
+	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
+		netRTs[iter1].clear();
+	}
+	netRTs.clear();
 
 	for(unsigned int iter1 = 0; iter1 < contexts.size(); iter1++) {
 		contexts.at(iter1).clear();	
@@ -138,11 +147,17 @@ void Model::initializeModel() {
 		setMaxBatchSize();
 		setDataType();
 
-		std::cerr<<__func__<<":"<<__LINE__<<" start_index: "<<start_index<<" cut_point: "<<cut_point<<" dla_core: "<<dla_core<<std::endl;
-		tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, dla_core);
-		assert(netRT->engineRT != nullptr);
+		int duplication_num = dla_core <= 1 ? 1 : dla_core; 
 
-		netRTs.push_back(netRT);
+		for(int iter2 = 0; iter2 < duplication_num; iter2++) {
+			int core = dla_core <= 1 ? dla_core : iter2 % DLA_NUM;
+
+			std::cerr<<"core: "<<core<<std::endl;
+			tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, core);
+			assert(netRT->engineRT != nullptr);
+
+			netRTs[iter1].push_back(netRT);
+		}
 	
 		start_index = cut_point + 1;
 	}
@@ -152,7 +167,11 @@ void Model::initializeModel() {
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::vector<nvinfer1::IExecutionContext *> context_vec;
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
-			nvinfer1::IExecutionContext *context = netRTs[iter1]->engineRT->createExecutionContext();	
+			int size = netRTs[iter1].size();
+			int index = size == 1 ? 0 : iter2 % DLA_NUM;
+
+			std::cerr<<"iter1: "<<iter1<<" iter2: "<<iter2<<" size: "<<size<<" index: "<<index<<std::endl;
+			nvinfer1::IExecutionContext *context = netRTs[iter1][index]->engineRT->createExecutionContext();	
 			assert(context);
 
 			context_vec.push_back(context);
@@ -170,7 +189,10 @@ void Model::finalizeModel() {
 			nvinfer1::IExecutionContext *context = contexts[iter1][iter2];		
 			context->destroy();
 		}
-		delete netRTs[iter1];
+
+		for(unsigned int iter2 = 0; iter2 < netRTs[iter1].size(); iter2++) {
+			delete netRTs[iter1][iter2];
+		}
 	}
 }
 
@@ -178,8 +200,8 @@ void Model::setBindingsNum(int curr, int &input_binding_num, int &output_binding
 	input_binding_num = 0;
 	output_binding_num = 0;
 
-	for(int iter = 0; iter < netRTs[curr]->engineRT->getNbBindings(); iter++) {
-		if(netRTs[curr]->engineRT->bindingIsInput(iter)) {
+	for(int iter = 0; iter < netRTs[curr][0]->engineRT->getNbBindings(); iter++) {
+		if(netRTs[curr][0]->engineRT->bindingIsInput(iter)) {
 			input_binding_num++;
 		}	
 		else {
@@ -201,7 +223,7 @@ void Model::initializeBindingVariables() {
 	}
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		int curr_binding_num = netRTs[iter1]->engineRT->getNbBindings();
+		int curr_binding_num = netRTs[iter1][0]->engineRT->getNbBindings();
 		for(int iter2 = 0; iter2 < curr_binding_num; iter2++) {
 			is_net_output.push_back(false);
 			binding_size.push_back(0);
@@ -222,7 +244,7 @@ void Model::setBufferIndexing() {
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		setBindingsNum(iter1, input_binding_num, output_binding_num);
-		curr_binding_num = netRTs[iter1]->engineRT->getNbBindings();
+		curr_binding_num = netRTs[iter1][0]->engineRT->getNbBindings();
 
 		start_bindings[iter1] = start_bindings[iter1] - input_binding_num;
 		start_bindings[iter1+1] = start_bindings[iter1] + curr_binding_num;
@@ -231,7 +253,7 @@ void Model::setBufferIndexing() {
 		for(int iter2 = input_binding_num; iter2 < curr_binding_num; iter2++) {
 			int index = start_bindings[iter1];
 
-			nvinfer1::Dims dim = netRTs[iter1]->engineRT->getBindingDimensions(iter2);	
+			nvinfer1::Dims dim = netRTs[iter1][0]->engineRT->getBindingDimensions(iter2);	
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
 			total_binding_num++;
 
@@ -239,19 +261,19 @@ void Model::setBufferIndexing() {
 			tmp_yolo_values[index + iter2] = yolo_value;
 		}
 
-		for(int iter2 = 0; iter2 < netRTs[iter1]->pluginFactory->n_yolos; iter2++) {
+		for(int iter2 = 0; iter2 < netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
 			YoloData yolo;
 
-			yolo.n_masks = netRTs[iter1]->pluginFactory->yolos[yolo_num + iter2]->n_masks;	
-			yolo.bias = netRTs[iter1]->pluginFactory->yolos[yolo_num + iter2]->bias;	
-			yolo.mask = netRTs[iter1]->pluginFactory->yolos[yolo_num + iter2]->mask;	
+			yolo.n_masks = netRTs[iter1][0]->pluginFactory->yolos[yolo_num + iter2]->n_masks;	
+			yolo.bias = netRTs[iter1][0]->pluginFactory->yolos[yolo_num + iter2]->bias;	
+			yolo.mask = netRTs[iter1][0]->pluginFactory->yolos[yolo_num + iter2]->mask;	
 
 			yolos.push_back(yolo);
 		}	
-		yolo_num += netRTs[iter1]->pluginFactory->n_yolos;
+		yolo_num += netRTs[iter1][0]->pluginFactory->n_yolos;
 
 		int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
-		for(int iter2 = index; iter2 < index + netRTs[iter1]->pluginFactory->n_yolos; iter2++) {
+		for(int iter2 = index; iter2 < index + netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
 			is_net_output[iter2] = true;
 			yolo_values.push_back(tmp_yolo_values.at(iter2));
 		}

@@ -34,6 +34,7 @@ typedef struct _InputDim {
 #define MAX_DEVICE_NUM 4
 #define MAX_BUFFER_NUM 8
 #define MAX_OUTPUT_NUM 4
+#define DLA_NUM 2
 
 #define NUM_CLASSES 80
 #define NMS 0.45
