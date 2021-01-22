@@ -152,7 +152,6 @@ void Model::initializeModel() {
 		for(int iter2 = 0; iter2 < duplication_num; iter2++) {
 			int core = dla_core <= 1 ? dla_core : iter2 % DLA_NUM;
 
-			std::cerr<<"core: "<<core<<std::endl;
 			tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, core);
 			assert(netRT->engineRT != nullptr);
 
@@ -170,7 +169,6 @@ void Model::initializeModel() {
 			int size = netRTs[iter1].size();
 			int index = size == 1 ? 0 : iter2 % DLA_NUM;
 
-			std::cerr<<"iter1: "<<iter1<<" iter2: "<<iter2<<" size: "<<size<<" index: "<<index<<std::endl;
 			nvinfer1::IExecutionContext *context = netRTs[iter1][index]->engineRT->createExecutionContext();	
 			assert(context);
 
