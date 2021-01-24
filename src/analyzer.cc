@@ -19,6 +19,9 @@ static void printHelpMessage() {
 	std::cout<<"	./network_analyzer -c config_file [-o output_file]" <<std::endl;
 }
 
+bool exit_flag = false;
+
+
 static void printRouteShortCutRange(ConfigData *config_data, std::string output_file_name, int instance_id)
 {
 	std::string bin_path(config_data->instances.at(instance_id).bin_path);

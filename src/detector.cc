@@ -13,6 +13,8 @@
 #include "yolo_wrapper.h"
 #include "coco.h"
 
+#define MAX_TIMEOUT (100000)
+
 static int readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int pre_thread_num, int index) {
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
@@ -43,8 +45,8 @@ void doPreProcessing(void *d) {
 	int sample_index = sample_offset + tid;
 	int index = (sample_offset + tid) * batch;
 
-	while(sample_index < sample_offset + sample_size) {
-		while(signals[sample_index % buffer_num]) {
+	while(sample_index < sample_offset + sample_size && exit_flag == false) {
+		while(signals[sample_index % buffer_num] && exit_flag == false) {
 			usleep(SLEEP_TIME);	
 		}
 
@@ -105,8 +107,8 @@ void doPostProcessing(void *d) {
 	setBiases(network_name);
 	allocateDetectionBox(batch, &dets);
 
-	while(sample_index < sample_offset + sample_size) {
-		while(!signals[sample_index % buffer_num]) {
+	while(sample_index < sample_offset + sample_size && exit_flag == false) {
+		while(!signals[sample_index % buffer_num] && exit_flag == false) {
 			usleep(SLEEP_TIME);	
 		}	
 
@@ -143,12 +145,13 @@ void doInference(void *d) {
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset;
 	std::vector<int> ready(buffer_num, 1);
+	int sleep_time = 0;
 
-	while(sample_index < sample_offset + sample_size) {
-		while(true) {
+	while(sample_index < sample_offset + sample_size && exit_flag == false) {
+		while(exit_flag == false) {
 			if(curr_signals[sample_index % buffer_num] == 1 && next_signals[sample_index % buffer_num] == 0 && ready[sample_index % buffer_num] == 1) {
 				break;	
-			}	
+			}
 
 			for(int iter = 0; iter < buffer_num; iter++) {
 				if(ready[iter] == 0) {
@@ -160,8 +163,15 @@ void doInference(void *d) {
 				}	
 			}
 			usleep(SLEEP_TIME);
-		}	
+			sleep_time++;
 
+			if(sleep_time > MAX_TIMEOUT) {
+				exit_flag = true;
+				printf("timeout is reached. program will be terminated.\n");
+			}
+		}	
+		
+		sleep_time = 0;
 		model->infer(device_id, sample_index % buffer_num);
 		ready[sample_index % buffer_num] = 0;
 
@@ -170,7 +180,10 @@ void doInference(void *d) {
 
 	for(int iter = 0; iter < buffer_num; iter++) {
 		if(ready[iter] == 0) {
-			model->waitUntilInferenceDone(device_id, iter);
+			if(exit_flag == false) 
+			{
+				model->waitUntilInferenceDone(device_id, iter);
+			}
 			curr_signals[iter] = 0;
 			next_signals[iter] = 1;
 			ready[iter] = 1;

@@ -147,7 +147,7 @@ void Model::initializeModel() {
 		setMaxBatchSize();
 		setDataType();
 
-		int duplication_num = dla_core <= 1 ? 1 : dla_core; 
+		int duplication_num = dla_core <= 1 && (buffer_num <= 4 || net->dla == false)  ? 1 : std::max(dla_core, 2); 
 
 		for(int iter2 = 0; iter2 < duplication_num; iter2++) {
 			int core = dla_core <= 1 ? dla_core : iter2 % DLA_NUM;
@@ -387,17 +387,39 @@ void Model::finalizeBuffers() {
 }
 
 bool Model::checkInferenceDone(int device_id, int buffer_id) {
-	return cudaStreamQuery(streams[device_id][buffer_id]) == cudaSuccess;	
+	cudaError_t error = cudaStreamQuery(streams[device_id][buffer_id]);	
+
+	if(error == cudaSuccess)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
-void Model::infer(int device_id, int buffer_id) {
+void Model::infer( int device_id, int buffer_id) {
 	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
 	int batch = config_data->instances.at(instance_id).batch;
+	bool enqueueSuccess = false;
 
-	contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
+	enqueueSuccess = contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
 	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	if(enqueueSuccess == false)
+	{
+		printf("enqueue error happened: %d, %d\n", device_id, buffer_id);
+		exit_flag = true;
+	}
 }
 
 void Model::waitUntilInferenceDone(int device_id, int buffer_id) {
-	cudaStreamSynchronize(streams[device_id][buffer_id]);
+	cudaError_t error;
+
+	error = cudaStreamSynchronize(streams[device_id][buffer_id]);
+	if(error != cudaSuccess)
+	{
+		printf("error happened in synchronize: %d, %d: %d\n", device_id, buffer_id, error);
+		exit_flag = true;
+	}
 }

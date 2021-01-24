@@ -44,4 +44,6 @@ typedef struct _InputDim {
 #define MAX_DETECTION_BOXES 8192
 #define NBOXES MAX_DETECTION_BOXES
 
+extern bool exit_flag;
+
 #endif

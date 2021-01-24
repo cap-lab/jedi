@@ -16,6 +16,8 @@ typedef struct _InstanceThreadData {
 	InferenceThread *infer_thread;
 } InstanceThreadData;
 
+bool exit_flag = false;
+
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
 	std::cout<<"	./proc -c config_file [-r result_file] [-l power_log_file] [-t latency_log_file]" <<std::endl;
@@ -246,5 +248,12 @@ int main(int argc, char *argv[]) {
 	// clear data
 	finalizeData(instance_num, models, datasets);
 
-	return 0;
+	if(exit_flag == false)
+	{
+		return 0;
+	}
+	else
+	{
+		return 1;
+	}	
 }
