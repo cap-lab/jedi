@@ -14,13 +14,14 @@ typedef struct _YoloData {
 	float *mask;
 	int n_masks;
 	float *bias;
-} YoloData;
-
-typedef struct _YoloValue {
+	int new_coords;
+	double nms_thresh;
+	tk::dnn::Yolo::nmsKind_t nms_kind;
 	int height;
 	int width;
 	int channel;	
-} YoloValue;
+} YoloData;
+
 
 class Model {
 	public:
@@ -29,9 +30,7 @@ class Model {
 		std::vector<int> start_bindings;
 		int total_binding_num;
 		std::vector<int> binding_size;
-		int yolo_num;
 		std::vector<YoloData> yolos;
-		std::vector<YoloValue> yolo_values;
 		InputDim input_dim;
 
 		tk::dnn::Network *net;

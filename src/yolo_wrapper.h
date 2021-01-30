@@ -8,6 +8,6 @@
 #include "model.h"
 #include "coco.h"
 
-void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num);
+void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num);
 
 #endif

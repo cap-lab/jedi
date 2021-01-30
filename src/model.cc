@@ -29,6 +29,7 @@ Model::~Model() {
 	stream_buffers.clear();
 	input_buffers.clear();
 	output_buffers.clear();
+	yolos.clear();
 
 	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
 		netRTs[iter1].clear();
@@ -147,7 +148,7 @@ void Model::initializeModel() {
 		setMaxBatchSize();
 		setDataType();
 
-		int duplication_num = dla_core <= 1 && (buffer_num <= 4 || net->dla == false)  ? 1 : std::max(dla_core, 2); 
+		int duplication_num = dla_core <= 1/* && (buffer_num <= 4 || net->dla == false)*/  ? 1 : std::max(dla_core, 2); 
 
 		for(int iter2 = 0; iter2 < duplication_num; iter2++) {
 			int core = dla_core <= 1 ? dla_core : iter2 % DLA_NUM;
@@ -229,7 +230,6 @@ void Model::initializeBindingVariables() {
 	}
 	binding_size.at(0) = input_dim.width * input_dim.height * input_dim.channel;
 
-	yolo_num = 0;
 	total_binding_num = 1;
 }
 
@@ -238,7 +238,6 @@ void Model::setBufferIndexing() {
 	int input_binding_num = 0, output_binding_num = 0, curr_binding_num = 0;
 	
 	initializeBindingVariables();
-	std::vector<YoloValue> tmp_yolo_values(binding_size.size());
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		setBindingsNum(iter1, input_binding_num, output_binding_num);
@@ -254,34 +253,33 @@ void Model::setBufferIndexing() {
 			nvinfer1::Dims dim = netRTs[iter1][0]->engineRT->getBindingDimensions(iter2);	
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
 			total_binding_num++;
-
-			YoloValue yolo_value = {dim.d[2], dim.d[1], dim.d[0]};
-			tmp_yolo_values[index + iter2] = yolo_value;
 		}
 
 		for(int iter2 = 0; iter2 < netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
 			YoloData yolo;
-
-			yolo.n_masks = netRTs[iter1][0]->pluginFactory->yolos[yolo_num + iter2]->n_masks;	
-			yolo.bias = netRTs[iter1][0]->pluginFactory->yolos[yolo_num + iter2]->bias;	
-			yolo.mask = netRTs[iter1][0]->pluginFactory->yolos[yolo_num + iter2]->mask;	
+			tk::dnn::YoloRT *yRT = netRTs[iter1][0]->pluginFactory->yolos[iter2];
+			yolo.n_masks = yRT->n_masks;	
+			yolo.bias = yRT->bias;	
+			yolo.mask = yRT->mask;	
+			yolo.new_coords = yRT->new_coords;
+			yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) yRT->nms_kind;
+			yolo.nms_thresh = yRT->nms_thresh;
+			yolo.height = yRT->h;
+			yolo.width = yRT->w;
+			yolo.channel = yRT->c;
 
 			yolos.push_back(yolo);
 		}	
-		yolo_num += netRTs[iter1][0]->pluginFactory->n_yolos;
 
 		int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
 		for(int iter2 = index; iter2 < index + netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
 			is_net_output[iter2] = true;
-			yolo_values.push_back(tmp_yolo_values.at(iter2));
 		}
 	}
 
-	if(yolo_num == 0) {
+	if(yolos.empty() == true) {
 		is_net_output[total_binding_num - 1] = true;	
 	}
-
-	tmp_yolo_values.clear();
 }
 
 void Model::allocateStream() {

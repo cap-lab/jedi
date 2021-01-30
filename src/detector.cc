@@ -44,10 +44,12 @@ void doPreProcessing(void *d) {
 	int pre_thread_num = config_data->instances.at(instance_id).pre_thread_num;
 	int sample_index = sample_offset + tid;
 	int index = (sample_offset + tid) * batch;
+	long stuckWhile = 0;
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
 		while(signals[sample_index % buffer_num] && exit_flag == false) {
 			usleep(SLEEP_TIME);	
+			stuckWhile++;
 		}
 
 		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, pre_thread_num, index);
@@ -55,14 +57,15 @@ void doPreProcessing(void *d) {
 		signals[sample_index % buffer_num] = 1;
 		sample_index += pre_thread_num;
 	}
+
+	fprintf(stderr, "stuckWhile(front thread: %d): %ld\n", tid, stuckWhile);
 }
 
-static void detectBox(std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
-	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
+static void detectBox(std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) { if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
 		regionLayerDetect(input_dim, batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
 	}
 	else {
-		yoloLayerDetect(input_dim, batch, output_buffers, buffer_id, yolo_num, yolos, yolo_values, dets, detections_num);
+		yoloLayerDetect(input_dim, batch, output_buffers, buffer_id, yolos, dets, detections_num);
 	}
 }
 
@@ -96,9 +99,9 @@ void doPostProcessing(void *d) {
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset + tid;
 	std::vector<YoloData> yolos = data->model->yolos;
-	std::vector<YoloValue> yolo_values = data->model->yolo_values;
-	int yolo_num = data->model->yolo_num;
 	int buffer_id = 0;
+	long stuckWhile = 0;
+
 	Detection *dets;
 	std::vector<int> detections_num(batch, 0);
 
@@ -110,11 +113,12 @@ void doPostProcessing(void *d) {
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
 		while(!signals[sample_index % buffer_num] && exit_flag == false) {
 			usleep(SLEEP_TIME);	
+			stuckWhile++;
 		}	
 
 		buffer_id = sample_index % buffer_num; 
 
-		detectBox(data->model->output_buffers, buffer_id, yolo_num, yolos, yolo_values, data->model->input_dim, batch, network_name, dets, detections_num);
+		detectBox(data->model->output_buffers, buffer_id, yolos, data->model->input_dim, batch, network_name, dets, detections_num);
 
 		signals[sample_index % buffer_num] = 0;
 
@@ -126,6 +130,8 @@ void doPostProcessing(void *d) {
 
 		sample_index += post_thread_num;
 	}
+
+	fprintf(stderr, "stuckWhile(back thread: %d): %ld\n", tid, stuckWhile);
 
 	deallocateDetectionBox(batch * NBOXES, dets);
 }
@@ -146,6 +152,7 @@ void doInference(void *d) {
 	int sample_index = sample_offset;
 	std::vector<int> ready(buffer_num, 1);
 	int sleep_time = 0;
+	long stuckWhile = 0;
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
 		while(exit_flag == false) {
@@ -164,6 +171,7 @@ void doInference(void *d) {
 			}
 			usleep(SLEEP_TIME);
 			sleep_time++;
+			stuckWhile++;
 
 			if(sleep_time > MAX_TIMEOUT) {
 				exit_flag = true;
@@ -177,6 +185,7 @@ void doInference(void *d) {
 
 		sample_index++;
 	}
+	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
 
 	for(int iter = 0; iter < buffer_num; iter++) {
 		if(ready[iter] == 0) {
