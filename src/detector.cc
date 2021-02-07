@@ -12,6 +12,7 @@
 #include "region_wrapper.h"
 #include "yolo_wrapper.h"
 #include "coco.h"
+#include "util.h"
 
 #define MAX_TIMEOUT (100000)
 
@@ -153,22 +154,30 @@ void doInference(void *d) {
 	std::vector<int> ready(buffer_num, 1);
 	int sleep_time = 0;
 	long stuckWhile = 0;
+	//std::vector<long> start_time(buffer_num, 0);
+	//long totalElapsedTime = 0;
+	int next_buffer_index = 0;
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
 		while(exit_flag == false) {
 			if(curr_signals[sample_index % buffer_num] == 1 && next_signals[sample_index % buffer_num] == 0 && ready[sample_index % buffer_num] == 1) {
+				next_buffer_index = sample_index % buffer_num;
 				break;	
 			}
 
 			for(int iter = 0; iter < buffer_num; iter++) {
 				if(ready[iter] == 0) {
+	
 					if(model->checkInferenceDone(device_id, iter)) {
-						curr_signals[iter] = 0;	
+						//totalElapsedTime += (getTime() - start_time[iter]);
+						//curr_signals[iter] = 0;	
 						next_signals[iter] = 1;
 						ready[iter] = 1;
-					}
+					} 
 				}	
 			}
+
+
 			usleep(SLEEP_TIME);
 			sleep_time++;
 			stuckWhile++;
@@ -180,22 +189,30 @@ void doInference(void *d) {
 		}	
 		
 		sleep_time = 0;
-		model->infer(device_id, sample_index % buffer_num);
-		ready[sample_index % buffer_num] = 0;
+
+		//start_time[next_buffer_index] = getTime();
+		model->infer(device_id, next_buffer_index);
+		ready[next_buffer_index] = 0;
+		model->waitUntilInputConsumed(device_id, next_buffer_index);
+		curr_signals[next_buffer_index] = 0;	
 
 		sample_index++;
 	}
-	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
 
 	for(int iter = 0; iter < buffer_num; iter++) {
 		if(ready[iter] == 0) {
 			if(exit_flag == false) 
 			{
 				model->waitUntilInferenceDone(device_id, iter);
+				//totalElapsedTime += (getTime() - start_time[iter]);
 			}
 			curr_signals[iter] = 0;
 			next_signals[iter] = 1;
 			ready[iter] = 1;
 		}	
 	}
+
+	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
+	//fprintf(stderr, "totalElapsedTime(device id: %d): %ld\n", device_id, totalElapsedTime);
+
 }

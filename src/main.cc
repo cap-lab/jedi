@@ -9,6 +9,7 @@
 #include "dataset.h"
 #include "thread.h"
 #include "coco.h"
+#include "util.h"
 
 typedef struct _InstanceThreadData {
 	PreProcessingThread *pre_thread;
@@ -62,14 +63,6 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 	fp.close();
 }
 
-static long getTime() {
-	struct timespec time;
-	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
-		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
-		exit(-1);
-	}
-	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000;
-}
 
 static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
 	for(int iter = 0; iter < instance_num; iter++) {

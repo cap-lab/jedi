@@ -287,16 +287,22 @@ void Model::allocateStream() {
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	streams.clear();
+	events.clear();
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::vector<cudaStream_t> stream_vec;
+		std::vector<cudaEvent_t> event_vec;
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
 			cudaStream_t stream;
+			cudaEvent_t event;
 			check_error(cudaStreamCreate(&stream));
-
+			check_error(cudaEventCreate(&event));
 			stream_vec.push_back(stream);
+			event_vec.push_back(event);
 		}
 		streams.push_back(stream_vec);
+		events.push_back(event_vec);
+
 	}
 }
 
@@ -308,12 +314,15 @@ void Model::deallocateStream() {
 		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
 			cudaStream_t stream = streams[iter1].back();
 			cudaStreamDestroy(stream);
-
 			streams[iter1].pop_back();
+			cudaEvent_t event = events[iter1].back();
+			cudaEventDestroy(event);
 		}
 		streams[iter1].clear();
+		events[iter1].clear();
 	}
 	streams.clear();
+	events.clear();
 }
 
 void Model::setStreamBuffer() {
@@ -384,6 +393,19 @@ void Model::finalizeBuffers() {
 	deallocateStream();
 }
 
+bool Model::checkInputConsumed(int device_id, int buffer_id) {
+	cudaError_t error = cudaEventQuery(events[device_id][buffer_id]);
+
+	if(error == cudaSuccess)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
 bool Model::checkInferenceDone(int device_id, int buffer_id) {
 	cudaError_t error = cudaStreamQuery(streams[device_id][buffer_id]);	
 
@@ -402,11 +424,22 @@ void Model::infer( int device_id, int buffer_id) {
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
 
-	enqueueSuccess = contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
+	enqueueSuccess = contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], &(events[device_id][buffer_id]));
 	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
 	if(enqueueSuccess == false)
 	{
 		printf("enqueue error happened: %d, %d\n", device_id, buffer_id);
+		exit_flag = true;
+	}
+}
+
+void Model::waitUntilInputConsumed(int device_id, int buffer_id) {
+	cudaError_t error;
+
+	error = cudaEventSynchronize(events[device_id][buffer_id]);
+	if(error != cudaSuccess)
+	{
+		printf("error happened in synchronize: %d, %d: %d\n", device_id, buffer_id, error);
 		exit_flag = true;
 	}
 }

@@ -37,6 +37,8 @@ class Model {
 		std::vector<std::vector<tk::dnn::NetworkRT *>> netRTs;
 		std::vector<std::vector<nvinfer1::IExecutionContext *>> contexts;
 		std::vector<std::vector<cudaStream_t>> streams;
+		std::vector<std::vector<cudaEvent_t>> events;
+
 		std::vector<bool> is_net_output;
 		std::vector<void *> stream_buffers;
 		std::vector<float *> input_buffers;
@@ -63,6 +65,8 @@ class Model {
 		bool checkInferenceDone(int device_id, int buffer_id);
 		void infer(int device_id, int buffer_id);
 		void waitUntilInferenceDone(int device_id, int buffer_id);
+		void waitUntilInputConsumed(int device_id, int buffer_id);
+		bool checkInputConsumed(int device_id, int buffer_id);
 };
 
 #endif
