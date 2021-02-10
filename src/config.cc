@@ -125,20 +125,38 @@ void ConfigData::readImagePath(Config *cfg) {
 	}
 }
 
-void ConfigData::readImageLabelPath(Config *cfg) {
+void ConfigData::readCalibImagePath(Config *cfg) {
 	try{	
 		Setting &settings = cfg->lookup("configs.instances");	
 		for(int iter = 0; iter < instance_num; iter++) {
-			const char *tmp = settings[iter]["image_label_path"];
+			const char *tmp = settings[iter]["calib_image_path"];
 			std::stringstream ss(tmp);
 			static std::string data;
 			ss >> data;
-			instances.at(iter).image_label_path = data.c_str();
-			std::cerr<<"image_label_path: "<<instances.at(iter).image_label_path<<std::endl;
+			instances.at(iter).calib_image_path = data.c_str();
+
+			std::cerr<<"calib_image_path: "<<instances.at(iter).calib_image_path<<std::endl;
 		}
 	}
 	catch(const SettingNotFoundException &nfex) {
-		std::cerr << "No 'image_label_path' setting in configuration file." << std::endl;
+		std::cerr << "No 'calib_image_path' setting in configuration file." << std::endl;
+	}
+}
+
+void ConfigData::readCalibImageLabelPath(Config *cfg) {
+	try{	
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *tmp = settings[iter]["calib_image_label_path"];
+			std::stringstream ss(tmp);
+			static std::string data;
+			ss >> data;
+			instances.at(iter).calib_image_label_path = data.c_str();
+			std::cerr<<"calib_image_label_path: "<<instances.at(iter).calib_image_label_path<<std::endl;
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'calib_image_label_path' setting in configuration file." << std::endl;
 	}
 }
 
@@ -386,7 +404,8 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readBinPath(&cfg);
 	readCfgPath(&cfg);
 	readImagePath(&cfg);
-	readImageLabelPath(&cfg);
+	readCalibImagePath(&cfg);
+	readCalibImageLabelPath(&cfg);
 	readCalibImagesNum(&cfg);
 	readNamePath(&cfg);
 	readBatch(&cfg);
