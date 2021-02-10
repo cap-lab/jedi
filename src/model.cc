@@ -82,7 +82,7 @@ void Model::getModelFileName(int curr, std::string &plan_file_name) {
 
 	image_size_name = std::to_string(input_dim.width) + "x" + std::to_string(input_dim.height);
 
-	plan_file_name = model_dir + "model" + image_size_name + "_" + cut_points_name + "_" + device_name + "_" + data_type_name + "_" + std::to_string(batch) + ".rt";
+	plan_file_name = model_dir + "/model" + image_size_name + "_" + cut_points_name + "_" + device_name + "_" + data_type_name + "_" + std::to_string(batch) + ".rt";
 	std::cerr<<"plan_file_name: "<<plan_file_name<<std::endl;
 }
 
@@ -117,6 +117,9 @@ void Model::setDataType() {
 	else if(data_type == TYPE_INT8) {
 		net->fp16 = false;	
 		net->int8 = true;
+		net->fileImgList = config_data->instances.at(instance_id).image_path;
+		net->fileLabelList = config_data->instances.at(instance_id).image_label_path;
+		net->num_calib_images = config_data->instances.at(instance_id).calib_images_num;
 	}
 }
 

@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 	int option;
 	int instance_num = 0;
 	std::string config_file_name = "config.cfg";
-	std::string result_file_name = "results/coco_results.json";
+	std::string result_file_name = "coco_results.json";
 	std::string power_file_name;
 	std::string time_file_name;
 
