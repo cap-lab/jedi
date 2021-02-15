@@ -9,6 +9,7 @@
 
 #include "variable.h"
 #include "config.h"
+#include "profiler.h"
 
 typedef struct _YoloData {
 	float *mask;
@@ -42,6 +43,8 @@ class Model {
 		std::vector<void *> stream_buffers;
 		std::vector<float *> input_buffers;
 		std::vector<float *> output_buffers;
+		std::vector<std::vector<long>> dla_profile_vec;
+		Profiler profiler;
 
 		Model(ConfigData *config_data, int instance_id);
 		~Model();
@@ -64,6 +67,7 @@ class Model {
 		bool checkInferenceDone(int device_id, int buffer_id);
 		void infer(int device_id, int buffer_id);
 		void waitUntilInferenceDone(int device_id, int buffer_id);
+		void printProfile(std::string max_profile_file_name, std::string avg_profile_file_name);
 };
 
 #endif

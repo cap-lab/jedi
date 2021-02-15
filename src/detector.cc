@@ -13,6 +13,30 @@
 #include "yolo_wrapper.h"
 #include "coco.h"
 
+std::vector<long> pre_time_vec, post_time_vec;
+
+static long getTime() {
+	struct timespec time;
+	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
+		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
+		exit(-1);
+	}
+	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000; // us
+}
+
+static int stickThisThreadToCore(int core_id) {
+	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+	if (core_id < 0 || core_id >= num_cores)
+		return EINVAL;
+
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(core_id, &cpuset);
+
+	pthread_t current_thread = pthread_self();    
+	return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+}
+
 static int readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int pre_thread_num, int index) {
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
@@ -42,16 +66,21 @@ void doPreProcessing(void *d) {
 	int pre_thread_num = config_data->instances.at(instance_id).pre_thread_num;
 	int sample_index = sample_offset + tid;
 	int index = (sample_offset + tid) * batch;
+	long curr_time = getTime();
+
+	stickThisThreadToCore(4);
 
 	while(sample_index < sample_offset + sample_size) {
 		while(signals[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}
+		curr_time = getTime();
 
 		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, pre_thread_num, index);
 
 		signals[sample_index % buffer_num] = 1;
 		sample_index += pre_thread_num;
+		pre_time_vec.push_back(getTime() - curr_time);
 	}
 }
 
@@ -99,6 +128,9 @@ void doPostProcessing(void *d) {
 	int buffer_id = 0;
 	Detection *dets;
 	std::vector<int> detections_num(batch, 0);
+	long curr_time = getTime();
+
+	stickThisThreadToCore(5);
 
 	buffer_id = sample_index % buffer_num;
 
@@ -109,6 +141,7 @@ void doPostProcessing(void *d) {
 		while(!signals[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}	
+		curr_time = getTime();
 
 		buffer_id = sample_index % buffer_num; 
 
@@ -123,6 +156,7 @@ void doPostProcessing(void *d) {
 		}
 
 		sample_index += post_thread_num;
+		post_time_vec.push_back(getTime() - curr_time);
 	}
 
 	deallocateDetectionBox(batch * NBOXES, dets);
@@ -143,6 +177,8 @@ void doInference(void *d) {
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset;
 	std::vector<int> ready(buffer_num, 1);
+
+	stickThisThreadToCore(device_id);
 
 	while(sample_index < sample_offset + sample_size) {
 		while(true) {

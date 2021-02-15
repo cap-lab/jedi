@@ -11,6 +11,14 @@
 #include "model.h"
 #include "variable.h"
 
+static long getTime() {
+	struct timespec time;
+	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
+		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
+		exit(-1);
+	}
+	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000; // us
+}
 
 Model::Model(ConfigData *config_data, int instance_id) {
 	this->config_data = config_data;
@@ -19,6 +27,11 @@ Model::Model(ConfigData *config_data, int instance_id) {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		netRTs.push_back(std::vector<tk::dnn::NetworkRT *>());
+	}
+
+	for(int iter=0; iter<2; iter++) {
+		std::vector<long> vec;	
+		dla_profile_vec.push_back(vec);
 	}
 }
 
@@ -175,6 +188,7 @@ void Model::initializeModel() {
 			nvinfer1::IExecutionContext *context = netRTs[iter1][index]->engineRT->createExecutionContext();	
 			assert(context);
 
+			context->setProfiler(&profiler);
 			context_vec.push_back(context);
 		}
 		contexts.push_back(context_vec);
@@ -396,11 +410,27 @@ bool Model::checkInferenceDone(int device_id, int buffer_id) {
 void Model::infer(int device_id, int buffer_id) {
 	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
 	int batch = config_data->instances.at(instance_id).batch;
+	bool is_dla = (config_data->instances.at(instance_id).devices.at(device_id) == DEVICE_DLA);
+	int dla_core = config_data->instances.at(instance_id).dla_cores.at(device_id);
+	long start_time;
 
-	contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
-	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	if(is_dla) {
+		start_time = getTime();	
+	}
+
+	// contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
+	contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+
+	if(is_dla) {
+		long dla_time = getTime() - start_time;	
+		dla_profile_vec.at(dla_core).push_back(dla_time);
+	}
 }
 
 void Model::waitUntilInferenceDone(int device_id, int buffer_id) {
 	cudaStreamSynchronize(streams[device_id][buffer_id]);
+}
+
+void Model::printProfile(std::string max_profile_file_name, std::string avg_profile_file_name) {
+	profiler.saveLayerTimes(max_profile_file_name.c_str(), avg_profile_file_name.c_str(), dla_profile_vec);
 }

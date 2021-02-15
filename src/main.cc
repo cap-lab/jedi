@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 #include <tkDNN/tkdnn.h>
@@ -10,11 +11,8 @@
 #include "thread.h"
 #include "coco.h"
 
-typedef struct _InstanceThreadData {
-	PreProcessingThread *pre_thread;
-	PostProcessingThread *post_thread;
-	InferenceThread *infer_thread;
-} InstanceThreadData;
+std::string power_file_name;
+std::string time_file_name;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
@@ -52,11 +50,24 @@ static void turnOffTegrastats() {
 	}
 }
 
-static void writeTimeResultFile(std::string time_file_name, double inference_time) {
+static int stickThisThreadToCore(int core_id) {
+	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+	if (core_id < 0 || core_id >= num_cores)
+		return EINVAL;
+
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(core_id, &cpuset);
+
+	pthread_t current_thread = pthread_self();    
+	return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+}
+
+static void writeTimeResultFile(std::string time_file_name, double inference_time, long max_stage_time) {
 	std::ofstream fp;
 
 	fp.open(time_file_name.c_str());
-	fp<<inference_time<<std::endl;
+	fp<<inference_time<<":"<<max_stage_time<<std::endl;
 	fp.close();
 }
 
@@ -69,8 +80,8 @@ static long getTime() {
 	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000;
 }
 
-static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
-	for(int iter = 0; iter < instance_num; iter++) {
+static void generateModels(int candidates_num, ConfigData &config_data, std::vector<Model *> &models) {
+	for(int iter = 0; iter < candidates_num; iter++) {
 		Model *model = new Model(&config_data, iter);
 
 		model->initializeModel();
@@ -80,8 +91,8 @@ static void generateModels(int instance_num, ConfigData &config_data, std::vecto
 	}
 }
 
-static void generateDatasets(int instance_num, ConfigData &config_data, std::vector<Dataset *> &datasets) {
-	for(int iter = 0; iter < instance_num; iter++) {
+static void generateDatasets(int candidates_num, ConfigData &config_data, std::vector<Dataset *> &datasets) {
+	for(int iter = 0; iter < candidates_num; iter++) {
 		Dataset *dataset = new Dataset(&config_data, iter);	
 
 		dataset->initializeDataset();
@@ -90,102 +101,84 @@ static void generateDatasets(int instance_num, ConfigData &config_data, std::vec
 	}
 }
 
-static void runInstanceThread(void *d) {
-	InstanceThreadData *data = (InstanceThreadData *)d;
-	PreProcessingThread *pre_thread = data-> pre_thread;	
-	PostProcessingThread *post_thread = data-> post_thread;	
-	InferenceThread *infer_thread = data->infer_thread;
-
-	pre_thread->runThreads();
-	post_thread->runThreads();
-	infer_thread->runThreads();
-
-	pre_thread->joinThreads();
-	post_thread->joinThreads();
-	infer_thread->joinThreads();
-}
-
-static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingThread *> &preProcessingThreads, std::vector<PostProcessingThread *> &postProcessingThreads, std::vector<InferenceThread *> &inferenceThreads) {
-	for(int iter = 0; iter < instance_num; iter++) {
-		delete preProcessingThreads[iter];		
-		delete postProcessingThreads[iter];		
-		delete inferenceThreads[iter];
-	}
-	
-	preProcessingThreads.clear();
-	postProcessingThreads.clear();
-	inferenceThreads.clear();
-}
-
-static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
+void generateThreads(int candidate, ConfigData config_data, std::vector<Model *> models, std::vector<Dataset *> datasets, std::string max_profile_file_name, std::string avg_profile_file_name) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
-	int signals[instance_num][MAX_DEVICE_NUM+1][MAX_BUFFER_NUM] = {0};
-	std::vector<InstanceThreadData> instance_threads_data;
-	std::vector<std::thread> instance_threads;
+	std::vector<long> inference_time_vec;
+	std::vector<long> max_stage_time_vec;
+	int signals[3] = {0};
 	long start_time = 0;
-	double inference_time = 0;
-	
-	for(int iter = 0; iter < instance_num; iter++) {
-		int device_num = config_data.instances.at(iter).device_num;
+	long max_stage_time = 0;
+	// double inference_time = 0;
 
-		PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, iter);
-		pre_thread->setThreadData(signals[iter][0], models[iter], datasets[iter]);		
-		preProcessingThreads.push_back(pre_thread);
+	PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, candidate);
+	pre_thread->setThreadData(&(signals[0]), models[candidate], datasets[candidate]);		
+	preProcessingThreads.push_back(pre_thread);
 
-		PostProcessingThread *post_thread = new PostProcessingThread(&config_data, iter);
-		post_thread->setThreadData(signals[iter][device_num], models[iter], datasets[iter]);		
-		postProcessingThreads.push_back(post_thread);
-
-		InferenceThread *infer_thread = new InferenceThread(&config_data, iter);
-		infer_thread->setThreadData(signals[iter][0], models[iter]);
-		inferenceThreads.push_back(infer_thread);
-
-		InstanceThreadData instance_thread_data;
-		instance_thread_data.pre_thread = preProcessingThreads[iter];
-		instance_thread_data.post_thread = postProcessingThreads[iter];
-		instance_thread_data.infer_thread = inferenceThreads[iter];
-		instance_threads_data.push_back(instance_thread_data);
-	}
+	PostProcessingThread *post_thread = new PostProcessingThread(&config_data, candidate);
+	post_thread->setThreadData(&(signals[2]), models[candidate], datasets[candidate]);		
+	postProcessingThreads.push_back(post_thread);
 
 	if(power_file_name.length() != 0) {
 		turnOnTegrastats(std::string(power_file_name));
 	}
 
-	start_time = getTime();
-	for(int iter = 0; iter < instance_num; iter++) {
-		instance_threads.push_back(std::thread(runInstanceThread, &(instance_threads_data[iter])));	
-	}
+	pre_thread->runThreads();
+	post_thread->runThreads();
 
-	for(int iter = 0; iter < instance_num; iter++) {
-		instance_threads[iter].join();	
+	for(int titer1 = 0; titer1 < config_data.instances.at(candidate).sample_size; titer1++) {
+		start_time = getTime();
+		signals[0] = 0;
+		while(!signals[0]) {
+			usleep(SLEEP_TIME);	
+		}
+
+		max_stage_time = 0;
+		for(int iter = 0; iter < config_data.instances.at(candidate).device_num; iter++) {
+			long start_time2 = getTime();
+
+			models[candidate]->infer(iter, 0);
+
+			long stage_time  = getTime() - start_time2;
+			if(stage_time > max_stage_time) {
+				max_stage_time = stage_time;	
+			}
+		}
+		max_stage_time_vec.push_back(max_stage_time);
+
+		signals[2] = 1;
+		while(signals[2]) {
+			usleep(SLEEP_TIME);	
+		}
+		inference_time_vec.push_back((long)(getTime() - start_time));
 	}
-	inference_time = (double)(getTime() - start_time) / 1000000;
-	std::cout<<"inference time: "<<inference_time<<std::endl;
+	pre_thread->joinThreads();
+	post_thread->joinThreads();
 
 	if(power_file_name.length() != 0) {
 		turnOffTegrastats();
 	}
 
-	if(time_file_name.length() != 0) {
-		writeTimeResultFile(time_file_name, inference_time);
-	}
+	models[candidate]->printProfile(max_profile_file_name, avg_profile_file_name);
 
-	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
+	if(time_file_name.length() != 0) {
+		long max_latency = *std::max_element(inference_time_vec.begin(), inference_time_vec.end());
+		long max_stage_time = *std::max_element(max_stage_time_vec.begin(), max_stage_time_vec.end());
+
+		std::cerr<<"max_latency: "<<max_latency<<", max_stage_time: "<<max_stage_time<<std::endl;
+		writeTimeResultFile(time_file_name, max_latency, max_stage_time);
+	}
 }
 
-static void finalizeData(int instance_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
-	for(int iter = 0; iter < instance_num; iter++) {
+static void finalizeData(int candidates_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
+	for(int iter = 0; iter < candidates_num; iter++) {
 		Model *model = models.at(iter);
 		Dataset *dataset = datasets.at(iter);	
 
 		model->finalizeBuffers();
 		model->finalizeModel();
 		dataset->finalizeDataset();
-
-		delete model;
-		delete dataset;
 	}
 
 	models.clear();
@@ -194,18 +187,22 @@ static void finalizeData(int instance_num, std::vector<Model *> &models, std::ve
 
 int main(int argc, char *argv[]) {
 	int option;
-	int instance_num = 0;
+	int candidates_num;
+	std::string config_list_file_name = "config_list.cfg";
 	std::string config_file_name = "config.cfg";
-	std::string result_file_name = "coco_results.json";
-	std::string power_file_name;
-	std::string time_file_name;
+	std::string result_file_name = "results/coco_results.json";
+	std::string max_profile_file_name = "max_profile.log";
+	std::string avg_profile_file_name = "avg_profile.log";
+	std::vector<ConfigData> config_data_vec;
+
+	stickThisThreadToCore(6);
 
 	if(argc == 1) {
 		printHelpMessage();
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "c:r:p:t:h")) != -1) {
+	while((option = getopt(argc, argv, "c:r:p:t:f:a:h")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
@@ -219,6 +216,15 @@ int main(int argc, char *argv[]) {
 			case 't':
 				time_file_name = std::string(optarg);
 				break;
+			case 'l':
+				config_list_file_name = std::string(optarg);
+				break;
+			case 'f':
+				max_profile_file_name = std::string(optarg);
+				break;
+			case 'a':
+				avg_profile_file_name = std::string(optarg);
+				break;
 			case 'h':
 				printHelpMessage();
 				break;
@@ -227,24 +233,24 @@ int main(int argc, char *argv[]) {
 
 	// read configurations
 	ConfigData config_data(config_file_name);
-	instance_num = config_data.instance_num;
+	candidates_num = config_data.instance_num;
 
 	// make models (engines, buffers)
 	std::vector<Model *> models;
-	generateModels(instance_num, config_data, models);
+	generateModels(candidates_num, config_data, models);
 
 	// make dataset
 	std::vector<Dataset *> datasets;
-	generateDatasets(instance_num, config_data, datasets);
+	generateDatasets(candidates_num, config_data, datasets);
 
 	// make threads
-	generateThreads(instance_num, config_data, power_file_name, time_file_name, models, datasets);
+	generateThreads(0, config_data, models, datasets, max_profile_file_name, avg_profile_file_name);
 
 	// write file
 	writeResultFile(result_file_name);
 
 	// clear data
-	finalizeData(instance_num, models, datasets);
+	finalizeData(candidates_num, models, datasets);
 
 	return 0;
 }
