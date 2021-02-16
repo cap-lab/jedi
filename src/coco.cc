@@ -38,19 +38,14 @@ int detected_num = 0;
 void writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
 	std::ofstream result_file;
+	std::vector<std::string> results_vec;
 
-	result_file.open(result_file_name);
-	result_file<<"["<<std::endl;
 	while(!detected_map.empty() && line_num < detected_num) {
 		auto it = detected_map.find(idx);	
 		if(it != detected_map.end()) {
 			for(auto it2 = it->second.begin(); it2 != it->second.end() && line_num < detected_num; it2++) {	
 				line_num++;
-				result_file<<*it2;
-				if(line_num != detected_num) {
-					result_file<<", ";	
-				}
-				result_file<<std::endl;
+				results_vec.push_back(*it2);
 			}
 
 			detected_map.erase(it);
@@ -58,7 +53,16 @@ void writeResultFile(std::string result_file_name) {
 
 		idx++;
 	}
-	result_file<<"]"<<std::endl;
+
+	result_file.open(result_file_name);
+	result_file<<"["<<std::endl;
+	auto it = results_vec.begin();
+	for(; it != std::prev(results_vec.end()); it++) {
+		result_file<<*it;	
+		result_file<<","<<std::endl;
+	}
+	result_file<<*it<<std::endl;
+	result_file<<"]";
 	result_file.close();
 }
 
@@ -113,9 +117,10 @@ static void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw
 }
 
 void printDetector(InputDim input_dim, Detection *dets, int idx, Dataset *dataset, int nDets) {
-    int w = dataset->w[idx];
-    int h = dataset->h[idx];
-	char *path = (char *)(dataset->paths[idx].c_str());
+	int image_index = idx % dataset->m;
+    int w = dataset->w[image_index];
+    int h = dataset->h[image_index];
+	char *path = (char *)(dataset->paths[image_index].c_str());
 
-	detectCOCO(dets, nDets, idx, w, h, input_dim.width, input_dim.height, path);
+	detectCOCO(dets, nDets, image_index, w, h, input_dim.width, input_dim.height, path);
 }
