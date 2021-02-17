@@ -18,6 +18,11 @@ typedef struct _InputDim {
 	int channel;
 } InputDim;
 
+typedef struct _MsqData {
+	long type;
+	unsigned char buf[16];
+} MsqData;
+
 #define NETWORK_YOLOV2 "yolo2"
 #define NETWORK_YOLOV2TINY "yolo2tiny"
 #define NETWORK_YOLOV3 "yolo3"
