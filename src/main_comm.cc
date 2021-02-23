@@ -7,9 +7,6 @@
 #include <sys/msg.h>
 
 #include <tkDNN/tkdnn.h>
-#include <czmq.h>
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
 
 #include "config.h"
 #include "variable.h"
