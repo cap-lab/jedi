@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 
 #include <tkDNN/tkdnn.h>
 
@@ -12,7 +13,8 @@
 #include "coco.h"
 
 std::string power_file_name;
-std::string time_file_name;
+std::string max_time_file_name;
+std::string avg_time_file_name;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
@@ -162,12 +164,16 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 
 	models[candidate]->printProfile(max_profile_file_name, avg_profile_file_name);
 
-	if(time_file_name.length() != 0) {
+	if(max_time_file_name.length() != 0 && avg_time_file_name.length() != 0) {
 		long max_latency = *std::max_element(inference_time_vec.begin(), inference_time_vec.end());
 		long max_stage_time = *std::max_element(max_stage_time_vec.begin(), max_stage_time_vec.end());
+		long avg_latency = std::accumulate(inference_time_vec.begin(), inference_time_vec.end(), 0) / inference_time_vec.size();
+		long avg_stage_time = std::accumulate(max_stage_time_vec.begin(), max_stage_time_vec.end(), 0) / max_stage_time_vec.size();
 
 		std::cerr<<"max_latency: "<<max_latency<<", max_stage_time: "<<max_stage_time<<std::endl;
-		writeTimeResultFile(time_file_name, max_latency, max_stage_time);
+		std::cerr<<"avg_latency: "<<avg_latency<<", avg_stage_time: "<<avg_stage_time<<std::endl;
+		writeTimeResultFile(max_time_file_name, max_latency, max_stage_time);
+		writeTimeResultFile(avg_time_file_name, avg_latency, avg_stage_time);
 	}
 }
 
@@ -202,7 +208,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "c:r:p:t:f:a:h")) != -1) {
+	while((option = getopt(argc, argv, "c:r:p:t:y:f:a:h")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
@@ -214,7 +220,10 @@ int main(int argc, char *argv[]) {
 				power_file_name = std::string(optarg);
 				break;
 			case 't':
-				time_file_name = std::string(optarg);
+				max_time_file_name = std::string(optarg);
+				break;
+			case 'y':
+				avg_time_file_name = std::string(optarg);
 				break;
 			case 'l':
 				config_list_file_name = std::string(optarg);

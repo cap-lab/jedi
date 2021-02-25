@@ -110,3 +110,9 @@ void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *
 		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
 	}
 }
+
+void loadImage(char *filename, int input_size, float *input) {
+	FILE *fp = fopen(filename, "rb");
+	fread(input, sizeof(float), input_size, fp);
+	fclose(fp);
+}

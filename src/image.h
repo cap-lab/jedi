@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <assert.h>
 #include <string.h>
+#include <vector>
 
 typedef struct {
     int w;
@@ -15,5 +16,6 @@ typedef struct {
 } Image;
 
 void getPaths(char *filename, std::vector<std::string> &paths);
+void getWidthHeight(char *filename, std::vector<int> &w, std::vector<int> &h);
 
 #endif 

@@ -27,6 +27,9 @@ void Dataset::initializeDataset() {
 		h.emplace_back(0);	
 		w.emplace_back(0);
 	}
+
+	std::string filename = config_data->instances.at(instance_id).wh_path;
+	getWidthHeight((char *)filename.c_str(), w, h);
 }
 
 void Dataset::finalizeDataset() {

@@ -14,6 +14,7 @@ typedef struct _ConfigInstance {
 	std::string image_path;
 	std::string calib_image_path;
 	std::string calib_image_label_path;
+	std::string wh_path;
 	int calib_images_num;
 	std::string name_path;
 	int batch;
@@ -50,6 +51,7 @@ class ConfigData {
 		void readCalibImageLabelPath(libconfig::Config *cfg);
 		void readCalibImagesNum(libconfig::Config * cfg);
 		void readNamePath(libconfig::Config *cfg);
+		void readWidthHeightPath(libconfig::Config *cfg);
 		void readBatch(libconfig::Config * cfg);
 		void readOffset(libconfig::Config * cfg);
 		void readSampleSize(libconfig::Config * cfg);

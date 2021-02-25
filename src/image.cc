@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <fstream>
 
 #include "image.h"
 #include "image_opencv.h"
@@ -52,4 +53,17 @@ void getPaths(char *filename, std::vector<std::string> &paths) {
 		path = nullptr;
 	}
 	fclose(file);
+}
+
+void getWidthHeight(char *filename, std::vector<int> &w, std::vector<int> &h) {
+	std::ifstream infile(filename);
+
+	int width, height, iter = 0;
+	while(infile >> width >> height) {
+		w.at(iter) = width;
+		h.at(iter) = height;
+		iter++;
+	}
+
+	infile.close();
 }

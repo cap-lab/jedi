@@ -193,6 +193,27 @@ void ConfigData::readNamePath(Config *cfg) {
 	}
 }
 
+void ConfigData::readWidthHeightPath(Config *cfg) {
+	try{	
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *tmp = settings[iter]["wh_path"];
+			std::stringstream ss(tmp);
+			static std::string data;
+			ss >> data;
+			instances.at(iter).wh_path = data.c_str();
+
+			std::cerr<<"wh_path: "<<instances.at(iter).wh_path<<std::endl;
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'wh_path' setting in configuration file." << std::endl;
+		for(int iter = 0; iter < instance_num; iter++) {
+			instances.at(iter).wh_path = "./width_height.log";
+		}
+	}
+}
+
 void ConfigData::readBatch(Config * cfg){
 	try {
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -408,6 +429,7 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readCalibImageLabelPath(&cfg);
 	readCalibImagesNum(&cfg);
 	readNamePath(&cfg);
+	readWidthHeightPath(&cfg);
 	readBatch(&cfg);
 	readOffset(&cfg);
 	readSampleSize(&cfg);
