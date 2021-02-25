@@ -120,25 +120,14 @@ static int createMsgQueue(int key_num) {
 	return msq_id;
 }
 
-static bool receiveDataFromMsgQueue(int rcv_msq_id, int type) {
+static int receiveDataFromMsgQueue(int rcv_msq_id) {
 	MsqData rcv_data;
 
-	if(type == 1) {
-		if(-1 == msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), 1, 0)) {
-			perror( "msgrcv() failed");
-			exit(1);
-		}
-		return false;
+	if(-1 == msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), -2, 0)) {
+		perror( "msgrcv() failed");
 	}
-	else if(type == 2) {
-		if(-1 != msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), 2, IPC_NOWAIT)) {
-			std::cerr<<__func__<<":"<<__LINE__<<" type two received"<<std::endl;
-			return true;
-		}
-		return false;
-	}
-	
-	return true;
+
+	return rcv_data.type;
 }
 
 static void sendDataToMsgQueue(int snd_msq_id) {
@@ -153,14 +142,10 @@ static void sendDataToMsgQueue(int snd_msq_id) {
 }
 
 static bool checkMsg(int rcv_msq_id) {
-	if(receiveDataFromMsgQueue(rcv_msq_id, 2)) {
+	int type = receiveDataFromMsgQueue(rcv_msq_id);
+	if(type == 2) {
 		exit_flag = true;
-		return true;
-	}
-	receiveDataFromMsgQueue(rcv_msq_id, 1);
-	if(receiveDataFromMsgQueue(rcv_msq_id, 2)) {
-		exit_flag = true;
-		return true;
+		return true;	
 	}
 
 	return false;
@@ -196,7 +181,6 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 	pre_thread->runThreads();
 	post_thread->runThreads();
 
-	// for(int titer1 = 0; titer1 < config_data.instances.at(candidate).sample_size; titer1++) {
 	while(true) {
 		// recv the msg from the controller
 		if(checkMsg(rcv_msq_id)) {
@@ -252,6 +236,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		std::cerr<<"max_latency: "<<max_latency<<", max_stage_time: "<<max_stage_time<<std::endl;
 		writeTimeResultFile(time_file_name, max_latency, max_stage_time);
 	}
+
+	std::cerr<<"program end"<<std::endl;
 }
 
 static void finalizeData(int candidates_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
