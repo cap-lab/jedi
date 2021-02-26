@@ -40,14 +40,16 @@ static int stickThisThreadToCore(int core_id) {
 
 static int readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int pre_thread_num, int index) {
 	for(int iter = 0; iter < batch; iter++) {
-		int orignal_width = 0, original_height = 0;
+		// int orignal_width = 0, original_height = 0;
 		int input_width = input_dim.width, input_height = input_dim.height, input_channel = input_dim.channel;
 		int input_size = input_width * input_height * input_channel;
 		int image_index = (index + iter) % dataset->m;
 
-		loadImageResize((char *)(dataset->paths[image_index].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);	
-		dataset->w.at(image_index) = orignal_width;
-		dataset->h.at(image_index) = original_height;
+		// loadImageResize((char *)(dataset->paths[image_index].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);	
+		// dataset->w.at(image_index) = orignal_width;
+		// dataset->h.at(image_index) = original_height;
+		
+		loadImage((char *)(dataset->paths[image_index].c_str()), input_size, input_buffer + iter * input_size);	
 	}	
 
 	return index + batch * pre_thread_num;
