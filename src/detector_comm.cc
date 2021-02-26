@@ -14,6 +14,7 @@
 #include "coco.h"
 
 std::vector<long> pre_time_vec, post_time_vec;
+extern int g_pre_core, g_post_core;
 extern bool exit_flag;
 
 static long getTime() {
@@ -71,13 +72,19 @@ void doPreProcessing(void *d) {
 	int sample_index = sample_offset + tid;
 	int index = (sample_offset + tid) * batch;
 	long curr_time = getTime();
+	int prev_pre_core = -1;
 
-	stickThisThreadToCore(4);
 
 	while(sample_index < sample_offset + sample_size) {
 		while(signals[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}
+
+		if(prev_pre_core != g_pre_core) {
+			stickThisThreadToCore(g_pre_core);
+			prev_pre_core = g_pre_core;
+		}
+
 		curr_time = getTime();
 
 		if(exit_flag) {
@@ -137,8 +144,7 @@ void doPostProcessing(void *d) {
 	Detection *dets;
 	std::vector<int> detections_num(batch, 0);
 	long curr_time = getTime();
-
-	stickThisThreadToCore(5);
+	int prev_post_core = -1;
 
 	buffer_id = sample_index % buffer_num;
 
@@ -149,6 +155,12 @@ void doPostProcessing(void *d) {
 		while(!signals[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}	
+
+		if(prev_post_core != g_post_core) {
+			stickThisThreadToCore(g_post_core);
+			prev_post_core = g_post_core;
+		}
+
 		curr_time = getTime();
 
 		if(exit_flag) {

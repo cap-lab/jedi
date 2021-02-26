@@ -14,10 +14,12 @@
 #include "dataset.h"
 #include "thread.h"
 #include "coco.h"
+#include "detector.h"
 
 std::string power_file_name;
 std::string time_file_name;
 int rcv_key_num, snd_key_num;
+int g_pre_core, g_post_core;
 bool exit_flag;
 
 // std::cerr<<__func__<<":"<<__LINE__<<std::endl;
@@ -120,20 +122,17 @@ static int createMsgQueue(int key_num) {
 	return msq_id;
 }
 
-static int receiveDataFromMsgQueue(int rcv_msq_id) {
-	MsqData rcv_data;
+static void receiveDataFromMsgQueue(int rcv_msq_id, MsqData &rcv_data) {
 
-	if(-1 == msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), -2, 0)) {
+	if(-1 == msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), -1 * MSG_RUN, 0)) {
 		perror( "msgrcv() failed");
 	}
-
-	return rcv_data.type;
 }
 
 static void sendDataToMsgQueue(int snd_msq_id) {
 	MsqData snd_data;
 
-	snd_data.type = 3;
+	snd_data.type = MSG_OK;
 	sprintf((char*)snd_data.buf, "inference done");	
 	if ( -1 == msgsnd(snd_msq_id, &snd_data, sizeof(MsqData), 0)) {
 		perror( "msgsnd() failed");
@@ -142,8 +141,26 @@ static void sendDataToMsgQueue(int snd_msq_id) {
 }
 
 static bool checkMsg(int rcv_msq_id) {
-	int type = receiveDataFromMsgQueue(rcv_msq_id);
-	if(type == 2) {
+	MsqData rcv_data;
+
+	receiveDataFromMsgQueue(rcv_msq_id, rcv_data);
+	int type = rcv_data.type;
+
+	if(type == MSG_RUNC) {
+		std::vector<int> cores;
+		std::string buf((const char*)rcv_data.buf);
+		std::stringstream ss(buf);
+		std::string temp;
+
+		while(std::getline(ss,temp,':')) {
+			cores.push_back(std::stoi(temp));	
+		}
+
+		g_pre_core = cores[0];
+		g_post_core = cores[1];
+		std::cerr<<"received MSG_RUNC"<<std::endl;
+	}
+	else if(type == MSG_EXIT) {
 		exit_flag = true;
 		return true;	
 	}
@@ -264,7 +281,9 @@ int main(int argc, char *argv[]) {
 	std::string avg_profile_file_name;
 	std::vector<ConfigData> config_data_vec;
 
-	stickThisThreadToCore(6);
+	stickThisThreadToCore(0);
+	g_pre_core = -1;
+	g_post_core = -1;
 
 	if(argc == 1) {
 		printHelpMessage();
