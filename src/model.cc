@@ -129,7 +129,6 @@ void Model::initializeModel() {
     std::string cfg_path(config_data->instances.at(instance_id).cfg_path);
     std::string name_path(config_data->instances.at(instance_id).name_path); 
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 	int start_index = 0;
 
 	// parse a network using tkDNN darknetParser
@@ -169,7 +168,8 @@ void Model::initializeModel() {
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::vector<nvinfer1::IExecutionContext *> context_vec;
-		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
+		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
+		for(int iter2 = 0; iter2 < stream_number; iter2++) {
 			int size = netRTs[iter1].size();
 			int index = size == 1 ? 0 : iter2 % DLA_NUM;
 
@@ -184,10 +184,10 @@ void Model::initializeModel() {
 
 void Model::finalizeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
+		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
+		for(int iter2 = 0; iter2 < stream_number; iter2++) {
 			nvinfer1::IExecutionContext *context = contexts[iter1][iter2];		
 			context->destroy();
 		}
@@ -287,7 +287,6 @@ void Model::setBufferIndexing() {
 
 void Model::allocateStream() {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	streams.clear();
 	events.clear();
@@ -295,7 +294,8 @@ void Model::allocateStream() {
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::vector<cudaStream_t> stream_vec;
 		std::vector<cudaEvent_t> event_vec;
-		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
+		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
+		for(int iter2 = 0; iter2 < stream_number; iter2++) {
 			cudaStream_t stream;
 			cudaEvent_t event;
 			check_error(cudaStreamCreate(&stream));
@@ -311,10 +311,10 @@ void Model::allocateStream() {
 
 void Model::deallocateStream() {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
+		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
+		for(int iter2 = 0; iter2 < stream_number; iter2++) {
 			cudaStream_t stream = streams[iter1].back();
 			cudaStreamDestroy(stream);
 			streams[iter1].pop_back();
@@ -396,8 +396,8 @@ void Model::finalizeBuffers() {
 	deallocateStream();
 }
 
-bool Model::checkInputConsumed(int device_id, int buffer_id) {
-	cudaError_t error = cudaEventQuery(events[device_id][buffer_id]);
+bool Model::checkInputConsumed(int device_id, int stream_id) {
+	cudaError_t error = cudaEventQuery(events[device_id][stream_id]);
 
 	if(error == cudaSuccess)
 	{
@@ -409,8 +409,8 @@ bool Model::checkInputConsumed(int device_id, int buffer_id) {
 	}
 }
 
-bool Model::checkInferenceDone(int device_id, int buffer_id) {
-	cudaError_t error = cudaStreamQuery(streams[device_id][buffer_id]);	
+bool Model::checkInferenceDone(int device_id, int stream_id) {
+	cudaError_t error = cudaStreamQuery(streams[device_id][stream_id]);	
 
 	if(error == cudaSuccess)
 	{
@@ -422,12 +422,12 @@ bool Model::checkInferenceDone(int device_id, int buffer_id) {
 	}
 }
 
-void Model::infer( int device_id, int buffer_id) {
+void Model::infer( int device_id, int stream_id, int buffer_id) {
 	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
 
-	enqueueSuccess = contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], &(events[device_id][buffer_id]));
+	enqueueSuccess = contexts[device_id][stream_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][stream_id], &(events[device_id][stream_id]));
 	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
 	if(enqueueSuccess == false)
 	{
@@ -436,24 +436,24 @@ void Model::infer( int device_id, int buffer_id) {
 	}
 }
 
-void Model::waitUntilInputConsumed(int device_id, int buffer_id) {
+void Model::waitUntilInputConsumed(int device_id, int stream_id) {
 	cudaError_t error;
 
-	error = cudaEventSynchronize(events[device_id][buffer_id]);
+	error = cudaEventSynchronize(events[device_id][stream_id]);
 	if(error != cudaSuccess)
 	{
-		printf("error happened in synchronize: %d, %d: %d\n", device_id, buffer_id, error);
+		printf("error happened in synchronize: %d, %d: %d\n", device_id, stream_id, error);
 		exit_flag = true;
 	}
 }
 
-void Model::waitUntilInferenceDone(int device_id, int buffer_id) {
+void Model::waitUntilInferenceDone(int device_id, int stream_id) {
 	cudaError_t error;
 
-	error = cudaStreamSynchronize(streams[device_id][buffer_id]);
+	error = cudaStreamSynchronize(streams[device_id][stream_id]);
 	if(error != cudaSuccess)
 	{
-		printf("error happened in synchronize: %d, %d: %d\n", device_id, buffer_id, error);
+		printf("error happened in synchronize: %d, %d: %d\n", device_id, stream_id, error);
 		exit_flag = true;
 	}
 }

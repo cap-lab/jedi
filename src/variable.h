@@ -32,7 +32,6 @@ typedef struct _InputDim {
 #define LOG_INTERVAL 100
 
 #define MAX_DEVICE_NUM 4
-#define MAX_BUFFER_NUM 8
 #define MAX_OUTPUT_NUM 4
 #define DLA_NUM 2
 

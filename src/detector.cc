@@ -35,7 +35,7 @@ void doPreProcessing(void *d) {
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
-	int *signals = data->signals;
+	std::vector<int> *signals = data->signals;
 	Dataset *dataset = data->dataset;
 
 	int sample_offset = config_data->instances.at(instance_id).offset;
@@ -48,14 +48,14 @@ void doPreProcessing(void *d) {
 	long stuckWhile = 0;
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
-		while(signals[sample_index % buffer_num] && exit_flag == false) {
+		while((*signals)[sample_index % buffer_num] && exit_flag == false) {
 			usleep(SLEEP_TIME);	
 			stuckWhile++;
 		}
 
 		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, pre_thread_num, index);
 
-		signals[sample_index % buffer_num] = 1;
+		(*signals)[sample_index % buffer_num] = 1;
 		sample_index += pre_thread_num;
 	}
 
@@ -88,7 +88,7 @@ void doPostProcessing(void *d) {
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
-	int *signals = data->signals;
+	std::vector<int> *signals = data->signals;
 	Dataset *dataset = data->dataset;
 
 	int instance_num = config_data->instance_num;
@@ -112,7 +112,7 @@ void doPostProcessing(void *d) {
 	allocateDetectionBox(batch, &dets);
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
-		while(!signals[sample_index % buffer_num] && exit_flag == false) {
+		while(!(*signals)[sample_index % buffer_num] && exit_flag == false) {
 			usleep(SLEEP_TIME);	
 			stuckWhile++;
 		}	
@@ -121,7 +121,7 @@ void doPostProcessing(void *d) {
 
 		detectBox(data->model->output_buffers, buffer_id, yolos, data->model->input_dim, batch, network_name, dets, detections_num);
 
-		signals[sample_index % buffer_num] = 0;
+		(*signals)[sample_index % buffer_num] = 0;
 
 		printBox(dataset, sample_index, data->model->input_dim, batch, network_name, dets, detections_num);
 		
@@ -142,41 +142,61 @@ void doInference(void *d) {
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
 	int device_id = data->tid;
-	int *curr_signals = data->curr_signals;
-	int *next_signals = data->next_signals;
+	std::vector<int> *curr_signals = data->curr_signals;
+	std::vector<int> *next_signals = data->next_signals;
 	Model *model = data->model;
 
 	int sample_offset = config_data->instances.at(instance_id).offset;
 	int sample_size = config_data->instances.at(instance_id).sample_size;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+	int stream_num = config_data->instances.at(instance_id).stream_numbers.at(device_id);
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset;
-	std::vector<int> ready(buffer_num, 1);
+	std::vector<int> ready(stream_num, 1);
+	std::vector<int> assignedSampleId(stream_num, -1);
 	int sleep_time = 0;
 	long stuckWhile = 0;
 	//std::vector<long> start_time(buffer_num, 0);
 	//long totalElapsedTime = 0;
 	int next_buffer_index = 0;
+	int assigned_buffer_id = 0;
+	int next_stream_index = 0;
+	int stream_index = 0;
+	int min_sample_index = 0;
+	//std::vector<bool> input_consumed(buffer_num, false);
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
 		while(exit_flag == false) {
-			if(curr_signals[sample_index % buffer_num] == 1 && next_signals[sample_index % buffer_num] == 0 && ready[sample_index % buffer_num] == 1) {
-				next_buffer_index = sample_index % buffer_num;
-				break;	
+			if((*curr_signals)[sample_index % buffer_num] == 1 && (*next_signals)[sample_index % buffer_num] == 0 && sample_index < min_sample_index + buffer_num) {
+				for(stream_index = 0; stream_index < stream_num; stream_index++	) {
+					if(ready[stream_index] == 1)
+						break;
+				}
+				if(stream_index < stream_num) {
+					next_buffer_index = sample_index % buffer_num;
+					next_stream_index = stream_index;
+					break;
+				}
 			}
-
-			for(int iter = 0; iter < buffer_num; iter++) {
+			min_sample_index = sample_offset + sample_size;
+			for(int iter = 0; iter < stream_num; iter++) {
 				if(ready[iter] == 0) {
-	
 					if(model->checkInferenceDone(device_id, iter)) {
-						//totalElapsedTime += (getTime() - start_time[iter]);
-						//curr_signals[iter] = 0;	
-						next_signals[iter] = 1;
-						ready[iter] = 1;
-					} 
-				}	
-			}
+						assigned_buffer_id = assignedSampleId[iter] % buffer_num;
 
+						(*curr_signals)[assigned_buffer_id] = 0;
+
+						//totalElapsedTime += (getTime() - start_time[iter]);
+						(*next_signals)[assigned_buffer_id] = 1;
+						ready[iter] = 1;
+						assignedSampleId[iter] = -1;
+					}
+					if(min_sample_index > assignedSampleId[iter] && assignedSampleId[iter] >= 0) {
+						min_sample_index = assignedSampleId[iter];	
+					}
+
+				}
+			}
 
 			usleep(SLEEP_TIME);
 			sleep_time++;
@@ -189,25 +209,28 @@ void doInference(void *d) {
 		}	
 		
 		sleep_time = 0;
-
+		assignedSampleId[next_stream_index] = sample_index;
 		//start_time[next_buffer_index] = getTime();
-		model->infer(device_id, next_buffer_index);
-		ready[next_buffer_index] = 0;
-		model->waitUntilInputConsumed(device_id, next_buffer_index);
-		curr_signals[next_buffer_index] = 0;	
+		model->infer(device_id, next_stream_index, next_buffer_index);
+		ready[next_stream_index] = 0;
+		//input_consumed[next_buffer_index] = false;
+
+		//model->waitUntilInputConsumed(device_id, next_buffer_index);
+		//curr_signals[next_buffer_index] = 0;	
 
 		sample_index++;
 	}
 
-	for(int iter = 0; iter < buffer_num; iter++) {
+	for(int iter = 0; iter < stream_num; iter++) {
 		if(ready[iter] == 0) {
 			if(exit_flag == false) 
 			{
 				model->waitUntilInferenceDone(device_id, iter);
 				//totalElapsedTime += (getTime() - start_time[iter]);
 			}
-			curr_signals[iter] = 0;
-			next_signals[iter] = 1;
+			assigned_buffer_id = assignedSampleId[iter] % buffer_num;
+			(*curr_signals)[assigned_buffer_id] = 0;
+			(*next_signals)[assigned_buffer_id] = 1;
 			ready[iter] = 1;
 		}	
 	}

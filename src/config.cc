@@ -344,6 +344,31 @@ void ConfigData::readDevices(Config *cfg){
 	}
 }
 
+void ConfigData::readStreams(Config *cfg){
+	try{
+		Setting &settings = cfg->lookup("configs.instances");
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *data = settings[iter]["streams"];
+			std::stringstream ss(data);
+			std::string temp;
+
+			while( getline(ss,temp,',')) {
+				instances.at(iter).stream_numbers.push_back(std::stoi(temp));
+			}
+		}
+
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'streams' setting in configuration file." << std::endl;
+		for(int iter = 0; iter < instance_num; iter++) {
+			for(int iter2 = 0 ; iter2 < instances.at(iter).device_num ; iter2++) {
+				instances.at(iter).stream_numbers.push_back(instances.at(iter).buffer_num);
+			}
+		}
+	}
+}
+
+
 void ConfigData::readDlaCores(Config *cfg){
 	try{
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -419,6 +444,7 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readDevices(&cfg);
 	readDlaCores(&cfg);
 	readDataType(&cfg);
+	readStreams(&cfg);
 }
 
 ConfigData::~ConfigData() {

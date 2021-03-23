@@ -27,6 +27,7 @@ typedef struct _ConfigInstance {
 	std::vector<int> cut_points;
 	std::vector<int> devices;
 	std::vector<int> dla_cores;
+	std::vector<int> stream_numbers;
 	int data_type;
 } ConfigInstance;
 
@@ -61,6 +62,8 @@ class ConfigData {
 		void readDevices(libconfig::Config *cfg);
 		void readDlaCores(libconfig::Config *cfg);
 		void readDataType(libconfig::Config *cfg);
+		void readStreams(libconfig::Config *cfg);
+
 };
 
 #endif
