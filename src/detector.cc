@@ -2,6 +2,7 @@
 #include <vector>
 #include <cassert>
 #include <unistd.h>
+#include <list>
 
 #include "variable.h"
 #include "config.h"
@@ -161,20 +162,22 @@ void doInference(void *d) {
 	int next_buffer_index = 0;
 	int assigned_buffer_id = 0;
 	int next_stream_index = 0;
-	int stream_index = 0;
 	int min_sample_index = 0;
 	//std::vector<bool> input_consumed(buffer_num, false);
+	std::vector<int> stream_balance(stream_num, 0);
+	std::list<int> available_streams;
+
+	for(int iter = 0; iter < stream_num ; iter++) {
+		available_streams.push_back(iter);
+	}
 
 	while(sample_index < sample_offset + sample_size && exit_flag == false) {
 		while(exit_flag == false) {
 			if((*curr_signals)[sample_index % buffer_num] == 1 && (*next_signals)[sample_index % buffer_num] == 0 && sample_index < min_sample_index + buffer_num) {
-				for(stream_index = 0; stream_index < stream_num; stream_index++	) {
-					if(ready[stream_index] == 1)
-						break;
-				}
-				if(stream_index < stream_num) {
+				if(available_streams.size() > 0) {
 					next_buffer_index = sample_index % buffer_num;
-					next_stream_index = stream_index;
+					next_stream_index = available_streams.front();
+					available_streams.pop_front();
 					break;
 				}
 			}
@@ -190,6 +193,7 @@ void doInference(void *d) {
 						(*next_signals)[assigned_buffer_id] = 1;
 						ready[iter] = 1;
 						assignedSampleId[iter] = -1;
+						available_streams.push_back(iter);
 					}
 					if(min_sample_index > assignedSampleId[iter] && assignedSampleId[iter] >= 0) {
 						min_sample_index = assignedSampleId[iter];	
@@ -212,6 +216,7 @@ void doInference(void *d) {
 		assignedSampleId[next_stream_index] = sample_index;
 		//start_time[next_buffer_index] = getTime();
 		model->infer(device_id, next_stream_index, next_buffer_index);
+		stream_balance[next_stream_index]++;
 		ready[next_stream_index] = 0;
 		//input_consumed[next_buffer_index] = false;
 
@@ -233,6 +238,7 @@ void doInference(void *d) {
 			(*next_signals)[assigned_buffer_id] = 1;
 			ready[iter] = 1;
 		}	
+		fprintf(stderr, "device id: %d, stream_id: %d, executed_num: %d\n", device_id, iter, stream_balance[iter]);
 	}
 
 	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
