@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include <cctype>
 
 #include <NvInfer.h>
 #include <tkDNN/tkdnn.h>
@@ -10,6 +11,14 @@
 
 #include "model.h"
 #include "variable.h"
+
+
+static bool fileExist(std::string fname) {
+    std::ifstream dataFile (fname.c_str(), std::ios::in | std::ios::binary);
+    if(!dataFile)
+    	return false;
+    return true;
+}
 
 
 Model::Model(ConfigData *config_data, int instance_id) {
@@ -103,6 +112,80 @@ void Model::setMaxBatchSize() {
 	net->maxBatchSize = batch;
 }
 
+int Model::getLayerNumberFromCalibrationKey(std::string key)
+{
+	int last_index = key.rfind('_');
+	int iter = last_index - 1;
+	int number;
+	while (isdigit(key.at(iter)) == true)
+	{
+		iter--;
+	}
+	std::stringstream ssString(key.substr(iter+1, last_index - (iter + 1)));
+	ssString >> number;
+
+	return number;
+}
+
+
+void Model::readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table) {
+	std::ifstream input(basic_calibration_table.c_str());
+	std::ofstream output(out_calib_table.c_str());
+	std::string title;
+	std::string key;
+	std::string value;
+	input >> title;
+	//std::cout << title << std::endl;
+	output << title << std::endl;
+	std::set<int> inputLayerSet = tk::dnn::NetworkRT::getInputLayers(net, start_index, end_index);
+
+	while(!input.eof())
+	{
+		input >> key;
+		input >> value;
+		//std::cout << "key: " << key << ", value: " << value << std::endl;
+		if(key == "data:" && start_index > 0)  {
+			continue;			
+		}
+		else if(key == "out:" || key == "data:") {
+			//std::cout  << key << " " << value << std::endl;
+			output << key << " " << value << std::endl;	
+		}
+		else {
+			int layer_number = getLayerNumberFromCalibrationKey(key);
+			if((layer_number >= start_index && layer_number <= end_index) || 
+				inputLayerSet.find(layer_number) != inputLayerSet.end()) {
+				//std::cout  << key << " " << value << std::endl;
+				output << key << " " << value << std::endl;	
+			}
+			else if(layer_number > end_index) {
+				break;
+			}
+		}
+
+		if(key == "out:") break;
+	}
+}
+
+void Model::createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index) {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int data_type = config_data->instances.at(instance_id).data_type;
+	std::string gpu_calib_table = config_data->instances.at(instance_id).gpu_calib_table;
+	std::string dla_calib_table = config_data->instances.at(instance_id).dla_calib_table;
+	std::string calib_table_name = plan_file_name.substr(0, plan_file_name.rfind('.')) + "-calibration.table";
+
+	if(fileExist(calib_table_name) == false && device_num > 1 && data_type == TYPE_INT8 && 
+		fileExist(gpu_calib_table) == true && fileExist(dla_calib_table) == true) {
+		int device = config_data->instances.at(instance_id).devices.at(iter);
+		if(device == DEVICE_DLA) {
+			readFromCalibrationTable(dla_calib_table, start_index, end_index, calib_table_name);
+		}
+		else {
+			readFromCalibrationTable(gpu_calib_table, start_index, end_index, calib_table_name);
+		}
+	}
+}
+
 void Model::setDataType() {
 	int data_type = config_data->instances.at(instance_id).data_type;
 
@@ -145,6 +228,7 @@ void Model::initializeModel() {
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 
 		getModelFileName(iter1, plan_file_name);
+		createCalibrationTable(plan_file_name, iter1, start_index, cut_point);
 
 		setDevice(iter1);
 		setMaxBatchSize();

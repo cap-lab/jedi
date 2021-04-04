@@ -388,6 +388,35 @@ void ConfigData::readDlaCores(Config *cfg){
 	}
 }
 
+void ConfigData::readCalibTable(Config *cfg) {
+	try{	
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			if(instances.at(iter).data_type == TYPE_INT8)
+			{
+				{
+					const char *tmp = settings[iter]["gpu_calib_table"];
+					std::stringstream ss(tmp);
+					static std::string data;
+					ss >> data;
+					instances.at(iter).gpu_calib_table = data.c_str();
+				}
+				{
+					const char *tmp = settings[iter]["dla_calib_table"];
+					std::stringstream ss(tmp);
+					static std::string data;
+					ss >> data;
+					instances.at(iter).dla_calib_table = data.c_str();
+				}
+			}
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "Missing 'calib_table' setting in configuration file." << std::endl;
+	}
+
+}
+
 void ConfigData::readDataType(Config *cfg) {
 	try{	
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -445,6 +474,7 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readDlaCores(&cfg);
 	readDataType(&cfg);
 	readStreams(&cfg);
+	readCalibTable(&cfg);
 }
 
 ConfigData::~ConfigData() {

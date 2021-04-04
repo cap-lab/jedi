@@ -67,6 +67,11 @@ class Model {
 		void waitUntilInferenceDone(int device_id, int stream_id);
 		void waitUntilInputConsumed(int device_id, int stream_id);
 		bool checkInputConsumed(int device_id, int stream_id);
+		void createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index);
+		void readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table);
+		int getLayerNumberFromCalibrationKey(std::string key);
+
+
 };
 
 #endif
