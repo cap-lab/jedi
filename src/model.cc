@@ -425,6 +425,7 @@ void Model::setStreamBuffer() {
 void Model::allocateBuffer() {
 	int batch = config_data->instances.at(instance_id).batch;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+	int data_type = config_data->instances.at(instance_id).data_type;
 
 	input_buffers.clear();
 	output_buffers.clear();
@@ -436,7 +437,12 @@ void Model::allocateBuffer() {
 
 		for(int iter2 = 1; iter2 < total_binding_num; iter2++) {
 			if(!is_net_output[iter2]) {
-				stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_16(NULL, batch * binding_size[iter2]);	
+				if(data_type == TYPE_INT8) {
+					stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_8(NULL, batch * binding_size[iter2]);
+				}
+				else {
+					stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_16(NULL, batch * binding_size[iter2]);
+				}
 			}
 			else {
 				float *output_buffer = cuda_make_array_host(batch * binding_size[iter2]);

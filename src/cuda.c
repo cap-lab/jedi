@@ -169,7 +169,23 @@ __half_raw *cuda_make_array_16(float *x, size_t n) {
         check_error(cudaMemset(x_gpu, 0, size));
     }
     if (!x_gpu)
-        error("Cuda malloc failed\n");
+        error("cuda malloc failed\n");
+    return x_gpu;
+}
+
+signed char *cuda_make_array_8(float *x, size_t n) {
+    signed char *x_gpu;
+    /* size_t size = sizeof(float) * n; */
+    size_t size = n;
+    cudaError_t status = cudaMalloc((void **)&x_gpu, size);
+    check_error(status);
+    if (x) {
+		// do nothing
+    } else {
+        check_error(cudaMemset(x_gpu, 0, size));
+    }
+    if (!x_gpu)
+        error("cuda malloc failed\n");
     return x_gpu;
 }
 
