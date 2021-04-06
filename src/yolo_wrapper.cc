@@ -2,13 +2,23 @@
 
 static int input_width, input_height;
 
-Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride)
+Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride, int new_coords)
 {
 	Box b;
-	b.x = (i + x[index + 0*stride]) / lw;
-	b.y = (j + x[index + 1*stride]) / lh;
-	b.w = exp(x[index + 2*stride]) * biases[2*n]   / w;
-	b.h = exp(x[index + 3*stride]) * biases[2*n+1] / h;
+	if(new_coords == 0) 
+	{
+		b.x = (i + x[index + 0*stride]) / lw;
+		b.y = (j + x[index + 1*stride]) / lh;
+		b.w = exp(x[index + 2*stride]) * biases[2*n]   / w;
+		b.h = exp(x[index + 3*stride]) * biases[2*n+1] / h;
+	}
+	else
+	{
+		b.x = (i + x[index + 0 * stride]) / lw;
+		b.y = (j + x[index + 1 * stride]) / lh;
+		b.w = x[index + 2 * stride] * x[index + 2 * stride] * 4 * biases[2 * n] / w;
+		b.h = x[index + 3 * stride] * x[index + 3 * stride] * 4 * biases[2 * n + 1] / h;
+	}
 	return b;
 }
 
@@ -108,7 +118,7 @@ static int yolo_computeDetections(float *predictions,  Detection *dets, int *nde
 			if(objectness <= thresh) continue;
 			int box_index  = entry_yolo_index(0, n*lw*lh + i, 0, lw, lh, lc);
 
-			dets[count].bbox = get_yolo_box(predictions, yolo.bias, yolo.mask[n], box_index, col, row, lw, lh, input_width, input_height, lw*lh);
+			dets[count].bbox = get_yolo_box(predictions, yolo.bias, yolo.mask[n], box_index, col, row, lw, lh, input_width, input_height, lw*lh, yolo.new_coords);
 			dets[count].objectness = objectness;
 			dets[count].classes = NUM_CLASSES;
 			for(j = 0; j < NUM_CLASSES; ++j){
@@ -128,7 +138,35 @@ static int yolo_computeDetections(float *predictions,  Detection *dets, int *nde
 	return count;
 }
 
-static void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
+static void box_c(const Box a, const Box b, float& top, float& bot, float& left, float& right) {
+    top = std::min(a.y - a.h / 2, b.y - b.h / 2); 
+    bot = std::max(a.y + a.h / 2, b.y + b.h / 2); 
+    left = std::min(a.x - a.w / 2, b.x - b.w / 2); 
+    right = std::max(a.x + a.w / 2, b.x + b.w / 2); 
+}
+
+
+// https://github.com/Zzh-tju/DIoU-darknet
+// https://arxiv.org/abs/1911.08287
+static float yolo_box_diou(const Box a, const Box b, const float nms_thresh=0.6)
+{
+    float top, bot, left, right;
+    box_c(a, b, top, bot, left, right);
+    float w = right - left;
+    float h = bot - top;
+    float c = w * w + h * h;
+    float iou = yolo_box_iou(a, b); 
+    if (c == 0)  
+    	return iou;
+    
+    float d = (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
+    float u = pow(d / c, nms_thresh);
+    float diou_term = u;
+    return iou - diou_term;
+}
+
+
+static void yolo_mergeDetections(Detection *dets, int ndets, int classes, double nms_thresh, tk::dnn::Yolo::nmsKind_t nms_kind) {
 	int total = ndets;
 	int i, j, k;
 	k = total-1;
@@ -154,7 +192,10 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 			Box a = dets[i].bbox;
 			for(j = i+1; j < total; ++j){
 				Box b = dets[j].bbox;
-				if (yolo_box_iou(a, b) > NMS){
+				if(nms_kind == tk::dnn::Yolo::GREEDY_NMS && yolo_box_iou(a, b) > nms_thresh) {
+					dets[j].prob[k] = 0;
+				}
+				else if(nms_kind == tk::dnn::Yolo::DIOU_NMS && yolo_box_diou(a, b, nms_thresh) > nms_thresh) {
 					dets[j].prob[k] = 0;
 				}
 			}
@@ -162,7 +203,7 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes) {
 	}
 }
 
-void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, Detection *dets, std::vector<int> &detections_num) {
+void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
 	int detection_num = 0;
 	int output_size = 0;
 
@@ -170,19 +211,19 @@ void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_
 	input_height = input_dim.height;
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
+		int yolo_num = yolos.size();
 		detection_num = 0;
-
 		for(int iter2 = 0; iter2 < yolo_num; iter2++) {
 			int index = buffer_id * yolo_num + iter2;
-			int w = yolo_values[iter2].width;
-			int h = yolo_values[iter2].height;
-			int c = yolo_values[iter2].channel;
+			int w = yolos[iter2].width;
+			int h = yolos[iter2].height;
+			int c = yolos[iter2].channel;
 
 			output_size = w * h * c;
 			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, w, h, c, CONFIDENCE_THRESH, yolos[iter2]);
 		}
 
-		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, NUM_CLASSES);
+		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, NUM_CLASSES, yolos[0].nms_thresh, yolos[0].nms_kind);
 		detections_num[iter1] = detection_num;
 	}
 }

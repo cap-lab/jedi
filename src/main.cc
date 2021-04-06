@@ -9,12 +9,15 @@
 #include "dataset.h"
 #include "thread.h"
 #include "coco.h"
+#include "util.h"
 
 typedef struct _InstanceThreadData {
 	PreProcessingThread *pre_thread;
 	PostProcessingThread *post_thread;
 	InferenceThread *infer_thread;
 } InstanceThreadData;
+
+bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
@@ -60,14 +63,6 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 	fp.close();
 }
 
-static long getTime() {
-	struct timespec time;
-	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
-		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
-		exit(-1);
-	}
-	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000;
-}
 
 static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
 	for(int iter = 0; iter < instance_num; iter++) {
@@ -121,7 +116,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
-	int signals[instance_num][MAX_DEVICE_NUM+1][MAX_BUFFER_NUM] = {0};
+	std::vector<int> signals[instance_num][MAX_DEVICE_NUM+1];
 	std::vector<InstanceThreadData> instance_threads_data;
 	std::vector<std::thread> instance_threads;
 	long start_time = 0;
@@ -129,17 +124,22 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	
 	for(int iter = 0; iter < instance_num; iter++) {
 		int device_num = config_data.instances.at(iter).device_num;
+		int buffer_num = config_data.instances.at(iter).buffer_num;
+
+		for(int iter2 = 0; iter2 < device_num + 1 ; iter2++) {
+			signals[iter][iter2].assign(buffer_num, 0);
+		}
 
 		PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, iter);
-		pre_thread->setThreadData(signals[iter][0], models[iter], datasets[iter]);		
+		pre_thread->setThreadData(&(signals[iter][0]), models[iter], datasets[iter]);		
 		preProcessingThreads.push_back(pre_thread);
 
 		PostProcessingThread *post_thread = new PostProcessingThread(&config_data, iter);
-		post_thread->setThreadData(signals[iter][device_num], models[iter], datasets[iter]);		
+		post_thread->setThreadData(&(signals[iter][device_num]), models[iter], datasets[iter]);		
 		postProcessingThreads.push_back(post_thread);
 
 		InferenceThread *infer_thread = new InferenceThread(&config_data, iter);
-		infer_thread->setThreadData(signals[iter][0], models[iter]);
+		infer_thread->setThreadData(signals[iter], models[iter]);
 		inferenceThreads.push_back(infer_thread);
 
 		InstanceThreadData instance_thread_data;
@@ -246,5 +246,12 @@ int main(int argc, char *argv[]) {
 	// clear data
 	finalizeData(instance_num, models, datasets);
 
-	return 0;
+	if(exit_flag == false)
+	{
+		return 0;
+	}
+	else
+	{
+		return 1;
+	}	
 }
