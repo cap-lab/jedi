@@ -201,7 +201,6 @@ void Model::setDataType() {
 		net->fp16 = false;	
 		net->int8 = true;
 		net->fileImgList = config_data->instances.at(instance_id).calib_image_path;
-		net->fileLabelList = config_data->instances.at(instance_id).calib_image_label_path;
 		net->num_calib_images = config_data->instances.at(instance_id).calib_images_num;
 	}
 }

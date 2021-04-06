@@ -13,7 +13,6 @@ typedef struct _ConfigInstance {
 	std::string cfg_path;
 	std::string image_path;
 	std::string calib_image_path;
-	std::string calib_image_label_path;
 	std::string gpu_calib_table;
 	std::string dla_calib_table;
 	int calib_images_num;
@@ -50,7 +49,6 @@ class ConfigData {
 		void readCfgPath(libconfig::Config *cfg);
 		void readImagePath(libconfig::Config *cfg);
 		void readCalibImagePath(libconfig::Config *cfg);
-		void readCalibImageLabelPath(libconfig::Config *cfg);
 		void readCalibImagesNum(libconfig::Config * cfg);
 		void readNamePath(libconfig::Config *cfg);
 		void readBatch(libconfig::Config * cfg);

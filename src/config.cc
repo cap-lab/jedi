@@ -143,23 +143,6 @@ void ConfigData::readCalibImagePath(Config *cfg) {
 	}
 }
 
-void ConfigData::readCalibImageLabelPath(Config *cfg) {
-	try{	
-		Setting &settings = cfg->lookup("configs.instances");	
-		for(int iter = 0; iter < instance_num; iter++) {
-			const char *tmp = settings[iter]["calib_image_label_path"];
-			std::stringstream ss(tmp);
-			static std::string data;
-			ss >> data;
-			instances.at(iter).calib_image_label_path = data.c_str();
-			std::cerr<<"calib_image_label_path: "<<instances.at(iter).calib_image_label_path<<std::endl;
-		}
-	}
-	catch(const SettingNotFoundException &nfex) {
-		std::cerr << "No 'calib_image_label_path' setting in configuration file." << std::endl;
-	}
-}
-
 void ConfigData::readCalibImagesNum(Config * cfg){
 	try {
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -459,7 +442,6 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readCfgPath(&cfg);
 	readImagePath(&cfg);
 	readCalibImagePath(&cfg);
-	readCalibImageLabelPath(&cfg);
 	readCalibImagesNum(&cfg);
 	readNamePath(&cfg);
 	readBatch(&cfg);
