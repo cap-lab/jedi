@@ -199,6 +199,7 @@ int main(int argc, char *argv[]) {
 	std::string result_file_name = "coco_results.json";
 	std::string power_file_name;
 	std::string time_file_name;
+	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	if(argc == 1) {
 		printHelpMessage();
