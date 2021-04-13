@@ -4,8 +4,8 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <mutex>
 
-#include "thread.h"
 #include "config.h"
 #include "variable.h"
 #include "dataset.h"
@@ -19,6 +19,10 @@ typedef struct _PreProcessingThreadData {
 	std::vector<int> *signals;
 	Model *model;
 	Dataset *dataset;
+	std::vector<long> *latency;
+	int *sample_index;
+	std::vector<int> *cur_running_index;
+	std::mutex *mu;
 } PreProcessingThreadData;
 
 typedef struct _PostProcessingThreadData {
@@ -28,6 +32,10 @@ typedef struct _PostProcessingThreadData {
 	std::vector<int> *signals;
 	Model *model;
 	Dataset *dataset;
+	std::vector<long> *latency;
+	int *sample_index;
+	std::mutex *mu;
+	std::vector<int> *cur_running_index;
 } PostProcessingThreadData;
 
 typedef struct _InferenceThreadData {
@@ -45,7 +53,6 @@ class Thread {
 		int instance_id;
 		int thread_num;
 		std::vector<std::thread> threads;
-
 		Thread(ConfigData *config_data, int instance_id);
 		virtual ~Thread();
 		virtual void runThreads() = 0;
@@ -55,10 +62,13 @@ class Thread {
 class PreProcessingThread : public Thread {
 	public:
 		std::vector<PreProcessingThreadData> threads_data;
+		int sample_index;
+		std::mutex mu;
+		std::vector<int> cur_running_index;
 
-		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
+		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {this->sample_index = 0;};
 		~PreProcessingThread();
-		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset);
+		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset, std::vector<long> *latency);
 		void runThreads();
 		void joinThreads();
 };
@@ -66,10 +76,13 @@ class PreProcessingThread : public Thread {
 class PostProcessingThread : public Thread {
 	public:
 		std::vector<PostProcessingThreadData> threads_data;
+		int sample_index;
+		std::mutex mu;
+		std::vector<int> cur_running_index;
 
-		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
+		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {this->sample_index = 0;};
 		~PostProcessingThread();
-		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset);
+		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset, std::vector<long> *latency);
 		void runThreads();
 		void joinThreads();
 };

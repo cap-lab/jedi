@@ -118,6 +118,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	std::vector<InferenceThread *> inferenceThreads;
 	std::vector<int> signals[instance_num][MAX_DEVICE_NUM+1];
 	std::vector<InstanceThreadData> instance_threads_data;
+	std::vector<long> latencies[instance_num];
 	std::vector<std::thread> instance_threads;
 	long start_time = 0;
 	double inference_time = 0;
@@ -125,17 +126,20 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	for(int iter = 0; iter < instance_num; iter++) {
 		int device_num = config_data.instances.at(iter).device_num;
 		int buffer_num = config_data.instances.at(iter).buffer_num;
+		int sample_size = config_data.instances.at(iter).sample_size;
 
 		for(int iter2 = 0; iter2 < device_num + 1 ; iter2++) {
 			signals[iter][iter2].assign(buffer_num, 0);
 		}
 
+		latencies[iter].assign(sample_size, 0);
+
 		PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, iter);
-		pre_thread->setThreadData(&(signals[iter][0]), models[iter], datasets[iter]);		
+		pre_thread->setThreadData(&(signals[iter][0]), models[iter], datasets[iter], &(latencies[iter]));
 		preProcessingThreads.push_back(pre_thread);
 
 		PostProcessingThread *post_thread = new PostProcessingThread(&config_data, iter);
-		post_thread->setThreadData(&(signals[iter][device_num]), models[iter], datasets[iter]);		
+		post_thread->setThreadData(&(signals[iter][device_num]), models[iter], datasets[iter], &(latencies[iter]));
 		postProcessingThreads.push_back(post_thread);
 
 		InferenceThread *infer_thread = new InferenceThread(&config_data, iter);
@@ -170,6 +174,10 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 
 	if(time_file_name.length() != 0) {
 		writeTimeResultFile(time_file_name, inference_time);
+	}
+
+	for(int iter = 0; iter < instance_num; iter++) {
+		std::cout<< "average latency ("<< iter <<"): " << getAverageLatency(iter, &config_data, latencies[iter]) << std::endl;
 	}
 
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);

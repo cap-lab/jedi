@@ -191,6 +191,24 @@ void ConfigData::readBatch(Config * cfg){
 	}
 }
 
+void ConfigData::readBatchThreadNum(Config * cfg){
+	try {
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *data = settings[iter]["batch_thread_num"];
+			instances.at(iter).batch_thread_num = atoi(data);
+
+			std::cerr<<"batch threads: "<<instances.at(iter).batch_thread_num<<std::endl;
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'batch_thread_num' setting in configuration file." <<std::endl;
+		for(int iter = 0; iter < instance_num; iter++) {
+			instances.at(iter).batch_thread_num = 1;
+		}
+	}
+}
+
 void ConfigData::readOffset(Config * cfg){
 	try {
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -445,6 +463,7 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readCalibImagesNum(&cfg);
 	readNamePath(&cfg);
 	readBatch(&cfg);
+	readBatchThreadNum(&cfg);
 	readOffset(&cfg);
 	readSampleSize(&cfg);
 	readDeviceNum(&cfg);

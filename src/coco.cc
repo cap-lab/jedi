@@ -31,9 +31,9 @@ static int get_coco_image_id(char *filename) {
     return atoi(p + 1);
 }
 
-std::map<int,std::list<std::string>> detected_map;
-std::mutex mu;
-int detected_num = 0;
+static std::map<int,std::list<std::string>> detected_map;
+static std::mutex mu;
+static int detected_num = 0;
 
 void writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
