@@ -357,14 +357,12 @@ void Model::setBufferIndexing() {
 			yolos.push_back(yolo);
 		}	
 
-		int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
-		for(int iter2 = index; iter2 < index + netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
-			is_net_output[iter2] = true;
+		if(iter1 == device_num -  1) {
+			int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
+			for(int iter2 = index; iter2 < index + output_binding_num; iter2++) {
+				is_net_output[iter2] = true;
+			}
 		}
-	}
-
-	if(yolos.empty() == true) {
-		is_net_output[total_binding_num - 1] = true;	
 	}
 }
 
