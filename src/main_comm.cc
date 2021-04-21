@@ -14,10 +14,12 @@
 #include "dataset.h"
 #include "thread.h"
 #include "coco.h"
+#include "detector.h"
 
 std::string power_file_name;
 std::string time_file_name;
 int rcv_key_num, snd_key_num;
+int g_pre_core, g_post_core;
 bool exit_flag;
 
 // std::cerr<<__func__<<":"<<__LINE__<<std::endl;
@@ -120,31 +122,17 @@ static int createMsgQueue(int key_num) {
 	return msq_id;
 }
 
-static bool receiveDataFromMsgQueue(int rcv_msq_id, int type) {
-	MsqData rcv_data;
+static void receiveDataFromMsgQueue(int rcv_msq_id, MsqData &rcv_data) {
 
-	if(type == 1) {
-		if(-1 == msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), 1, 0)) {
-			perror( "msgrcv() failed");
-			exit(1);
-		}
-		return false;
+	if(-1 == msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), -1 * MSG_RUN, 0)) {
+		perror( "msgrcv() failed");
 	}
-	else if(type == 2) {
-		if(-1 != msgrcv(rcv_msq_id, &rcv_data, sizeof(MsqData) - sizeof(long), 2, IPC_NOWAIT)) {
-			std::cerr<<__func__<<":"<<__LINE__<<" type two received"<<std::endl;
-			return true;
-		}
-		return false;
-	}
-	
-	return true;
 }
 
 static void sendDataToMsgQueue(int snd_msq_id) {
 	MsqData snd_data;
 
-	snd_data.type = 3;
+	snd_data.type = MSG_OK;
 	sprintf((char*)snd_data.buf, "inference done");	
 	if ( -1 == msgsnd(snd_msq_id, &snd_data, sizeof(MsqData), 0)) {
 		perror( "msgsnd() failed");
@@ -153,14 +141,28 @@ static void sendDataToMsgQueue(int snd_msq_id) {
 }
 
 static bool checkMsg(int rcv_msq_id) {
-	if(receiveDataFromMsgQueue(rcv_msq_id, 2)) {
-		exit_flag = true;
-		return true;
+	MsqData rcv_data;
+
+	receiveDataFromMsgQueue(rcv_msq_id, rcv_data);
+	int type = rcv_data.type;
+
+	if(type == MSG_RUNC) {
+		std::vector<int> cores;
+		std::string buf((const char*)rcv_data.buf);
+		std::stringstream ss(buf);
+		std::string temp;
+
+		while(std::getline(ss,temp,':')) {
+			cores.push_back(std::stoi(temp));	
+		}
+
+		g_pre_core = cores[0];
+		g_post_core = cores[1];
+		std::cerr<<"received MSG_RUNC"<<std::endl;
 	}
-	receiveDataFromMsgQueue(rcv_msq_id, 1);
-	if(receiveDataFromMsgQueue(rcv_msq_id, 2)) {
+	else if(type == MSG_EXIT) {
 		exit_flag = true;
-		return true;
+		return true;	
 	}
 
 	return false;
@@ -199,7 +201,6 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 	pre_thread->runThreads();
 	post_thread->runThreads();
 
-	// for(int titer1 = 0; titer1 < config_data.instances.at(candidate).sample_size; titer1++) {
 	while(true) {
 		// recv the msg from the controller
 		if(checkMsg(rcv_msq_id)) {
@@ -255,6 +256,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		std::cerr<<"max_latency: "<<max_latency<<", max_stage_time: "<<max_stage_time<<std::endl;
 		writeTimeResultFile(time_file_name, max_latency, max_stage_time);
 	}
+
+	std::cerr<<"program end"<<std::endl;
 }
 
 static void finalizeData(int candidates_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
@@ -281,7 +284,9 @@ int main(int argc, char *argv[]) {
 	std::string avg_profile_file_name;
 	std::vector<ConfigData> config_data_vec;
 
-	stickThisThreadToCore(6);
+	stickThisThreadToCore(0);
+	g_pre_core = -1;
+	g_post_core = -1;
 
 	if(argc == 1) {
 		printHelpMessage();

@@ -23,6 +23,14 @@ typedef struct _MsqData {
 	unsigned char buf[16];
 } MsqData;
 
+enum MsgType {
+	MSG_EXIT = 1,
+	MSG_RUNC = 2,
+	MSG_RUN = 3,
+	MSG_OK = 4,
+	MSG_STOP = 5	
+};
+
 #define NETWORK_YOLOV2 "yolo2"
 #define NETWORK_YOLOV2TINY "yolo2tiny"
 #define NETWORK_YOLOV3 "yolo3"
