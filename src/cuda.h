@@ -35,6 +35,10 @@ __half_raw *cuda_make_array_16(float *not_used, size_t n);
 // void cuda_pull_array_16(__half_raw *x_gpu, float *x, size_t n);
 // void cuda_push_array_16(__half_raw *x_gpu, float *x, size_t n);
 // cudnnHandle_t cudnn_handle();
+
+signed char *cuda_make_array_8(float *x, size_t n);
+
+
 #ifdef __cplusplus
 }
 #endif

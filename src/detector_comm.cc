@@ -58,7 +58,7 @@ void doPreProcessing(void *d) {
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
-	int *signals = data->signals;
+	std::vector<int> *signals = data->signals;
 	Dataset *dataset = data->dataset;
 
 	int sample_offset = config_data->instances.at(instance_id).offset;
@@ -73,7 +73,7 @@ void doPreProcessing(void *d) {
 	stickThisThreadToCore(4);
 
 	while(sample_index < sample_offset + sample_size) {
-		while(signals[sample_index % buffer_num]) {
+		while((*signals)[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}
 		curr_time = getTime();
@@ -84,18 +84,18 @@ void doPreProcessing(void *d) {
 
 		index = readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, pre_thread_num, index);
 
-		signals[sample_index % buffer_num] = 1;
+		(*signals)[sample_index % buffer_num] = 1;
 		sample_index += pre_thread_num;
 		pre_time_vec.push_back(getTime() - curr_time);
 	}
 }
 
-static void detectBox(std::vector<float *> output_buffers, int buffer_id, int yolo_num, std::vector<YoloData> yolos, std::vector<YoloValue> yolo_values, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
+static void detectBox(std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) {
 	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
 		regionLayerDetect(input_dim, batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
 	}
 	else {
-		yoloLayerDetect(input_dim, batch, output_buffers, buffer_id, yolo_num, yolos, yolo_values, dets, detections_num);
+		yoloLayerDetect(input_dim, batch, output_buffers, buffer_id, yolos, dets, detections_num);
 	}
 }
 
@@ -117,7 +117,7 @@ void doPostProcessing(void *d) {
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
-	int *signals = data->signals;
+	std::vector<int> *signals = data->signals;
 	Dataset *dataset = data->dataset;
 
 	int instance_num = config_data->instance_num;
@@ -129,8 +129,6 @@ void doPostProcessing(void *d) {
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset + tid;
 	std::vector<YoloData> yolos = data->model->yolos;
-	std::vector<YoloValue> yolo_values = data->model->yolo_values;
-	int yolo_num = data->model->yolo_num;
 	int buffer_id = 0;
 	Detection *dets;
 	std::vector<int> detections_num(batch, 0);
@@ -144,7 +142,7 @@ void doPostProcessing(void *d) {
 	allocateDetectionBox(batch, &dets);
 
 	while(sample_index < sample_offset + sample_size) {
-		while(!signals[sample_index % buffer_num]) {
+		while(!(*signals)[sample_index % buffer_num]) {
 			usleep(SLEEP_TIME);	
 		}	
 		curr_time = getTime();
@@ -155,9 +153,9 @@ void doPostProcessing(void *d) {
 
 		buffer_id = sample_index % buffer_num; 
 
-		detectBox(data->model->output_buffers, buffer_id, yolo_num, yolos, yolo_values, data->model->input_dim, batch, network_name, dets, detections_num);
+		detectBox(data->model->output_buffers, buffer_id, yolos, data->model->input_dim, batch, network_name, dets, detections_num);
 
-		signals[sample_index % buffer_num] = 0;
+		(*signals)[sample_index % buffer_num] = 0;
 
 		printBox(dataset, sample_index, data->model->input_dim, batch, network_name, dets, detections_num);
 		
@@ -170,56 +168,4 @@ void doPostProcessing(void *d) {
 	}
 
 	deallocateDetectionBox(batch * NBOXES, dets);
-}
-
-void doInference(void *d) {
-	InferenceThreadData *data = (InferenceThreadData *)d;
-	ConfigData *config_data = data->config_data;
-	int instance_id = data->instance_id;
-	int device_id = data->tid;
-	int *curr_signals = data->curr_signals;
-	int *next_signals = data->next_signals;
-	Model *model = data->model;
-
-	int sample_offset = config_data->instances.at(instance_id).offset;
-	int sample_size = config_data->instances.at(instance_id).sample_size;
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
-	std::string network_name = config_data->instances.at(instance_id).network_name;
-	int sample_index = sample_offset;
-	std::vector<int> ready(buffer_num, 1);
-
-	stickThisThreadToCore(device_id);
-
-	while(sample_index < sample_offset + sample_size) {
-		while(true) {
-			if(curr_signals[sample_index % buffer_num] == 1 && next_signals[sample_index % buffer_num] == 0 && ready[sample_index % buffer_num] == 1) {
-				break;	
-			}	
-
-			for(int iter = 0; iter < buffer_num; iter++) {
-				if(ready[iter] == 0) {
-					if(model->checkInferenceDone(device_id, iter)) {
-						curr_signals[iter] = 0;	
-						next_signals[iter] = 1;
-						ready[iter] = 1;
-					}
-				}	
-			}
-			usleep(SLEEP_TIME);
-		}	
-
-		model->infer(device_id, sample_index % buffer_num);
-		ready[sample_index % buffer_num] = 0;
-
-		sample_index++;
-	}
-
-	for(int iter = 0; iter < buffer_num; iter++) {
-		if(ready[iter] == 0) {
-			model->waitUntilInferenceDone(device_id, iter);
-			curr_signals[iter] = 0;
-			next_signals[iter] = 1;
-			ready[iter] = 1;
-		}	
-	}
 }

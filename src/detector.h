@@ -18,6 +18,4 @@ void doPreProcessing(void *d);
 
 void doPostProcessing(void *d);
 
-void doInference(void *d);
-
 #endif

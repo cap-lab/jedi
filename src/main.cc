@@ -11,10 +11,13 @@
 #include "dataset.h"
 #include "thread.h"
 #include "coco.h"
+#include "util.h"
 
 std::string power_file_name;
 std::string max_time_file_name;
 std::string avg_time_file_name;
+
+bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
@@ -73,14 +76,6 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 	fp.close();
 }
 
-static long getTime() {
-	struct timespec time;
-	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
-		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
-		exit(-1);
-	}
-	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000;
-}
 
 static void generateModels(int candidates_num, ConfigData &config_data, std::vector<Model *> &models) {
 	for(int iter = 0; iter < candidates_num; iter++) {
@@ -106,13 +101,16 @@ static void generateDatasets(int candidates_num, ConfigData &config_data, std::v
 void generateThreads(int candidate, ConfigData config_data, std::vector<Model *> models, std::vector<Dataset *> datasets, std::string max_profile_file_name, std::string avg_profile_file_name) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
-	std::vector<InferenceThread *> inferenceThreads;
 	std::vector<long> inference_time_vec;
 	std::vector<long> max_stage_time_vec;
-	int signals[3] = {0};
+	std::vector<int> signals[MAX_DEVICE_NUM+1];
 	long start_time = 0;
 	long max_stage_time = 0;
 	// double inference_time = 0;
+
+	for(int iter = 0; iter < 3; iter++) {
+		signals[iter].assign(1, 0);		
+	}
 
 	PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, candidate);
 	pre_thread->setThreadData(&(signals[0]), models[candidate], datasets[candidate]);		
@@ -131,8 +129,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 
 	for(int titer1 = 0; titer1 < config_data.instances.at(candidate).sample_size; titer1++) {
 		start_time = getTime();
-		signals[0] = 0;
-		while(!signals[0]) {
+		signals[0][0] = 0;
+		while(!signals[0][0]) {
 			usleep(SLEEP_TIME);	
 		}
 
@@ -149,8 +147,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		}
 		max_stage_time_vec.push_back(max_stage_time);
 
-		signals[2] = 1;
-		while(signals[2]) {
+		signals[2][0] = 1;
+		while(signals[2][0]) {
 			usleep(SLEEP_TIME);	
 		}
 		inference_time_vec.push_back((long)(getTime() - start_time));
@@ -261,5 +259,12 @@ int main(int argc, char *argv[]) {
 	// clear data
 	finalizeData(candidates_num, models, datasets);
 
-	return 0;
+	if(exit_flag == false)
+	{
+		return 0;
+	}
+	else
+	{
+		return 1;
+	}	
 }

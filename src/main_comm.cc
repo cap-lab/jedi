@@ -169,10 +169,9 @@ static bool checkMsg(int rcv_msq_id) {
 void generateThreads(int candidate, ConfigData config_data, std::vector<Model *> models, std::vector<Dataset *> datasets, std::string max_profile_file_name, std::string avg_profile_file_name) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
-	std::vector<InferenceThread *> inferenceThreads;
 	std::vector<long> inference_time_vec;
 	std::vector<long> max_stage_time_vec;
-	int signals[3] = {0};
+	std::vector<int> signals[MAX_DEVICE_NUM+1];
 	long start_time = 0;
 	long max_stage_time = 0;
 	int rcv_msq_id = -1, snd_msq_id = -1;
@@ -180,6 +179,10 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 	exit_flag = false;
 	rcv_msq_id = createMsgQueue(rcv_key_num);
 	snd_msq_id = createMsgQueue(snd_key_num);
+
+	for(int iter = 0; iter < 3; iter++) {
+		signals[iter].assign(1, 0);		
+	}
 
 	PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, candidate);
 	pre_thread->setThreadData(&(signals[0]), models[candidate], datasets[candidate]);		
@@ -204,8 +207,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		}
 
 		start_time = getTime();
-		signals[0] = 0;
-		while(!signals[0]) {
+		signals[0][0] = 0;
+		while(!signals[0][0]) {
 			usleep(SLEEP_TIME);	
 		}
 
@@ -222,8 +225,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		}
 		max_stage_time_vec.push_back(max_stage_time);
 
-		signals[2] = 1;
-		while(signals[2]) {
+		signals[2][0] = 1;
+		while(signals[2][0]) {
 			usleep(SLEEP_TIME);	
 		}
 		inference_time_vec.push_back((long)(getTime() - start_time));
@@ -232,8 +235,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		sendDataToMsgQueue(snd_msq_id);
 	}
 
-	signals[0] = 0;
-	signals[2] = 1;
+	signals[0][0] = 0;
+	signals[2][0] = 1;
 	pre_thread->joinThreads();
 	post_thread->joinThreads();
 

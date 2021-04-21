@@ -16,7 +16,7 @@ typedef struct _PreProcessingThreadData {
 	ConfigData *config_data;
 	int instance_id;
 	int tid;
-	int *signals;
+	std::vector<int> *signals;
 	Model *model;
 	Dataset *dataset;
 } PreProcessingThreadData;
@@ -25,19 +25,10 @@ typedef struct _PostProcessingThreadData {
 	ConfigData *config_data;
 	int instance_id;
 	int tid;
-	int *signals;
+	std::vector<int> *signals;
 	Model *model;
 	Dataset *dataset;
 } PostProcessingThreadData;
-
-typedef struct _InferenceThreadData {
-	ConfigData *config_data;
-	int instance_id;
-	int tid;
-	int *curr_signals;
-	int *next_signals;
-	Model *model;
-} InferenceThreadData;
 
 class Thread {
 	public:
@@ -58,7 +49,7 @@ class PreProcessingThread : public Thread {
 
 		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
 		~PreProcessingThread();
-		void setThreadData(int *signals, Model *model, Dataset *dataset);
+		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset);
 		void runThreads();
 		void joinThreads();
 };
@@ -69,18 +60,7 @@ class PostProcessingThread : public Thread {
 
 		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
 		~PostProcessingThread();
-		void setThreadData(int *signals, Model *model, Dataset *dataset);
-		void runThreads();
-		void joinThreads();
-};
-
-class InferenceThread : public Thread {
-	public:
-		std::vector<InferenceThreadData> threads_data;
-
-		InferenceThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
-		~InferenceThread();
-		void setThreadData(int *signals, Model *model);
+		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset);
 		void runThreads();
 		void joinThreads();
 };

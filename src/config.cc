@@ -143,23 +143,6 @@ void ConfigData::readCalibImagePath(Config *cfg) {
 	}
 }
 
-void ConfigData::readCalibImageLabelPath(Config *cfg) {
-	try{	
-		Setting &settings = cfg->lookup("configs.instances");	
-		for(int iter = 0; iter < instance_num; iter++) {
-			const char *tmp = settings[iter]["calib_image_label_path"];
-			std::stringstream ss(tmp);
-			static std::string data;
-			ss >> data;
-			instances.at(iter).calib_image_label_path = data.c_str();
-			std::cerr<<"calib_image_label_path: "<<instances.at(iter).calib_image_label_path<<std::endl;
-		}
-	}
-	catch(const SettingNotFoundException &nfex) {
-		std::cerr << "No 'calib_image_label_path' setting in configuration file." << std::endl;
-	}
-}
-
 void ConfigData::readCalibImagesNum(Config * cfg){
 	try {
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -365,6 +348,31 @@ void ConfigData::readDevices(Config *cfg){
 	}
 }
 
+void ConfigData::readStreams(Config *cfg){
+	try{
+		Setting &settings = cfg->lookup("configs.instances");
+		for(int iter = 0; iter < instance_num; iter++) {
+			const char *data = settings[iter]["streams"];
+			std::stringstream ss(data);
+			std::string temp;
+
+			while( getline(ss,temp,',')) {
+				instances.at(iter).stream_numbers.push_back(std::stoi(temp));
+			}
+		}
+
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'streams' setting in configuration file." << std::endl;
+		for(int iter = 0; iter < instance_num; iter++) {
+			for(int iter2 = 0 ; iter2 < instances.at(iter).device_num ; iter2++) {
+				instances.at(iter).stream_numbers.push_back(instances.at(iter).buffer_num);
+			}
+		}
+	}
+}
+
+
 void ConfigData::readDlaCores(Config *cfg){
 	try{
 		Setting &settings = cfg->lookup("configs.instances");	
@@ -382,6 +390,35 @@ void ConfigData::readDlaCores(Config *cfg){
 	catch(const SettingNotFoundException &nfex) {
 		std::cerr << "No 'dla_cores' setting in configuration file." << std::endl;
 	}
+}
+
+void ConfigData::readCalibTable(Config *cfg) {
+	try{	
+		Setting &settings = cfg->lookup("configs.instances");	
+		for(int iter = 0; iter < instance_num; iter++) {
+			if(instances.at(iter).data_type == TYPE_INT8)
+			{
+				{
+					const char *tmp = settings[iter]["gpu_calib_table"];
+					std::stringstream ss(tmp);
+					static std::string data;
+					ss >> data;
+					instances.at(iter).gpu_calib_table = data.c_str();
+				}
+				{
+					const char *tmp = settings[iter]["dla_calib_table"];
+					std::stringstream ss(tmp);
+					static std::string data;
+					ss >> data;
+					instances.at(iter).dla_calib_table = data.c_str();
+				}
+			}
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "Missing 'calib_table' setting in configuration file." << std::endl;
+	}
+
 }
 
 void ConfigData::readDataType(Config *cfg) {
@@ -426,7 +463,6 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readCfgPath(&cfg);
 	readImagePath(&cfg);
 	readCalibImagePath(&cfg);
-	readCalibImageLabelPath(&cfg);
 	readCalibImagesNum(&cfg);
 	readNamePath(&cfg);
 	readWidthHeightPath(&cfg);
@@ -441,6 +477,8 @@ ConfigData::ConfigData(std::string config_file_path) {
 	readDevices(&cfg);
 	readDlaCores(&cfg);
 	readDataType(&cfg);
+	readStreams(&cfg);
+	readCalibTable(&cfg);
 }
 
 ConfigData::~ConfigData() {

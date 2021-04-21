@@ -19,6 +19,8 @@ static void printHelpMessage() {
 	std::cout<<"	./network_analyzer -c config_file [-o output_file]" <<std::endl;
 }
 
+bool exit_flag = false;
+
 static void printRouteShortCutRange(ConfigData *config_data, std::string output_file_name, int instance_id)
 {
 	std::string bin_path(config_data->instances.at(instance_id).bin_path);
@@ -40,7 +42,7 @@ static void printRouteShortCutRange(ConfigData *config_data, std::string output_
 				tk::dnn::Shortcut* shortcutLayer = (tk::dnn::Shortcut *) l;
 				tk::dnn::Layer *backLayer = shortcutLayer->backLayer;
 				//std::cout << backLayer->id << " " << l->id  << std::endl;
-				writeFile << backLayer->id << ":" << l->id  << std::endl;
+				writeFile << backLayer->id << ":" << l->id  << ":" << 2 << std::endl;
 			}
 			else if(l->getLayerType() == tk::dnn::LAYER_ROUTE)
 			{
@@ -50,7 +52,7 @@ static void printRouteShortCutRange(ConfigData *config_data, std::string output_
 					if(l->id - currLayer->id > 1) 
 					{
 						//std::cout << currLayer->id << " " << l->id  << std::endl;
-						writeFile << currLayer->id << ":" << l->id  << std::endl;
+						writeFile << currLayer->id << ":" << l->id << ":" << routeLayer->layers_n  << std::endl;
 					}
 				}
 

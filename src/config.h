@@ -13,7 +13,8 @@ typedef struct _ConfigInstance {
 	std::string cfg_path;
 	std::string image_path;
 	std::string calib_image_path;
-	std::string calib_image_label_path;
+	std::string gpu_calib_table;
+	std::string dla_calib_table;
 	std::string wh_path;
 	int calib_images_num;
 	std::string name_path;
@@ -28,6 +29,7 @@ typedef struct _ConfigInstance {
 	std::vector<int> cut_points;
 	std::vector<int> devices;
 	std::vector<int> dla_cores;
+	std::vector<int> stream_numbers;
 	int data_type;
 } ConfigInstance;
 
@@ -48,7 +50,6 @@ class ConfigData {
 		void readCfgPath(libconfig::Config *cfg);
 		void readImagePath(libconfig::Config *cfg);
 		void readCalibImagePath(libconfig::Config *cfg);
-		void readCalibImageLabelPath(libconfig::Config *cfg);
 		void readCalibImagesNum(libconfig::Config * cfg);
 		void readNamePath(libconfig::Config *cfg);
 		void readWidthHeightPath(libconfig::Config *cfg);
@@ -63,6 +64,9 @@ class ConfigData {
 		void readDevices(libconfig::Config *cfg);
 		void readDlaCores(libconfig::Config *cfg);
 		void readDataType(libconfig::Config *cfg);
+		void readStreams(libconfig::Config *cfg);
+		void readCalibTable(libconfig::Config *cfg);
+
 };
 
 #endif

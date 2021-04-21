@@ -26,11 +26,7 @@ PostProcessingThread::~PostProcessingThread() {
 	threads_data.clear();
 }
 
-InferenceThread::~InferenceThread() {
-	threads_data.clear();
-}
-
-void PreProcessingThread::setThreadData(int *signals, Model *model, Dataset *dataset) {
+void PreProcessingThread::setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset) {
 	thread_num = config_data->instances.at(instance_id).pre_thread_num;	
 
 	for(int iter = 0; iter < thread_num; iter++) {
@@ -58,7 +54,7 @@ void PreProcessingThread::joinThreads() {
 	}
 }
 
-void PostProcessingThread::setThreadData(int *signals, Model *model, Dataset *dataset) {
+void PostProcessingThread::setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset) {
 	thread_num = config_data->instances.at(instance_id).post_thread_num;	
 
 	for(int iter = 0; iter < thread_num; iter++) {
@@ -86,30 +82,3 @@ void PostProcessingThread::joinThreads() {
 	}
 }
 
-void InferenceThread::setThreadData(int *signals, Model *model) {
-	thread_num = config_data->instances.at(instance_id).device_num;	
-
-	for(int iter = 0; iter < thread_num; iter++) {
-		InferenceThreadData thread_data;		
-		thread_data.config_data = config_data;
-		thread_data.instance_id = instance_id;
-		thread_data.tid = iter;
-		thread_data.curr_signals = signals + iter * MAX_BUFFER_NUM;
-		thread_data.next_signals = signals + (iter + 1) * MAX_BUFFER_NUM;
-		thread_data.model = model;
-
-		threads_data.push_back(thread_data);
-	}
-}
-
-void InferenceThread::runThreads() {
-	for(int iter = 0; iter < thread_num; iter++) {
-		threads.push_back(std::thread(doInference, &(threads_data[iter])));
-	}
-}
-
-void InferenceThread::joinThreads() {
-	for(int iter = 0; iter < thread_num; iter++) {
-		threads[iter].join();
-	}
-}
