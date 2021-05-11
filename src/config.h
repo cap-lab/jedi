@@ -13,8 +13,7 @@ typedef struct _ConfigInstance {
 	std::string cfg_path;
 	std::string image_path;
 	std::string calib_image_path;
-	std::string gpu_calib_table;
-	std::string dla_calib_table;
+	std::string calib_table;
 	int calib_images_num;
 	std::string name_path;
 	int batch;

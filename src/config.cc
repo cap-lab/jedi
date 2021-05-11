@@ -395,20 +395,11 @@ void ConfigData::readCalibTable(Config *cfg) {
 		for(int iter = 0; iter < instance_num; iter++) {
 			if(instances.at(iter).data_type == TYPE_INT8)
 			{
-				{
-					const char *tmp = settings[iter]["gpu_calib_table"];
-					std::stringstream ss(tmp);
-					static std::string data;
-					ss >> data;
-					instances.at(iter).gpu_calib_table = data.c_str();
-				}
-				{
-					const char *tmp = settings[iter]["dla_calib_table"];
-					std::stringstream ss(tmp);
-					static std::string data;
-					ss >> data;
-					instances.at(iter).dla_calib_table = data.c_str();
-				}
+				const char *tmp = settings[iter]["calib_table"];
+				std::stringstream ss(tmp);
+				static std::string data;
+				ss >> data;
+				instances.at(iter).calib_table = data.c_str();
 			}
 		}
 	}

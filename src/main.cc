@@ -166,7 +166,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 		instance_threads[iter].join();	
 	}
 	inference_time = (double)(getTime() - start_time) / 1000000;
-	std::cout<<"inference time: "<<inference_time<<std::endl;
+	std::cout<< std::endl <<"inference time: "<<inference_time<<std::endl;
 
 	if(power_file_name.length() != 0) {
 		turnOffTegrastats();

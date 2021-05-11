@@ -66,11 +66,6 @@ static void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw
 	int i, j;
 	int image_id = get_coco_image_id(path);
 	std::list<std::string> detected;
-	float x_ratio;
-	float y_ratio;
-
-	x_ratio =  (float) w / (float) iw;
-	y_ratio =  (float) h / (float) ih;
 
 	for (i = 0; i < nDets; ++i) {
 		if (dets[i].objectness >= 0) {
