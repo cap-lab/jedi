@@ -31,7 +31,7 @@ long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<lon
 	return sum / (long) nSize;
 }
 
-static void readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int batch_thread_num, int index) 
+static void readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int batch_thread_num, int index, bool letter_box) 
 {
 	int input_width = input_dim.width, input_height = input_dim.height, input_channel = input_dim.channel;
 	int input_size = input_width * input_height * input_channel;
@@ -40,7 +40,10 @@ static void readImage(float *input_buffer, Dataset *dataset, InputDim input_dim,
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
 
-		loadImageResize((char *)(dataset->paths[index + iter].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);	
+		if(letter_box == true)
+			loadImageLetterBox((char *)(dataset->paths[index + iter].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
+		else
+			loadImageResize((char *)(dataset->paths[index + iter].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
 		dataset->w.at(index + iter) = orignal_width;
 		dataset->h.at(index + iter) = original_height;
 	}	
@@ -103,7 +106,7 @@ void doPreProcessing(void *d) {
 		}
 
 		(*latency)[sample_index - sample_offset] = getTime();
-		readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, batch_thread_num, index);
+		readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, batch_thread_num, index, data->model->letter_box);
 		(*signals)[sample_index % buffer_num] = 1;
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
@@ -113,11 +116,12 @@ void doPreProcessing(void *d) {
 	fprintf(stderr, "stuckWhile(front thread: %d): %ld\n", tid, stuckWhile);
 }
 
-static void detectBox(std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) { if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-		regionLayerDetect(input_dim, batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
+static void detectBox(std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Dataset *dataset, int sampleIndex, InputDim input_dim, bool letter_box, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) { 
+	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
+		regionLayerDetect(dataset, sampleIndex, input_dim, batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
 	}
 	else {
-		yoloLayerDetect(input_dim, batch, output_buffers, buffer_id, yolos, dets, detections_num);
+		yoloLayerDetect(dataset, sampleIndex, input_dim, letter_box, batch, output_buffers, buffer_id, yolos, dets, detections_num);
 	}
 }
 
@@ -173,7 +177,7 @@ void doPostProcessing(void *d) {
 
 		buffer_id = sample_index % buffer_num; 
 
-		detectBox(data->model->output_buffers, buffer_id, yolos, data->model->input_dim, batch, network_name, dets, detections_num);
+		detectBox(data->model->output_buffers, buffer_id, yolos, dataset, sample_index, data->model->input_dim, data->model->letter_box, batch, network_name, dets, detections_num);
 
 		(*signals)[sample_index % buffer_num] = 0;
 

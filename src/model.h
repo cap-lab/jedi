@@ -32,6 +32,7 @@ class Model {
 		std::vector<int> binding_size;
 		std::vector<YoloData> yolos;
 		InputDim input_dim;
+		bool letter_box;
 
 		tk::dnn::Network *net;
 		std::vector<std::vector<tk::dnn::NetworkRT *>> netRTs;

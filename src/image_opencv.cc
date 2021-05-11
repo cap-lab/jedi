@@ -25,6 +25,7 @@
 
 typedef void* mat_cv;
 
+
 static mat_cv *load_image_mat_cv(const char *filename, int flag)
 {
 	cv::Mat *mat_ptr = NULL;
@@ -91,6 +92,52 @@ static void mat_to_data(cv::Mat mat, float *input)
 				input[k*w*h + y*w + x] = data[y*step + x*c + k] / 255.0f;
 			}
 		}
+	}
+}
+
+cv::Mat letterbox(const cv::Mat& src, uchar pad) {
+	int N = std::max(src.cols, src.rows);
+	cv::Mat dst = cv::Mat::zeros(N, N, CV_8UC(src.channels()))
+                + cv::Scalar(pad, pad, pad, 0);
+	int dx = (N - src.cols) / 2;
+	int dy = (N - src.rows) / 2;
+	src.copyTo(dst(cv::Rect(dx, dy, src.cols, src.rows)));
+	return dst;
+}
+
+#define GRAY_COLOR 127
+
+
+void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
+{
+	try {
+		cv::Mat loaded_image = load_image_mat(filename, c);
+
+		*orig_width = loaded_image.cols;
+		*orig_height = loaded_image.rows;
+
+		int new_w = loaded_image.cols;
+		int new_h = loaded_image.rows;
+		if (((float)w / loaded_image.cols) < ((float)h / loaded_image.rows)) {
+				new_w = w;
+				new_h = (loaded_image.rows * w) / loaded_image.cols;
+		}
+		else {
+				new_h = h;
+				new_w = (loaded_image.cols * h) / loaded_image.rows;
+		}
+
+		cv::Mat resized(new_h, new_w, CV_8UC3);
+		cv::resize(loaded_image, resized, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
+		int N = std::max(new_w, new_h);
+		cv::Mat dst = cv::Mat::zeros(w, h, CV_8UC3) + cv::Scalar(GRAY_COLOR, GRAY_COLOR, GRAY_COLOR, 0);
+		int dx = (N - new_w) / 2;
+		int dy = (N - new_h) / 2;
+		resized.copyTo(dst(cv::Rect(dx, dy, new_w, new_h)));
+		mat_to_data(dst, input);
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageLetterBox() can't load image %s " << filename << std::endl;
 	}
 }
 

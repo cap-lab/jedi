@@ -216,7 +216,8 @@ void Model::initializeModel() {
 	// parse a network using tkDNN darknetParser
 	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
 	net->print();
-
+	
+	letter_box = net->letterBox;
 	input_dim.width = net->input_dim.w;
 	input_dim.height = net->input_dim.h;
 	input_dim.channel = net->input_dim.c;

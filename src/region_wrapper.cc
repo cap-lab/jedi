@@ -44,13 +44,10 @@ static void correct_region_boxes(Detection *dets, int n, int w, int h) {
     int new_h = 0;
     int netw = input_width;
     int neth = input_height;
-    if (((float)netw / w) < ((float)neth / h)) {
-        new_w = netw;
-        new_h = (h * netw) / w;
-    } else {
-        new_h = neth;
-        new_w = (w * neth) / h;
-    }
+
+	new_w = netw;
+   	new_h = neth;
+
     for (i = 0; i < n; ++i){
         Box b = dets[i].bbox;
         b.x =  (b.x - (netw - new_w) / 2. / netw) / ((float)new_w / netw); 
@@ -85,7 +82,7 @@ static Box get_region_box(float *x, int n, int index, int i, int j) {
     return b;
 }
 
-static void get_region_detections(float *last_data, float thresh, Detection *dets, int *nDets) {
+static void get_region_detections(float *last_data, float thresh, Detection *dets, int *nDets, int orig_width, int orig_height) {
 	int w = input_width;
 	int h = input_height;
     int lw = w / 32;
@@ -117,11 +114,11 @@ static void get_region_detections(float *last_data, float thresh, Detection *det
 			dets[index].prob[NUM_CLASSES] = max;
 		}
 	}
-	correct_region_boxes(dets, lw*lh*NUM_ANCHOR, w, h);
+	correct_region_boxes(dets, lw*lh*NUM_ANCHOR, orig_width, orig_height);
 	*nDets = lw *lh * NUM_ANCHOR ;
 }
 
-void regionLayerDetect(InputDim input_dim, int batch, float *output, Detection *dets, int *detection_num) {
+void regionLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, int batch, float *output, Detection *dets, int *detection_num) {
 	int count = 0, in_width = 0, in_height = 0;
 
 	input_width = input_dim.width;
@@ -131,7 +128,9 @@ void regionLayerDetect(InputDim input_dim, int batch, float *output, Detection *
 	in_height = input_height / 32;
 
 	for(int i = 0; i < batch; i++) {
-		get_region_detections(&output[i * in_width * in_height * NUM_ANCHOR * (NUM_CLASSES + 5)], CONFIDENCE_THRESH, &dets[i * NBOXES], &count);
+		int orig_width = dataset->w.at(sampleIndex + i);
+		int orig_height = dataset->h.at(sampleIndex + i);
+		get_region_detections(&output[i * in_width * in_height * NUM_ANCHOR * (NUM_CLASSES + 5)], CONFIDENCE_THRESH, &dets[i * NBOXES], &count, orig_width, orig_height);
 		do_nms_sort(&dets[i * NBOXES], count, NMS);
 	}
 
