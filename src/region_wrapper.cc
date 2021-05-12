@@ -44,7 +44,6 @@ static void correct_region_boxes(Detection *dets, int n, int w, int h) {
     int new_h = 0;
     int netw = input_width;
     int neth = input_height;
-
 	new_w = netw;
    	new_h = neth;
 
@@ -128,8 +127,8 @@ void regionLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, in
 	in_height = input_height / 32;
 
 	for(int i = 0; i < batch; i++) {
-		int orig_width = dataset->w.at(sampleIndex + i);
-		int orig_height = dataset->h.at(sampleIndex + i);
+		int orig_width = dataset->w.at(sampleIndex * batch + i);
+		int orig_height = dataset->h.at(sampleIndex * batch + i);
 		get_region_detections(&output[i * in_width * in_height * NUM_ANCHOR * (NUM_CLASSES + 5)], CONFIDENCE_THRESH, &dets[i * NBOXES], &count, orig_width, orig_height);
 		do_nms_sort(&dets[i * NBOXES], count, NMS);
 	}

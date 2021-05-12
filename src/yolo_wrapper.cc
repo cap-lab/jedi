@@ -223,8 +223,8 @@ void yoloLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, bool
 	input_height = input_dim.height;
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
-		int orig_width = dataset->w.at(sampleIndex + iter1);
-		int orig_height = dataset->h.at(sampleIndex + iter1);
+		int orig_width = dataset->w.at(sampleIndex * batch + iter1);
+		int orig_height = dataset->h.at(sampleIndex * batch + iter1);
 		detection_num = 0;
 
 		for(int iter2 = 0; iter2 < yolo_num; iter2++) {
