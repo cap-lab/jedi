@@ -39,13 +39,13 @@ static void readImage(float *input_buffer, Dataset *dataset, InputDim input_dim,
 	#pragma omp for
 	for(int iter = 0; iter < batch; iter++) {
 		int orignal_width = 0, original_height = 0;
-
+    int image_index = (index + iter) % dataset->m;
 		if(letter_box == true)
-			loadImageLetterBox((char *)(dataset->paths[index + iter].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
+			loadImageLetterBox((char *)(dataset->paths[image_index].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
 		else
-			loadImageResize((char *)(dataset->paths[index + iter].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
-		dataset->w.at(index + iter) = orignal_width;
-		dataset->h.at(index + iter) = original_height;
+			loadImageResize((char *)(dataset->paths[image_index].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
+		dataset->w.at(image_index) = orignal_width;
+		dataset->h.at(image_index) = original_height;
 	}	
 }
 
