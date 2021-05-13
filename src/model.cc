@@ -12,6 +12,11 @@
 #include "model.h"
 #include "variable.h"
 
+typedef struct _CalibrationTable {
+	std::string key;
+	std::string value;
+} CalibrationTable;
+
 
 static bool fileExist(std::string fname) {
     std::ifstream dataFile (fname.c_str(), std::ios::in | std::ios::binary);
@@ -128,7 +133,7 @@ int Model::getLayerNumberFromCalibrationKey(std::string key)
 }
 
 
-void Model::readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table) {
+void Model::readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table, int device) {
 	std::ifstream input(basic_calibration_table.c_str());
 	std::ofstream output(out_calib_table.c_str());
 	std::string title;
@@ -138,25 +143,31 @@ void Model::readFromCalibrationTable(std::string basic_calibration_table, int st
 	//std::cout << title << std::endl;
 	output << title << std::endl;
 	std::set<int> inputLayerSet = tk::dnn::NetworkRT::getInputLayers(net, start_index, end_index);
+	std::vector<CalibrationTable> calibration_vec;
 
 	while(!input.eof())
 	{
 		input >> key;
 		input >> value;
+		CalibrationTable calib;
 		//std::cout << "key: " << key << ", value: " << value << std::endl;
 		if(key == "data:" && start_index > 0)  {
 			continue;			
 		}
 		else if(key == "out:" || key == "data:") {
 			//std::cout  << key << " " << value << std::endl;
-			output << key << " " << value << std::endl;	
+			calib.key = key;	
+			calib.value = value;
+			calibration_vec.push_back(calib);
 		}
 		else {
 			int layer_number = getLayerNumberFromCalibrationKey(key);
 			if((layer_number >= start_index && layer_number <= end_index) || 
 				inputLayerSet.find(layer_number) != inputLayerSet.end()) {
 				//std::cout  << key << " " << value << std::endl;
-				output << key << " " << value << std::endl;	
+				calib.key = key;	
+				calib.value = value;
+				calibration_vec.push_back(calib);
 			}
 			else if(layer_number > end_index) {
 				break;
@@ -165,24 +176,38 @@ void Model::readFromCalibrationTable(std::string basic_calibration_table, int st
 
 		if(key == "out:") break;
 	}
+	if(device == DEVICE_DLA) {
+		for (std::vector<CalibrationTable>::iterator it = calibration_vec.begin() ; it != calibration_vec.end(); it++) {
+			key = (*it).key;
+			value = (*it).value;
+			if(!(key == "out:" || key == "data:")) {
+				int layer_number = getLayerNumberFromCalibrationKey(key);
+				if(layer_number == start_index && key.find("Shortcut", 0) == 0 && key.find("poolOut", 0) > 0 ) {
+					auto prev_it = it-1;
+					(*prev_it).value = value;	
+					break;
+				}
+			}
+		}
+	}
+
+	for (std::vector<CalibrationTable>::iterator it = calibration_vec.begin() ; it != calibration_vec.end(); it++) {
+		key = (*it).key;
+		value = (*it).value;
+		output << key << " " << value << std::endl;	
+	}
 }
 
 void Model::createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index) {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int data_type = config_data->instances.at(instance_id).data_type;
-	std::string gpu_calib_table = config_data->instances.at(instance_id).gpu_calib_table;
-	std::string dla_calib_table = config_data->instances.at(instance_id).dla_calib_table;
+	std::string calib_table = config_data->instances.at(instance_id).calib_table;
 	std::string calib_table_name = plan_file_name.substr(0, plan_file_name.rfind('.')) + "-calibration.table";
 
 	if(fileExist(calib_table_name) == false && device_num > 1 && data_type == TYPE_INT8 && 
-		fileExist(gpu_calib_table) == true && fileExist(dla_calib_table) == true) {
+		fileExist(calib_table) == true) {
 		int device = config_data->instances.at(instance_id).devices.at(iter);
-		if(device == DEVICE_DLA) {
-			readFromCalibrationTable(dla_calib_table, start_index, end_index, calib_table_name);
-		}
-		else {
-			readFromCalibrationTable(gpu_calib_table, start_index, end_index, calib_table_name);
-		}
+		readFromCalibrationTable(calib_table, start_index, end_index, calib_table_name, device);
 	}
 }
 
@@ -216,7 +241,8 @@ void Model::initializeModel() {
 	// parse a network using tkDNN darknetParser
 	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
 	net->print();
-
+	
+	letter_box = net->letterBox;
 	input_dim.width = net->input_dim.w;
 	input_dim.height = net->input_dim.h;
 	input_dim.channel = net->input_dim.c;
@@ -357,14 +383,12 @@ void Model::setBufferIndexing() {
 			yolos.push_back(yolo);
 		}	
 
-		int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
-		for(int iter2 = index; iter2 < index + netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
-			is_net_output[iter2] = true;
+		if(iter1 == device_num -  1) {
+			int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
+			for(int iter2 = index; iter2 < index + output_binding_num; iter2++) {
+				is_net_output[iter2] = true;
+			}
 		}
-	}
-
-	if(yolos.empty() == true) {
-		is_net_output[total_binding_num - 1] = true;	
 	}
 }
 

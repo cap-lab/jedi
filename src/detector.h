@@ -20,4 +20,6 @@ void doPostProcessing(void *d);
 
 void doInference(void *d);
 
+long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<long> latency);
+
 #endif

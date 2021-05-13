@@ -32,6 +32,7 @@ class Model {
 		std::vector<int> binding_size;
 		std::vector<YoloData> yolos;
 		InputDim input_dim;
+		bool letter_box;
 
 		tk::dnn::Network *net;
 		std::vector<std::vector<tk::dnn::NetworkRT *>> netRTs;
@@ -68,7 +69,7 @@ class Model {
 		void waitUntilInputConsumed(int device_id, int stream_id);
 		bool checkInputConsumed(int device_id, int stream_id);
 		void createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index);
-		void readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table);
+		void readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table, int device);
 		int getLayerNumberFromCalibrationKey(std::string key);
 
 

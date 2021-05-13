@@ -22,24 +22,35 @@ Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw
 	return b;
 }
 
-static void correct_yolo_boxes(Detection *dets, int n, int w, int h, int netw, int neth, int relative)
+static void correct_yolo_boxes(Detection *dets, int n, int w, int h, int netw, int neth, int relative, bool letter_box)
 {
 	int i;
 	int new_w=0;
 	int new_h=0;
-	if (((float)netw/w) < ((float)neth/h)) {
-		new_w = netw;
-		new_h = (h * netw)/w;
-	} else {
-		new_h = neth;
-		new_w = (w * neth)/h;
+	if(letter_box == true)  {
+		if (((float)netw/w) < ((float)neth/h)) {
+			new_w = netw;
+			new_h = (h * netw)/w;
+		} else {
+			new_h = neth;
+			new_w = (w * neth)/h;
+		}
 	}
+	else {
+		new_w = netw;
+    	new_h = neth;
+	}
+
+	float deltaw = netw - new_w;
+	float deltah = neth - new_h;
+	float ratiow = (float) new_w / netw;
+	float ratioh = (float) new_h / neth;
 	for (i = 0; i < n; ++i){
 		Box b = dets[i].bbox;
-		b.x =  (b.x - (netw - new_w)/2./netw) / ((float)new_w/netw); 
-		b.y =  (b.y - (neth - new_h)/2./neth) / ((float)new_h/neth); 
-		b.w *= (float)netw/new_w;
-		b.h *= (float)neth/new_h;
+        b.x = (b.x - deltaw / 2. / netw) / ratiow;
+        b.y = (b.y - deltah / 2. / neth) / ratioh;
+        b.w *= 1 / ratiow;
+        b.h *= 1 / ratioh;
 		if(!relative){
 			b.x *= w;
 			b.w *= w;
@@ -106,7 +117,7 @@ static int entry_yolo_index(int b, int location, int entry, int width, int heigh
 }
 
 
-static int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo) {
+static int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo, int orig_width, int orig_height, bool letter_box) {
 	int i,j,n;
 	int count = *ndets;
 	for (i = 0; i < lw*lh; ++i){
@@ -133,7 +144,7 @@ static int yolo_computeDetections(float *predictions,  Detection *dets, int *nde
 		}
 	}
 
-	correct_yolo_boxes(dets + *ndets, count - *ndets, input_width, input_height, input_width, input_height, 0);
+	correct_yolo_boxes(dets + *ndets, count - *ndets, orig_width, orig_height, input_width, input_height, 0, letter_box);
 	*ndets = count;
 	return count;
 }
@@ -203,16 +214,19 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes, double
 	}
 }
 
-void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
+void yoloLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, bool letter_box, int batch, std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
 	int detection_num = 0;
 	int output_size = 0;
+	int yolo_num = yolos.size();
 
 	input_width = input_dim.width;
 	input_height = input_dim.height;
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
-		int yolo_num = yolos.size();
+		int orig_width = dataset->w.at(sampleIndex * batch + iter1);
+		int orig_height = dataset->h.at(sampleIndex * batch + iter1);
 		detection_num = 0;
+
 		for(int iter2 = 0; iter2 < yolo_num; iter2++) {
 			int index = buffer_id * yolo_num + iter2;
 			int w = yolos[iter2].width;
@@ -220,7 +234,7 @@ void yoloLayerDetect(InputDim input_dim, int batch, std::vector<float *> output_
 			int c = yolos[iter2].channel;
 
 			output_size = w * h * c;
-			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, w, h, c, CONFIDENCE_THRESH, yolos[iter2]);
+			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, w, h, c, CONFIDENCE_THRESH, yolos[iter2], orig_width, orig_height, letter_box);
 		}
 
 		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, NUM_CLASSES, yolos[0].nms_thresh, yolos[0].nms_kind);

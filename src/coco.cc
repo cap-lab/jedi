@@ -31,9 +31,9 @@ static int get_coco_image_id(char *filename) {
     return atoi(p + 1);
 }
 
-std::map<int,std::list<std::string>> detected_map;
-std::mutex mu;
-int detected_num = 0;
+static std::map<int,std::list<std::string>> detected_map;
+static std::mutex mu;
+static int detected_num = 0;
 
 void writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
@@ -71,20 +71,12 @@ static void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw
 	int image_id = get_coco_image_id(path);
 	std::list<std::string> detected;
 
-	float x_ratio =  (float) w / (float) iw;
-	float y_ratio =  (float) h / (float) ih;
-
 	for (i = 0; i < nDets; ++i) {
 		if (dets[i].objectness >= 0) {
 			float xmin = dets[i].bbox.x - dets[i].bbox.w / 2.;
 			float xmax = dets[i].bbox.x + dets[i].bbox.w / 2.;
 			float ymin = dets[i].bbox.y - dets[i].bbox.h / 2.;
 			float ymax = dets[i].bbox.y + dets[i].bbox.h / 2.;
-
-			xmin = x_ratio*xmin;
-			xmax = x_ratio*xmax;
-			ymin = y_ratio*ymin;
-			ymax = y_ratio*ymax;
 
 			if (xmin < 0)
 				xmin = 0;

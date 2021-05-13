@@ -11,6 +11,6 @@
 #define COORDS      4
 
 void setBiases(std::string network_name);
-void regionLayerDetect(InputDim input_dim, int batch, float *output, Detection *dets, int *detection_num);
+void regionLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, int batch, float *output, Detection *dets, int *detection_num);
 
 #endif 
