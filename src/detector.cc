@@ -263,7 +263,9 @@ void doInference(void *d) {
 
 			usleep(SLEEP_TIME);
 			sleep_time++;
-			stuckWhile++;
+			if(available_streams.size() > 0) {
+				stuckWhile++;
+			}
 
 			if(sleep_time > MAX_TIMEOUT) {
 				exit_flag = true;
