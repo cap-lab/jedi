@@ -6,11 +6,11 @@
 #include "box.h"
 #include "coco.h"
 
-// #define IN_WIDTH    (INPUT_WIDTH / 32)
-// #define IN_HEIGHT   (INPUT_HEIGHT / 32)
-#define COORDS      4
+#define COORDS     4
+#define NUM_ANCHOR 5
+
 
 void setBiases(std::string network_name);
-void regionLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, int batch, float *output, Detection *dets, int *detection_num);
+void get_region_detections(float *last_data, float thresh, InputDim input_dim, Detection *dets, int *nDets, int orig_width, int orig_height);
 
 #endif 

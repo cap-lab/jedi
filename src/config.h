@@ -1,71 +1,41 @@
 #ifndef CONFIG_H_
-#define CONFIG_H_         
+#define CONFIG_H_
 
 #include <iostream>
 #include <vector>
 
-#include <libconfig.h++>
-
-typedef struct _ConfigInstance {
-	std::string network_name;
-	std::string model_dir;
-	std::string bin_path;
-	std::string cfg_path;
-	std::string image_path;
-	std::string calib_image_path;
-	std::string calib_table;
-	int calib_images_num;
-	std::string name_path;
-	int batch;
-	int batch_thread_num;
-	int offset;
-	int sample_size;
-
-	int device_num;
-	int pre_thread_num;
-	int post_thread_num;
-	int buffer_num;
-	std::vector<int> cut_points;
-	std::vector<int> devices;
-	std::vector<int> dla_cores;
-	std::vector<int> stream_numbers;
-	int data_type;
-} ConfigInstance;
+#include "config_data.h"
+#include "inference_application.h"
 
 class ConfigData {
 	public:
 		int instance_num;	
 		std::vector<ConfigInstance> instances;
 
-		ConfigData(std::string config_file_path);
+		ConfigData(std::string config_file_path, std::vector<IInferenceApplication *> &apps);
 		~ConfigData();
 	
 	private:
 		void readConfigFile(libconfig::Config *cfg, std::string config_file_path);
 		void readInstanceNum(libconfig::Config *cfg);
-		void readNetworkName(libconfig::Config *cfg);
-		void readModelDir(libconfig::Config *cfg);
-		void readBinPath(libconfig::Config *cfg);
-		void readCfgPath(libconfig::Config *cfg);
-		void readImagePath(libconfig::Config *cfg);
-		void readCalibImagePath(libconfig::Config *cfg);
-		void readCalibImagesNum(libconfig::Config * cfg);
-		void readNamePath(libconfig::Config *cfg);
-		void readBatch(libconfig::Config * cfg);
-		void readBatchThreadNum(libconfig::Config * cfg);
-		void readOffset(libconfig::Config * cfg);
-		void readSampleSize(libconfig::Config * cfg);
-		void readDeviceNum(libconfig::Config * cfg);
-		void readPreThreadNum(libconfig::Config * cfg);
-		void readPostThreadNum(libconfig::Config * cfg);
-		void readBufferNum(libconfig::Config * cfg);
-		void readCutPoints(libconfig::Config *cfg);
-		void readDevices(libconfig::Config *cfg);
-		void readDlaCores(libconfig::Config *cfg);
-		void readDataType(libconfig::Config *cfg);
-		void readStreams(libconfig::Config *cfg);
-		void readCalibTable(libconfig::Config *cfg);
-
+		void readNetworkName(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readModelDir(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readBinPath(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readBatch(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readBatchThreadNum(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readOffset(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readSampleSize(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readDeviceNum(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readPreThreadNum(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readPostThreadNum(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readBufferNum(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readCutPoints(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readDevices(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readDlaCores(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readDataType(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readStreams(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readCalibTable(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readApplicationType(libconfig::Setting &setting, ConfigInstance &config_instance);
 };
 
 #endif

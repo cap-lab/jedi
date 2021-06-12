@@ -5,10 +5,7 @@
 #include <vector>
 #include <cassert>
 
-#include "dataset.h"
-#include "config.h"
-#include "image.h"
-
+/*
 class Dataset {
 	public:
 		ConfigData *config_data;
@@ -24,5 +21,24 @@ class Dataset {
 		void initializeDataset();
 		void finalizeDataset();
 };
+*/
+
+template <typename T>
+class Dataset {
+	public:
+		Dataset() {};
+		virtual ~Dataset() {
+			while(!data.empty()) {
+				data.pop_back();
+			}
+		}
+		virtual T *getData(int index) = 0;
+		int getSize() {
+			return data.size();
+		}
+	protected:
+		std::vector<T> data;
+};
+
 
 #endif

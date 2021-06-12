@@ -66,7 +66,7 @@ void writeResultFile(std::string result_file_name) {
 	result_file.close();
 }
 
-static void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path) {
+void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path) {
 	int i, j;
 	int image_id = get_coco_image_id(path);
 	std::list<std::string> detected;
@@ -108,11 +108,3 @@ static void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw
 	mu.unlock();
 }
 
-void printDetector(InputDim input_dim, Detection *dets, int idx, Dataset *dataset, int nDets) {
-	int image_index = idx % dataset->m;
-    int w = dataset->w[image_index];
-    int h = dataset->h[image_index];
-	char *path = (char *)(dataset->paths[image_index].c_str());
-
-	detectCOCO(dets, nDets, image_index, w, h, input_dim.width, input_dim.height, path);
-}

@@ -1,6 +1,6 @@
-#include "yolo_wrapper.h"
+#include <cmath>
 
-static int input_width, input_height;
+#include "yolo_wrapper.h"
 
 Box get_yolo_box(float *x, float *biases, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride, int new_coords)
 {
@@ -117,7 +117,7 @@ static int entry_yolo_index(int b, int location, int entry, int width, int heigh
 }
 
 
-static int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo, int orig_width, int orig_height, bool letter_box) {
+int yolo_computeDetections(float *predictions,  Detection *dets, int *ndets, int lw, int lh, int lc, float thresh, YoloData yolo, int orig_width, int orig_height, int input_width, int input_height, bool letter_box) {
 	int i,j,n;
 	int count = *ndets;
 	for (i = 0; i < lw*lh; ++i){
@@ -177,7 +177,7 @@ static float yolo_box_diou(const Box a, const Box b, const float nms_thresh=0.6)
 }
 
 
-static void yolo_mergeDetections(Detection *dets, int ndets, int classes, double nms_thresh, tk::dnn::Yolo::nmsKind_t nms_kind) {
+void yolo_mergeDetections(Detection *dets, int ndets, double nms_thresh, tk::dnn::Yolo::nmsKind_t nms_kind) {
 	int total = ndets;
 	int i, j, k;
 	k = total-1;
@@ -193,7 +193,7 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes, double
 	}
 	total = k+1;
 
-	for(k = 0; k < classes; ++k){
+	for(k = 0; k < NUM_CLASSES; ++k){
 		for(i = 0; i < total; ++i){
 			dets[i].sort_class = k;
 		}
@@ -211,33 +211,5 @@ static void yolo_mergeDetections(Detection *dets, int ndets, int classes, double
 				}
 			}
 		}
-	}
-}
-
-void yoloLayerDetect(Dataset *dataset, int sampleIndex, InputDim input_dim, bool letter_box, int batch, std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Detection *dets, std::vector<int> &detections_num) {
-	int detection_num = 0;
-	int output_size = 0;
-	int yolo_num = yolos.size();
-
-	input_width = input_dim.width;
-	input_height = input_dim.height;
-
-	for (int iter1 = 0; iter1 < batch; iter1++) {
-		int orig_width = dataset->w.at(sampleIndex * batch + iter1);
-		int orig_height = dataset->h.at(sampleIndex * batch + iter1);
-		detection_num = 0;
-
-		for(int iter2 = 0; iter2 < yolo_num; iter2++) {
-			int index = buffer_id * yolo_num + iter2;
-			int w = yolos[iter2].width;
-			int h = yolos[iter2].height;
-			int c = yolos[iter2].channel;
-
-			output_size = w * h * c;
-			yolo_computeDetections(output_buffers[index] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, w, h, c, CONFIDENCE_THRESH, yolos[iter2], orig_width, orig_height, letter_box);
-		}
-
-		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, NUM_CLASSES, yolos[0].nms_thresh, yolos[0].nms_kind);
-		detections_num[iter1] = detection_num;
 	}
 }

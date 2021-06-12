@@ -30,7 +30,7 @@ InferenceThread::~InferenceThread() {
 	threads_data.clear();
 }
 
-void PreProcessingThread::setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset, std::vector<long> *latency) {
+void PreProcessingThread::setThreadData(std::vector<int> *signals, Model *model, IInferenceApplication *app, std::vector<long> *latency) {
 	thread_num = config_data->instances.at(instance_id).pre_thread_num;	
 	this->cur_running_index.assign(thread_num, 0);
 
@@ -40,7 +40,7 @@ void PreProcessingThread::setThreadData(std::vector<int> *signals, Model *model,
 		thread_data.instance_id = instance_id;
 		thread_data.tid = iter;
 		thread_data.signals = signals;
-		thread_data.dataset = dataset;
+		thread_data.app = app;
 		thread_data.model = model;
 		thread_data.latency = latency;
 		thread_data.sample_index = &(this->sample_index);
@@ -63,7 +63,7 @@ void PreProcessingThread::joinThreads() {
 	}
 }
 
-void PostProcessingThread::setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset, std::vector<long> *latency) {
+void PostProcessingThread::setThreadData(std::vector<int> *signals, Model *model, IInferenceApplication *app, std::vector<long> *latency) {
 	thread_num = config_data->instances.at(instance_id).post_thread_num;	
 	this->cur_running_index.assign(thread_num, 0);
 
@@ -74,7 +74,7 @@ void PostProcessingThread::setThreadData(std::vector<int> *signals, Model *model
 		thread_data.tid = iter;
 		thread_data.signals = signals;
 		thread_data.model = model;
-		thread_data.dataset = dataset;
+		thread_data.app = app;
 		thread_data.latency = latency;
 		thread_data.sample_index = &(this->sample_index);
 		thread_data.mu = &(this->mu);

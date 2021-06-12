@@ -16,6 +16,8 @@
 #include "coco.h"
 #include "util.h"
 
+#include "inference_application.h"
+
 #define MAX_TIMEOUT (100000)
 
 long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<long> latency)
@@ -31,22 +33,15 @@ long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<lon
 	return sum / (long) nSize;
 }
 
-static void readImage(float *input_buffer, Dataset *dataset, InputDim input_dim, int batch, int batch_thread_num, int index, bool letter_box) 
+static void readData(int thread_id, float *input_buffer, IInferenceApplication *app, InputDim input_dim, int batch, int batch_thread_num, int index, bool letter_box)
 {
 	int input_width = input_dim.width, input_height = input_dim.height, input_channel = input_dim.channel;
 	int input_size = input_width * input_height * input_channel;
 	#pragma omp parallel num_threads(batch_thread_num)
 	#pragma omp for
 	for(int iter = 0; iter < batch; iter++) {
-		int orignal_width = 0, original_height = 0;
-    int image_index = (index + iter) % dataset->m;
-		if(letter_box == true)
-			loadImageLetterBox((char *)(dataset->paths[image_index].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
-		else
-			loadImageResize((char *)(dataset->paths[image_index].c_str()), input_width, input_height, input_channel, &orignal_width, &original_height, input_buffer + iter * input_size);
-		dataset->w.at(image_index) = orignal_width;
-		dataset->h.at(image_index) = original_height;
-	}	
+		app->preprocessing(thread_id, index, iter, input_buffer + iter * input_size);
+	}
 }
 
 static int getMinSampleIndex(std::vector<int> *running_list, int cur_sample_index)
@@ -82,7 +77,7 @@ void doPreProcessing(void *d) {
 	int instance_id = data->instance_id;
 	int tid = data->tid;
 	std::vector<int> *signals = data->signals;
-	Dataset *dataset = data->dataset;
+	IInferenceApplication *app = data->app;
 	int *sample_index_global = data->sample_index;
 	std::mutex *mu = data->mu;
 	int sample_offset = config_data->instances.at(instance_id).offset;
@@ -99,14 +94,14 @@ void doPreProcessing(void *d) {
 
 	index = sample_index * batch;
 
-	while(sample_index < sample_offset + sample_size && exit_flag == false) {
+	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
 		while(((*signals)[sample_index % buffer_num] || sample_index >= getMinSampleIndex(cur_running_index_list, sample_index) + buffer_num) && exit_flag == false) {
 			usleep(SLEEP_TIME);
 			stuckWhile++;
 		}
 
 		(*latency)[sample_index - sample_offset] = getTime();
-		readImage(data->model->input_buffers.at(sample_index % buffer_num), dataset, data->model->input_dim, batch, batch_thread_num, index, data->model->letter_box);
+		readData(tid, data->model->input_buffers.at(sample_index % buffer_num), app, data->model->input_dim, batch, batch_thread_num, index, data->model->letter_box);
 		(*signals)[sample_index % buffer_num] = 1;
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
@@ -116,27 +111,6 @@ void doPreProcessing(void *d) {
 	fprintf(stderr, "stuckWhile(front thread: %d): %ld\n", tid, stuckWhile);
 }
 
-static void detectBox(std::vector<float *> output_buffers, int buffer_id, std::vector<YoloData> yolos, Dataset *dataset, int sampleIndex, InputDim input_dim, bool letter_box, int batch, std::string network_name, Detection *dets, std::vector<int> &detections_num) { 
-	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-		regionLayerDetect(dataset, sampleIndex, input_dim, batch, output_buffers.at(buffer_id), dets, &(detections_num[0]));	
-	}
-	else {
-		yoloLayerDetect(dataset, sampleIndex, input_dim, letter_box, batch, output_buffers, buffer_id, yolos, dets, detections_num);
-	}
-}
-
-static void printBox(Dataset *dataset, int sample_index, InputDim input_dim, int batch, std::string network_name, Detection *dets, std::vector<int> detections_num) {
-	for(int iter1 = 0; iter1 < batch; iter1++) {
-		int index = sample_index * batch + iter1;
-
-		if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-			printDetector(input_dim, &dets[iter1 * NBOXES], index, dataset, detections_num[0]);
-		}
-		else {
-			printDetector(input_dim, &dets[iter1 * NBOXES], index, dataset, detections_num[iter1]);
-		}
-	}
-}
 
 void doPostProcessing(void *d) {
 	PostProcessingThreadData *data = (PostProcessingThreadData *)d;
@@ -145,8 +119,7 @@ void doPostProcessing(void *d) {
 	int instance_id = data->instance_id;
 	int tid = data->tid;
 	std::vector<int> *signals = data->signals;
-	Dataset *dataset = data->dataset;
-
+	IInferenceApplication *app = data->app;
 	int instance_num = config_data->instance_num;
 	int sample_offset = config_data->instances.at(instance_id).offset;
 	int sample_size = config_data->instances.at(instance_id).sample_size;
@@ -154,34 +127,30 @@ void doPostProcessing(void *d) {
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset + tid;
-	std::vector<YoloData> yolos = data->model->yolos;
 	int buffer_id = 0;
 	long stuckWhile = 0;
 	int *sample_index_global = data->sample_index;
 	std::mutex *mu = data->mu;
 	std::vector<int> *cur_running_index_list = data->cur_running_index;
+	float **output_pointers;
 
-	Detection *dets;
-	std::vector<int> detections_num(batch, 0);
-
-	setBiases(network_name);
-	allocateDetectionBox(batch, &dets);
+	output_pointers = (float **) calloc(data->model->network_output_number, sizeof(float *));
 
 	sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 
-	while(sample_index < sample_offset + sample_size && exit_flag == false) {
+	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
 		while(((!(*signals)[sample_index % buffer_num]) || sample_index >= getMinSampleIndex(cur_running_index_list, sample_index) + buffer_num) && exit_flag == false) {
 			usleep(SLEEP_TIME);	
 			stuckWhile++;
-		}	
+		}
 
-		buffer_id = sample_index % buffer_num; 
+		buffer_id = sample_index % buffer_num;
 
-		detectBox(data->model->output_buffers, buffer_id, yolos, dataset, sample_index, data->model->input_dim, data->model->letter_box, batch, network_name, dets, detections_num);
+		for(int iter = 0 ; iter < data->model->network_output_number; iter++) {
+			output_pointers[iter] = data->model->output_buffers[buffer_id * (data->model->network_output_number) + iter];
+		}
 
-		(*signals)[sample_index % buffer_num] = 0;
-
-		printBox(dataset, sample_index, data->model->input_dim, batch, network_name, dets, detections_num);
+		app->postprocessing(tid, sample_index, output_pointers, data->model->network_output_number, batch, &((*signals)[sample_index % buffer_num]));
 		
 		if(tid == 0 && instance_id == 0) {
 			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
@@ -194,7 +163,7 @@ void doPostProcessing(void *d) {
 
 	fprintf(stderr, "stuckWhile(back thread: %d): %ld\n", tid, stuckWhile);
 
-	deallocateDetectionBox(batch * NBOXES, dets);
+	free(output_pointers);
 }
 
 void doInference(void *d) {
@@ -230,7 +199,7 @@ void doInference(void *d) {
 		available_streams.push_back(iter);
 	}
 
-	while(sample_index < sample_offset + sample_size && exit_flag == false) {
+	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
 		while(exit_flag == false) {
 			if((*curr_signals)[sample_index % buffer_num] == 1 && (*next_signals)[sample_index % buffer_num] == 0 && sample_index < min_sample_index + buffer_num) {
 				if(available_streams.size() > 0) {
@@ -261,11 +230,12 @@ void doInference(void *d) {
 				}
 			}
 
-			usleep(SLEEP_TIME);
-			sleep_time++;
 			if(available_streams.size() > 0) {
 				stuckWhile++;
 			}
+			usleep(SLEEP_TIME);
+			sleep_time++;
+
 
 			if(sleep_time > MAX_TIMEOUT) {
 				exit_flag = true;

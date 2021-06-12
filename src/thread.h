@@ -8,9 +8,10 @@
 
 #include "config.h"
 #include "variable.h"
-#include "dataset.h"
 #include "model.h"
 #include "detector.h"
+
+#include "inference_application.h"
 
 typedef struct _PreProcessingThreadData {
 	ConfigData *config_data;
@@ -18,7 +19,7 @@ typedef struct _PreProcessingThreadData {
 	int tid;
 	std::vector<int> *signals;
 	Model *model;
-	Dataset *dataset;
+	IInferenceApplication *app;
 	std::vector<long> *latency;
 	int *sample_index;
 	std::vector<int> *cur_running_index;
@@ -31,7 +32,7 @@ typedef struct _PostProcessingThreadData {
 	int tid;
 	std::vector<int> *signals;
 	Model *model;
-	Dataset *dataset;
+	IInferenceApplication *app;
 	std::vector<long> *latency;
 	int *sample_index;
 	std::mutex *mu;
@@ -68,7 +69,7 @@ class PreProcessingThread : public Thread {
 
 		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {this->sample_index = 0;};
 		~PreProcessingThread();
-		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset, std::vector<long> *latency);
+		void setThreadData(std::vector<int> *signals, Model *model, IInferenceApplication *app, std::vector<long> *latency);
 		void runThreads();
 		void joinThreads();
 };
@@ -82,7 +83,7 @@ class PostProcessingThread : public Thread {
 
 		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {this->sample_index = 0;};
 		~PostProcessingThread();
-		void setThreadData(std::vector<int> *signals, Model *model, Dataset *dataset, std::vector<long> *latency);
+		void setThreadData(std::vector<int> *signals, Model *model, IInferenceApplication *app, std::vector<long> *latency);
 		void runThreads();
 		void joinThreads();
 };

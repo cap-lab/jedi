@@ -10,17 +10,8 @@
 #include "variable.h"
 #include "config.h"
 
-typedef struct _YoloData {
-	float *mask;
-	int n_masks;
-	float *bias;
-	int new_coords;
-	double nms_thresh;
-	tk::dnn::Yolo::nmsKind_t nms_kind;
-	int height;
-	int width;
-	int channel;	
-} YoloData;
+#include "inference_application.h"
+
 
 
 class Model {
@@ -30,9 +21,9 @@ class Model {
 		std::vector<int> start_bindings;
 		int total_binding_num;
 		std::vector<int> binding_size;
-		std::vector<YoloData> yolos;
 		InputDim input_dim;
 		bool letter_box;
+		IInferenceApplication *app;
 
 		tk::dnn::Network *net;
 		std::vector<std::vector<tk::dnn::NetworkRT *>> netRTs;
@@ -44,8 +35,9 @@ class Model {
 		std::vector<void *> stream_buffers;
 		std::vector<float *> input_buffers;
 		std::vector<float *> output_buffers;
+		int network_output_number;
 
-		Model(ConfigData *config_data, int instance_id);
+		Model(ConfigData *config_data, int instance_id, IInferenceApplication *app);
 		~Model();
 		void getModelFileName(int curr, std::string &plan_file_name);
 		void setDevice(int curr);

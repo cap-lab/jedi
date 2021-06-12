@@ -10,9 +10,8 @@
 #include "config.h"
 #include "variable.h"
 #include "model.h"
-#include "dataset.h"
-#include "thread.h"
-#include "coco.h"
+
+#include "inference_application.h"
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
@@ -22,15 +21,11 @@ static void printHelpMessage() {
 bool exit_flag = false;
 
 
-static void printRouteShortCutRange(ConfigData *config_data, std::string output_file_name, int instance_id)
+static void printRouteShortCutRange(ConfigData *config_data, std::string output_file_name, int instance_id, std::vector<IInferenceApplication *> apps)
 {
-	std::string bin_path(config_data->instances.at(instance_id).bin_path);
-    std::string wgs_path  = bin_path + "/layers";
-    std::string cfg_path(config_data->instances.at(instance_id).cfg_path);
-    std::string name_path(config_data->instances.at(instance_id).name_path);
 	tk::dnn::Network *net = NULL;
 
-	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
+	net = apps[instance_id]->createNetwork(&(config_data->instances.at(instance_id)));
 	std::ofstream writeFile(output_file_name.data());
 
 	if(writeFile.is_open())
@@ -88,9 +83,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	// read configurations
-	ConfigData config_data(config_file_name);
+	std::vector<IInferenceApplication *> apps;
+	ConfigData config_data(config_file_name, apps);
 
-	printRouteShortCutRange(&config_data, out_file_name, 0);
+	printRouteShortCutRange(&config_data, out_file_name, 0, apps);
 
 	return 0;
 }
