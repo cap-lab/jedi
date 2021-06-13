@@ -26,9 +26,11 @@ static bool fileExist(std::string fname) {
 }
 
 
-Model::Model(ConfigData *config_data, int instance_id) {
+Model::Model(ConfigData *config_data, int instance_id, IInferenceApplication *app) {
 	this->config_data = config_data;
 	this->instance_id = instance_id;
+	this->network_output_number = 0;
+	this->app = app;
 
 	int device_num = config_data->instances.at(instance_id).device_num;
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
@@ -43,7 +45,6 @@ Model::~Model() {
 	stream_buffers.clear();
 	input_buffers.clear();
 	output_buffers.clear();
-	yolos.clear();
 
 	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
 		netRTs[iter1].clear();
@@ -225,21 +226,16 @@ void Model::setDataType() {
 	else if(data_type == TYPE_INT8) {
 		net->fp16 = false;	
 		net->int8 = true;
-		net->fileImgList = config_data->instances.at(instance_id).calib_image_path;
-		net->num_calib_images = config_data->instances.at(instance_id).calib_images_num;
 	}
 }
 
 void Model::initializeModel() {
-	std::string bin_path(config_data->instances.at(instance_id).bin_path);
-    std::string wgs_path  = bin_path + "/layers";
-    std::string cfg_path(config_data->instances.at(instance_id).cfg_path);
-    std::string name_path(config_data->instances.at(instance_id).name_path); 
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int start_index = 0;
 
 	// parse a network using tkDNN darknetParser
-	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
+
+	net = app->createNetwork(&(config_data->instances.at(instance_id)));
 	net->print();
 	
 	letter_box = net->letterBox;
@@ -366,27 +362,13 @@ void Model::setBufferIndexing() {
 			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
 			total_binding_num++;
 		}
-
-		for(int iter2 = 0; iter2 < netRTs[iter1][0]->pluginFactory->n_yolos; iter2++) {
-			YoloData yolo;
-			tk::dnn::YoloRT *yRT = netRTs[iter1][0]->pluginFactory->yolos[iter2];
-			yolo.n_masks = yRT->n_masks;	
-			yolo.bias = yRT->bias;	
-			yolo.mask = yRT->mask;	
-			yolo.new_coords = yRT->new_coords;
-			yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) yRT->nms_kind;
-			yolo.nms_thresh = yRT->nms_thresh;
-			yolo.height = yRT->h;
-			yolo.width = yRT->w;
-			yolo.channel = yRT->c;
-
-			yolos.push_back(yolo);
-		}	
+		app->referNetworkRTInfo(iter1, netRTs[iter1][0]);
 
 		if(iter1 == device_num -  1) {
 			int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
 			for(int iter2 = index; iter2 < index + output_binding_num; iter2++) {
 				is_net_output[iter2] = true;
+				this->network_output_number++;
 			}
 		}
 	}

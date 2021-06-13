@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <assert.h>
-#include <string.h>
+#include <string>
+#include <vector>
 
 typedef struct {
     int w;

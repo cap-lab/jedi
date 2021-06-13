@@ -26,7 +26,8 @@ extern "C" {
 void check_error(cudaError_t status);
 float *cuda_make_array(float *x, size_t n);
 float *cuda_make_array_host(size_t n);
-// int *cuda_make_int_array(int *x, size_t n);
+int *cuda_make_int_array_host(size_t n);
+int *cuda_make_int_array(int *x, size_t n);
 // float cuda_compare(float *x_gpu, float *x, size_t n, char *s);
 // dim3 cuda_gridsize(size_t n);
 void cuda_free(float *x_gpu);

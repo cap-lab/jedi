@@ -31,17 +31,12 @@ typedef struct _InputDim {
 #define SLEEP_TIME 100
 #define LOG_INTERVAL 100
 
-#define MAX_DEVICE_NUM 4
-#define MAX_OUTPUT_NUM 4
+#define MAX_DEVICE_NUM 12
 #define DLA_NUM 2
 
 #define NUM_CLASSES 80
-#define NMS 0.45
-#define PRINT_THRESH 0.3
-#define CONFIDENCE_THRESH 0.05
-#define NUM_ANCHOR 5
-#define MAX_DETECTION_BOXES (8192*2)
-#define NBOXES MAX_DETECTION_BOXES
+#define PRINT_THRESH 0.01
+#define CONFIDENCE_THRESH 0.01
 
 extern bool exit_flag;
 

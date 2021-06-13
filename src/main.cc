@@ -11,6 +11,8 @@
 #include "coco.h"
 #include "util.h"
 
+#include "inference_application.h"
+
 typedef struct _InstanceThreadData {
 	PreProcessingThread *pre_thread;
 	PostProcessingThread *post_thread;
@@ -21,10 +23,10 @@ bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-l power_log_file] [-t latency_log_file]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
-	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -l power.log -t latency.log"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
 }
 
 static void turnOnTegrastats(std::string power_file_name) {
@@ -64,9 +66,9 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 }
 
 
-static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models) {
+static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models, std::vector<IInferenceApplication *> &apps) {
 	for(int iter = 0; iter < instance_num; iter++) {
-		Model *model = new Model(&config_data, iter);
+		Model *model = new Model(&config_data, iter, apps[iter]);
 
 		model->initializeModel();
 		model->initializeBuffers();
@@ -75,15 +77,19 @@ static void generateModels(int instance_num, ConfigData &config_data, std::vecto
 	}
 }
 
-static void generateDatasets(int instance_num, ConfigData &config_data, std::vector<Dataset *> &datasets) {
+
+static void initializePreAndPostprocessing(int instance_num, ConfigData &config_data, std::vector<IInferenceApplication *> &apps) {
 	for(int iter = 0; iter < instance_num; iter++) {
-		Dataset *dataset = new Dataset(&config_data, iter);	
+		std::string network_name = config_data.instances.at(iter).network_name;
+		int batch_size = config_data.instances.at(iter).batch;
+		int pre_thread_num = config_data.instances.at(iter).pre_thread_num;
+		int post_thread_num = config_data.instances.at(iter).post_thread_num;
 
-		dataset->initializeDataset();
-
-		datasets.emplace_back(dataset);
+		apps[iter]->initializePreprocessing(network_name, batch_size, pre_thread_num);
+		apps[iter]->initializePostprocessing(network_name, batch_size, post_thread_num);
 	}
 }
+
 
 static void runInstanceThread(void *d) {
 	InstanceThreadData *data = (InstanceThreadData *)d;
@@ -112,7 +118,8 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 	inferenceThreads.clear();
 }
 
-static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name, std::vector<Model *> models, std::vector<Dataset *> datasets) {
+static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name,
+							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
@@ -135,11 +142,11 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 		latencies[iter].assign(sample_size, 0);
 
 		PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, iter);
-		pre_thread->setThreadData(&(signals[iter][0]), models[iter], datasets[iter], &(latencies[iter]));
+		pre_thread->setThreadData(&(signals[iter][0]), models[iter], apps[iter], &(latencies[iter]));
 		preProcessingThreads.push_back(pre_thread);
 
 		PostProcessingThread *post_thread = new PostProcessingThread(&config_data, iter);
-		post_thread->setThreadData(&(signals[iter][device_num]), models[iter], datasets[iter], &(latencies[iter]));
+		post_thread->setThreadData(&(signals[iter][device_num]), models[iter], apps[iter], &(latencies[iter]));
 		postProcessingThreads.push_back(post_thread);
 
 		InferenceThread *infer_thread = new InferenceThread(&config_data, iter);
@@ -183,21 +190,20 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
 }
 
-static void finalizeData(int instance_num, std::vector<Model *> &models, std::vector<Dataset *> &datasets) {
+static void finalizeData(int instance_num, std::vector<Model *> &models, std::vector<IInferenceApplication *> &apps) {
 	for(int iter = 0; iter < instance_num; iter++) {
 		Model *model = models.at(iter);
-		Dataset *dataset = datasets.at(iter);	
+		IInferenceApplication *app = apps.at(iter);
 
 		model->finalizeBuffers();
 		model->finalizeModel();
-		dataset->finalizeDataset();
 
+		delete app;
 		delete model;
-		delete dataset;
 	}
 
 	models.clear();
-	datasets.clear();
+	apps.clear();
 }
 
 int main(int argc, char *argv[]) {
@@ -234,26 +240,27 @@ int main(int argc, char *argv[]) {
 		}	
 	}
 
+	std::vector<IInferenceApplication *> apps;
+
 	// read configurations
-	ConfigData config_data(config_file_name);
+	ConfigData config_data(config_file_name, apps);
 	instance_num = config_data.instance_num;
 
 	// make models (engines, buffers)
 	std::vector<Model *> models;
-	generateModels(instance_num, config_data, models);
+	generateModels(instance_num, config_data, models, apps);
 
-	// make dataset
-	std::vector<Dataset *> datasets;
-	generateDatasets(instance_num, config_data, datasets);
+	// initialize dataset, pre/post processing
+	initializePreAndPostprocessing(instance_num, config_data, apps);
 
 	// make threads
-	generateThreads(instance_num, config_data, power_file_name, time_file_name, models, datasets);
+	generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
 
 	// write file
 	writeResultFile(result_file_name);
 
 	// clear data
-	finalizeData(instance_num, models, datasets);
+	finalizeData(instance_num, models, apps);
 
 	if(exit_flag == false)
 	{

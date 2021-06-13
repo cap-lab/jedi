@@ -141,6 +141,87 @@ void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, in
 	}
 }
 
+
+static cv::Mat getSrcAffineMatrix(int orig_width, int orig_height) {
+	cv::Mat src = cv::Mat(cv::Size(2,3), CV_32F);
+
+    float scale = 1.0;
+	float new_height = orig_height * scale;
+	float new_width = orig_width * scale;
+	float c[] = {new_width / 2.0f, new_height /2.0f};
+	float s[2];
+
+	if(orig_width > orig_height){
+		s[0] = orig_width * 1.0;
+		s[1] = orig_width * 1.0;
+	}
+	else{
+		s[0] = orig_height * 1.0;
+		s[1] = orig_height * 1.0;
+	}
+
+	src.at<float>(0,0)=c[0];
+	src.at<float>(0,1)=c[1];
+	src.at<float>(1,0)=c[0];
+	src.at<float>(1,1)=c[1] + s[0] * -0.5;
+	src.at<float>(2,0)=src.at<float>(1,0) + (-src.at<float>(0,1)+src.at<float>(1,1) );
+	src.at<float>(2,1)=src.at<float>(1,1) + (src.at<float>(0,0)-src.at<float>(1,0) );
+
+	return src;
+}
+
+cv::Mat restoreAffinedTransform(int orig_width, int orig_height, cv::Mat dst2)
+{
+	cv::Mat trans2 = cv::Mat(cv::Size(3,2), CV_32F);
+
+	cv::Mat src = getSrcAffineMatrix(orig_width, orig_height);
+
+	trans2 = cv::getAffineTransform( dst2, src );
+
+	return trans2;
+}
+
+void loadImageAffineTransform(char *filename, int w, int h, int c, int *orig_width, int *orig_height, cv::Vec<float, 3> mean, cv::Vec<float, 3> stddev, cv::Mat dst, float *input)
+{
+	try {
+		//cv::Mat src = cv::Mat(cv::Size(2,3), CV_32F);
+		cv::Mat trans = cv::Mat(cv::Size(3,2), CV_32F);
+		//cv::Mat dst2 = cv::Mat(cv::Size(2,3), CV_32F);
+
+		cv::Mat loaded_image = cv::imread(filename, cv::IMREAD_COLOR);
+
+		*orig_width = loaded_image.cols;
+		*orig_height = loaded_image.rows;
+
+		cv::Mat src = getSrcAffineMatrix(*orig_width, *orig_height);
+
+		cv::Mat resized(w, h, CV_8UC3);
+	    trans = cv::getAffineTransform( src, dst );
+	    cv::warpAffine(loaded_image, resized, trans, cv::Size(w, h), cv::INTER_LINEAR );
+
+	    resized.convertTo(resized, CV_32FC3, 1/255.0);
+
+	    //split channels
+	    cv::Mat bgr[3];
+	    cv::split(resized,bgr);//split source
+	    for(int i=0; i<3; i++){
+			bgr[i] = bgr[i] - mean[i];
+			bgr[i] = bgr[i] / stddev[i];
+	    }
+
+	    //write channels
+	    for(int i=0; i < c; i++) {
+			int idx = i*resized.rows * resized.cols;
+			int ch = c - 3 +i;
+			memcpy((void*)&input[idx], (void*)bgr[ch].data, resized.rows * resized.cols * sizeof(float));
+	    }
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageAffineTransform() can't load image %s " << filename << std::endl;
+	}
+}
+
+
 void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
 	try {

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <string.h>
 
 #include "image.h"
 #include "image_opencv.h"
