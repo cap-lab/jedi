@@ -23,10 +23,10 @@ bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-l power_log_file] [-t latency_log_file]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
-	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -l power.log -t latency.log"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
 }
 
 static void turnOnTegrastats(std::string power_file_name) {

@@ -5,24 +5,6 @@
 #include <vector>
 #include <cassert>
 
-/*
-class Dataset {
-	public:
-		ConfigData *config_data;
-		int instance_id;
-
-		std::vector<std::string> paths;
-		std::vector<int> h;
-		std::vector<int> w;
-		int m;
-
-		Dataset(ConfigData *config_data, int instance_id);
-		~Dataset();
-		void initializeDataset();
-		void finalizeDataset();
-};
-*/
-
 template <typename T>
 class Dataset {
 	public:

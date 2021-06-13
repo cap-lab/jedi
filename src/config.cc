@@ -248,7 +248,7 @@ void ConfigData::readStreams(Setting &setting, ConfigInstance &config_instance){
 			config_instance.stream_numbers.push_back(std::stoi(temp));
 		}
 
-		while(config_instance.device_num > config_instance.stream_numbers.size()) 
+		while(config_instance.device_num > (int) config_instance.stream_numbers.size()) 
 		{
 			std::cerr << "The number of streams is less than the number of devices. Set 2 as a default stream number for the rest of devices." << std::endl;
 			config_instance.stream_numbers.push_back(DEFAULT_STREAM_NUM);
