@@ -108,17 +108,17 @@ REGISTER_JEDI_APPLICATION([Your application class name]);
 
 ## Supported and Tested Networks
 
-| Network                                       | Trained Dataset                             |
-| :-------------------------------------------- | :-----------------------------------------: |
-| YOLO v2<sup>1</sup>                           | COCO 2014 trainval                          |
-| YOLO v2 tiny<sup>1</sup>                      | COCO 2014 trainval                          |
-| YOLO v3<sup>2</sup>                           | COCO 2014 trainval                          |
-| YOLO v3 tiny<sup>2</sup>                      | COCO 2014 trainval                          |
-| Centernet (DLA34 backend)<sup>4</sup>         | COCO 2017 train                             |
-| Cross Stage Partial Network <sup>7</sup>      | COCO 2014 trainval                          |
-| Yolov4 <sup>8</sup>                           | COCO 2014 trainval                          |
-| Yolov4 tiny <sup>9</sup>                      | COCO 2014 trainval                          |
-| Scaled Yolov4 <sup>10</sup>                   | COCO 2017 train                             |
-| Densenet+Yolo                                 | COCO 2014 trainval                          |
+| Network                         | Trained Dataset                             |
+| :------------------------------ | :-----------------------------------------: |
+| YOLO v2                         | COCO 2014 trainval                          |
+| YOLO v2 tiny                    | COCO 2014 trainval                          |
+| YOLO v3                         | COCO 2014 trainval                          |
+| YOLO v3 tiny                    | COCO 2014 trainval                          |
+| Centernet (DLA34 backend)       | COCO 2017 train                             |
+| Cross Stage Partial Network     | COCO 2014 trainval                          |
+| Yolov4                          | COCO 2014 trainval                          |
+| Yolov4 tiny                     | COCO 2014 trainval                          |
+| Scaled Yolov4                   | COCO 2017 train                             |
+| Densenet+Yolo                   | COCO 2014 trainval                          |
 
 
