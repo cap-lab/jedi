@@ -40,7 +40,7 @@ Model::Model(ConfigData *config_data, int instance_id) {
 
 	for(int iter=0; iter<2; iter++) {
 		std::vector<long> vec;	
-		dla_profile_vec.push_back(vec);
+		// dla_profile_vec.push_back(vec);
 	}
 }
 
@@ -239,11 +239,8 @@ void Model::initializeModel() {
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 
-		fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 		getModelFileName(iter1, plan_file_name);
-		fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 		createCalibrationTable(plan_file_name, iter1, start_index, cut_point);
-		fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 
 		setDevice(iter1);
 		setMaxBatchSize();
@@ -254,10 +251,8 @@ void Model::initializeModel() {
 		for(int iter2 = 0; iter2 < duplication_num; iter2++) {
 			int core = dla_core <= 1 ? dla_core : iter2 % DLA_NUM;
 
-			fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 			tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, core);
 			assert(netRT->engineRT != nullptr);
-			fprintf(stderr, "%s:%d\n", __func__, __LINE__);
 
 			netRTs[iter1].push_back(netRT);
 		}
@@ -277,7 +272,7 @@ void Model::initializeModel() {
 			nvinfer1::IExecutionContext *context = netRTs[iter1][index]->engineRT->createExecutionContext();	
 			assert(context);
 
-			context->setProfiler(&profiler);
+			// context->setProfiler(&profiler);
 			context_vec.push_back(context);
 		}
 		contexts.push_back(context_vec);
@@ -524,17 +519,17 @@ void Model::infer(int device_id, int buffer_id) {
 	int dla_core = config_data->instances.at(instance_id).dla_cores.at(device_id);
 	long start_time;
 
-	if(is_dla) {
-		start_time = getTime();	
-	}
+//	if(is_dla) {
+//		start_time = getTime();	
+//	}
 
 	// contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
 	contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
 
-	if(is_dla) {
-		long dla_time = getTime() - start_time;	
-		dla_profile_vec.at(dla_core).push_back(dla_time);
-	}
+//	if(is_dla) {
+//		long dla_time = getTime() - start_time;	
+//		dla_profile_vec.at(dla_core).push_back(dla_time);
+//	}
 }
 
 void Model::waitUntilInferenceDone(int device_id, int stream_id) {

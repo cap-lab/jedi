@@ -181,6 +181,8 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 	exit_flag = false;
 	rcv_msq_id = createMsgQueue(rcv_key_num);
 	snd_msq_id = createMsgQueue(snd_key_num);
+	inference_time_vec.reserve(4096);
+	max_stage_time_vec.reserve(4096);
 
 	for(int iter = 0; iter < 3; iter++) {
 		signals[iter].assign(1, 0);		
@@ -245,9 +247,11 @@ void generateThreads(int candidate, ConfigData config_data, std::vector<Model *>
 		turnOffTegrastats();
 	}
 
+	/*
 	if(max_profile_file_name.length() != 0 && avg_profile_file_name.length() != 0) {
 		models[candidate]->printProfile(max_profile_file_name, avg_profile_file_name);
 	}
+	*/
 
 	if(time_file_name.length() != 0) {
 		long max_latency = *std::max_element(inference_time_vec.begin(), inference_time_vec.end());
