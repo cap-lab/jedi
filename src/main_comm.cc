@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
 	std::string avg_profile_file_name;
 	std::vector<ConfigData> config_data_vec;
 
-	stickThisThreadToCore(0);
+	stickThisThreadToCore(7);
 	g_pre_core = -1;
 	g_post_core = -1;
 
