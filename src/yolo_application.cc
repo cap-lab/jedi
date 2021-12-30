@@ -2,6 +2,8 @@
 #include <cstring>
 #include <sstream>
 
+#include <opencv2/opencv.hpp>
+
 #include <tkDNN/DarknetParser.h>
 
 #include "image_opencv.h"
@@ -89,6 +91,20 @@ void YoloApplication::readNamePath(libconfig::Setting &setting) {
 	}
 }
 
+void YoloApplication::readOpenCVParallelNum(libconfig::Setting &setting) {
+	try{	
+		const char *data = setting["opencv_parallel_num"];
+		yoloAppConfig.opencv_parallel_num = atoi(data);
+
+		std::cerr<<"opencv_parallel_num: "<<yoloAppConfig.opencv_parallel_num<<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'opencv_parallel_num' setting in configuration file. Set -1 as a Default." << std::endl;
+		yoloAppConfig.opencv_parallel_num = -1;
+	}
+}
+
+
 
 void YoloApplication::readCustomOptions(libconfig::Setting &setting)
 {
@@ -97,6 +113,7 @@ void YoloApplication::readCustomOptions(libconfig::Setting &setting)
 	readCalibImagePath(setting);
 	readCalibImagesNum(setting);
 	readNamePath(setting);
+	readOpenCVParallelNum(setting);
 }
 
 tk::dnn::Network *YoloApplication::createNetwork(ConfigInstance *basic_config_data)
@@ -144,6 +161,10 @@ void YoloApplication::initializePreprocessing(std::string network_name, int maxi
 {
 	this->network_name = network_name;
 	dataset = new ImageDataset(yoloAppConfig.image_path);
+
+	if(yoloAppConfig.opencv_parallel_num >= 0) {
+		cv::setNumThreads(0);
+	}
 }
 
 
