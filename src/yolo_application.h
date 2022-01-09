@@ -17,6 +17,7 @@ typedef struct _YoloAppConfig {
 	std::string calib_image_path;
 	int calib_images_num;
 	std::string name_path;
+	int opencv_parallel_num;
 } YoloAppConfig;
 
 
@@ -47,6 +48,7 @@ class YoloApplication : public IInferenceApplication {
 		void readCalibImagePath(libconfig::Setting &setting);
 		void readCalibImagesNum(libconfig::Setting &setting);
 		void readNamePath(libconfig::Setting &setting);
+		void readOpenCVParallelNum(libconfig::Setting &setting);
 		void regionLayerDetect(int sampleIndex, int batch, float *output_buffer, Detection *dets, std::vector<int> &detections_num);
 		void yoloLayerDetect(int sampleIndex, int batch, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num);
 		void detectBox(float **output_buffers, int output_num, int sampleIndex, int batch, Detection *dets, std::vector<int> &detections_num);
