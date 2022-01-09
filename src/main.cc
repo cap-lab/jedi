@@ -33,6 +33,12 @@ static void turnOnTegrastats(std::string power_file_name) {
 	int result = -1;
 	std::string cmd;
 
+	cmd = "tegrastats --stop";
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;
+	}
+
 	cmd = std::string("rm -f ") + power_file_name;
 	result = system(cmd.c_str());
 	if(result == -1 || result == 127) {

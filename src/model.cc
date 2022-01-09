@@ -293,7 +293,7 @@ void Model::finalizeModel() {
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
 		for(int iter2 = 0; iter2 < stream_number; iter2++) {
-			nvinfer1::IExecutionContext *context = contexts[iter1][iter2];		
+			nvinfer1::IExecutionContext *context = contexts[iter1][iter2];
 			context->destroy();
 		}
 
@@ -521,9 +521,8 @@ void Model::infer( int device_id, int stream_id, int buffer_id) {
 	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
-
 	enqueueSuccess = contexts[device_id][stream_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][stream_id], &(events[device_id][stream_id]));
-	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	//enqueueSuccess = contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
 	if(enqueueSuccess == false)
 	{
 		printf("enqueue error happened: %d, %d\n", device_id, buffer_id);

@@ -116,13 +116,29 @@ tk::dnn::Network *YoloApplication::createNetwork(ConfigInstance *basic_config_da
 
 	net->fileImgList = yoloAppConfig.calib_image_path;
 	net->num_calib_images = yoloAppConfig.calib_images_num;
+	for (int iter = 0 ; iter < net->num_layers; iter++) {
+		if(net->layers[iter]->getLayerType() == LAYER_YOLO) {
+			YoloData yolo;
+			tk::dnn::Yolo *yoloTKDNN = (tk::dnn::Yolo *) net->layers[iter];
+			yolo.n_masks = yoloTKDNN->n_masks;
+			yolo.bias = yoloTKDNN->bias_h;
+			yolo.mask = yoloTKDNN->mask_h;
+			yolo.new_coords = yoloTKDNN->new_coords;
+			yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) yoloTKDNN->nsm_kind;
+			yolo.nms_thresh = yoloTKDNN->nms_thresh;
+			yolo.height = yoloTKDNN->input_dim.h;
+			yolo.width = yoloTKDNN->input_dim.w;
+			yolo.channel = yoloTKDNN->input_dim.c;
 
+			yolos.push_back(yolo);
+		}
+	}
 	return net;
 }
 
 void YoloApplication::referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT)
 {
-	for(int iter = 0; iter < networkRT->pluginFactory->n_yolos; iter++) {
+	/*for(int iter = 0; iter < networkRT->pluginFactory->n_yolos; iter++) {
 		YoloData yolo;
 		tk::dnn::YoloRT *yRT = networkRT->pluginFactory->yolos[iter];
 		yolo.n_masks = yRT->n_masks;
@@ -136,7 +152,7 @@ void YoloApplication::referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *netw
 		yolo.channel = yRT->c;
 
 		yolos.push_back(yolo);
-	}
+	}*/
 }
 
 
