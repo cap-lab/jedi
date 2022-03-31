@@ -3,7 +3,7 @@
 #define YOLO_APPLICATION_H_
 
 #include "variable.h"
-#include "image_dataset.h"
+// #include "image_dataset.h"
 
 #include "inference_application.h"
 
@@ -26,19 +26,22 @@ class YoloApplication : public IInferenceApplication {
 		YoloApplication() {};
 		~YoloApplication();
 		void initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
-		void preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer) override;
+		// void preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer) override;
 		void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
-		void postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied) override;
+		// void postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied) override;
 		tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
 		void referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT) override;
 		void readCustomOptions(libconfig::Setting &setting) override;
+
+		void preprocessing2(char *path, bool letter_box, int *pwidth, int *pheight, float *input_buffer) override;
+		void postprocessing2(int width, int height, float **output_buffers, int output_num) override;
 
 	private:
 		YoloAppConfig yoloAppConfig;
 		std::vector<YoloData> yolos;
 		InputDim input_dim;
 		bool letter_box;
-		ImageDataset *dataset;
+		// ImageDataset *dataset;
 		std::vector<Detection *> dets_vec;
 		std::vector<std::vector<int>> detection_num_vec;
 		std::string network_name;
@@ -49,10 +52,15 @@ class YoloApplication : public IInferenceApplication {
 		void readCalibImagesNum(libconfig::Setting &setting);
 		void readNamePath(libconfig::Setting &setting);
 		void readOpenCVParallelNum(libconfig::Setting &setting);
-		void regionLayerDetect(int sampleIndex, int batch, float *output_buffer, Detection *dets, std::vector<int> &detections_num);
-		void yoloLayerDetect(int sampleIndex, int batch, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num);
-		void detectBox(float **output_buffers, int output_num, int sampleIndex, int batch, Detection *dets, std::vector<int> &detections_num);
-		void printBox(int sample_index, int batch, Detection *dets, std::vector<int> detections_num);
+		// void regionLayerDetect(int sampleIndex, int batch, float *output_buffer, Detection *dets, std::vector<int> &detections_num);
+		// void yoloLayerDetect(int sampleIndex, int batch, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num);
+		// void detectBox(float **output_buffers, int output_num, int sampleIndex, int batch, Detection *dets, std::vector<int> &detections_num);
+		// void printBox(int sample_index, int batch, Detection *dets, std::vector<int> detections_num);
+
+		void regionLayerDetect2(int width, int height, float *output, Detection *dets, std::vector<int> &detections_num);
+		void yoloLayerDetect2(int width, int height, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num);
+		void detectBox2(int width, int height, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num);
+		void printBox2(int width, int height, Detection *dets, std::vector<int> detections_num);
 };
 
 #endif

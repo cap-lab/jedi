@@ -110,3 +110,45 @@ void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int i
 	mu.unlock();
 }
 
+void detectCOCO2(Detection *dets, int nDets, int w, int h, int iw, int ih) {
+	int i, j;
+	int image_id = 0; // get_coco_image_id(path);
+	std::list<std::string> detected;
+
+	for (i = 0; i < nDets; ++i) {
+		if (dets[i].objectness >= 0) {
+			float xmin = dets[i].bbox.x - dets[i].bbox.w / 2.;
+			float xmax = dets[i].bbox.x + dets[i].bbox.w / 2.;
+			float ymin = dets[i].bbox.y - dets[i].bbox.h / 2.;
+			float ymax = dets[i].bbox.y + dets[i].bbox.h / 2.;
+
+			if (xmin < 0)
+				xmin = 0;
+			if (ymin < 0)
+				ymin = 0;
+			if (xmax > w)
+				xmax = w;
+			if (ymax > h)
+				ymax = h;
+
+			float bx = xmin;
+			float by = ymin;
+			float bw = xmax - xmin;
+			float bh = ymax - ymin;
+
+			for (j = 0; j < NUM_CLASSES; ++j) {
+				// std::cerr<<__func__<<":"<<__LINE__<<" prob: "<<dets[i].prob[j]<<std::endl;
+				if (dets[i].prob[j] >= PRINT_THRESH) {
+					// std::stringstream result;
+					std::cout<<"{\"image_id\":"<<image_id<<", \"category_id\":"<<coco_ids[j]<<", \"bbox\":["<<bx<<", "<<by<<", "<<bw<<", "<<bh<<"], \"score\":"<<dets[i].prob[j]<<"}"<<std::endl;
+					// detected.push_back(result.str());
+					// detected_num++;
+				}
+			}
+		}
+	}
+
+	// mu.lock();
+	// detected_map.insert(std::pair<int,std::list<std::string>>(idx,detected));
+	// mu.unlock();
+}

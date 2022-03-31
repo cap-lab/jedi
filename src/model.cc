@@ -521,12 +521,12 @@ void Model::infer( int device_id, int stream_id, int buffer_id) {
 	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
-	enqueueSuccess = contexts[device_id][stream_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][stream_id], &(events[device_id][stream_id]));
-	//enqueueSuccess = contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	// enqueueSuccess = contexts[device_id][stream_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][stream_id], &(events[device_id][stream_id]));
+	enqueueSuccess = contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
 	if(enqueueSuccess == false)
 	{
 		printf("enqueue error happened: %d, %d\n", device_id, buffer_id);
-		exit_flag = true;
+		// exit_flag = true;
 	}
 }
 
@@ -537,7 +537,7 @@ void Model::waitUntilInputConsumed(int device_id, int stream_id) {
 	if(error != cudaSuccess)
 	{
 		printf("error happened in synchronize: %d, %d: %d\n", device_id, stream_id, error);
-		exit_flag = true;
+		// exit_flag = true;
 	}
 }
 
@@ -548,6 +548,6 @@ void Model::waitUntilInferenceDone(int device_id, int stream_id) {
 	if(error != cudaSuccess)
 	{
 		printf("error happened in synchronize: %d, %d: %d\n", device_id, stream_id, error);
-		exit_flag = true;
+		// exit_flag = true;
 	}
 }

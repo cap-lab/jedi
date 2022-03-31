@@ -38,6 +38,6 @@ typedef struct _InputDim {
 #define PRINT_THRESH 0.01
 #define CONFIDENCE_THRESH 0.01
 
-extern bool exit_flag;
+// extern bool exit_flag;
 
 #endif
