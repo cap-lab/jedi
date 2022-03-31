@@ -152,12 +152,22 @@ static bool checkMsg(int rcv_msq_id) {
 		std::stringstream ss(buf);
 		std::string temp;
 
-		while(std::getline(ss,temp,':')) {
-			cores.push_back(std::stoi(temp));	
-		}
+//		while(std::getline(ss,temp,':')) {
+//			std::cerr<<"temp:"<<temp.substr(0,1)<<"/"<<std::endl;
+//			cores.push_back(std::stoi(temp.substr(0,1)));	
+//		}
+
+		std::getline(ss,temp,':');
+		std::cerr<<"temp:"<<temp.substr(0,1)<<"/"<<std::endl;
+		cores.push_back(std::stoi(temp.substr(0,1)));	
+
+		std::getline(ss,temp,':');
+		std::cerr<<"temp:"<<temp.substr(0,1)<<"/"<<std::endl;
+		cores.push_back(std::stoi(temp.substr(0,1)));
 
 		g_pre_core = cores[0];
 		g_post_core = cores[1];
+		stickThisThreadToCore(g_pre_core);
 		std::cerr<<"received MSG_RUNC"<<std::endl;
 	}
 	else if(type == MSG_EXIT) {

@@ -250,6 +250,9 @@ int main(int argc, char *argv[]) {
 	std::vector<Dataset *> datasets;
 	generateDatasets(candidates_num, config_data, datasets);
 
+	printf("wait");
+	usleep(1000 * 1000 * 10);	
+	printf("wait end");
 	// make threads
 	generateThreads(0, config_data, models, datasets, max_profile_file_name, avg_profile_file_name);
 

@@ -518,13 +518,15 @@ void Model::infer(int device_id, int buffer_id) {
 	bool is_dla = (config_data->instances.at(instance_id).devices.at(device_id) == DEVICE_DLA);
 	int dla_core = config_data->instances.at(instance_id).dla_cores.at(device_id);
 	long start_time;
+	cudaError_t error;
 
 //	if(is_dla) {
 //		start_time = getTime();	
 //	}
 
-	// contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
-	contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	contexts[device_id][buffer_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][buffer_id], nullptr);
+	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	error = cudaStreamSynchronize(streams[device_id][buffer_id]);
 
 //	if(is_dla) {
 //		long dla_time = getTime() - start_time;	

@@ -173,9 +173,9 @@ void doPostProcessing(void *d) {
 
 		printBox(dataset, sample_index, data->model->input_dim, batch, network_name, dets, detections_num);
 		
-		if(tid == (sample_index % post_thread_num) && instance_id == 0) {
-			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
-		}
+//		if(tid == (sample_index % post_thread_num) && instance_id == 0) {
+//			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
+//		}
 
 		sample_index += post_thread_num;
 		post_time_vec.push_back(getTime() - curr_time);
