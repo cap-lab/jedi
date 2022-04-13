@@ -1,7 +1,22 @@
 #include "runner.h"
 
+int stickThisThreadToCore(int core_id) {
+	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+	if (core_id < 0 || core_id >= num_cores)
+		return EINVAL;
+
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(core_id, &cpuset);
+
+	pthread_t current_thread = pthread_self();    
+	return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+}
+
 void runPreProcess(void *d) {
 	Runner *runner = (Runner *)d;
+
+	stickThisThreadToCore(runner->pre_thread_core);
 
 	while (!runner->exit_flag) {
 		while(runner->signals.at(PRE_LOCK) && !runner->exit_flag) {
@@ -35,6 +50,8 @@ void runInference(void *d) {
 
 void runPostProcess(void *d) {
 	Runner *runner = (Runner *)d;
+
+	stickThisThreadToCore(runner->post_thread_core);
 
 	while(!runner->exit_flag) {
 		while(runner->signals.at(POST_LOCK) && !runner->exit_flag) {
@@ -93,14 +110,10 @@ void Runner::init() {
 }
 
 
-/*
-void Runner::readData() {
-	Model *model = this->models.at(0);
-	IInferenceApplication *app = this->apps.at(0);
-
-	app->preprocessing2(this->image_path, model->letter_box, &(this->width), &(this->height), model->input_buffers.at(0));
+void Runner::set_thread_cores(int pre_thread_core, int post_thread_core) {
+	this->pre_thread_core = pre_thread_core;
+	this->post_thread_core = post_thread_core;
 }
-*/
 
 
 void Runner::setInputData() {
@@ -126,18 +139,13 @@ void Runner::postProcess() {
 }
 
 
-
-
-
 void Runner::runThreads() {
 	for (int iter = 0; iter < LOCK_NUM; iter++) {
 		this->signals.push_back(1);
 	}
 
 	this->threads.push_back(std::thread(runPreProcess, this));	
-
 	this->threads.push_back(std::thread(runInference, this));	
-
 	this->threads.push_back(std::thread(runPostProcess, this));
 }
 

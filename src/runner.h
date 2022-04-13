@@ -26,7 +26,7 @@ class Runner {
 		~Runner();
 		void init();
 		void run_with_data(char *data, int width, int height, int channel);
-		void run_with_path(char *path);
+		void set_thread_cores(int pre_thread_core, int post_thread_core);
 		void wrapup();
 
 		void setInputData();
@@ -36,11 +36,12 @@ class Runner {
 		std::vector<Model *> models;
 		std::vector<int> signals;
 		bool exit_flag = false;
+		int pre_thread_core = 0;
+		int post_thread_core = 0;
 
 	private:
 		void generateModels();
 		void initializePreAndPostprocessing();
-		void readData();
 		void finalizeData();
 		void runThreads();
 
