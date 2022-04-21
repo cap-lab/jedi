@@ -20,6 +20,7 @@
 #include <opencv2/core/version.hpp>
 #endif
 
+#include "image_opencv.h"
 #include "variable.h"
 #include "image.h"
 

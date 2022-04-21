@@ -176,31 +176,12 @@ void YoloApplication::referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *netw
 void YoloApplication::initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number)
 {
 	this->network_name = network_name;
-	// dataset = new ImageDataset(yoloAppConfig.image_path);
 
 	if(yoloAppConfig.opencv_parallel_num >= 0) {
 		cv::setNumThreads(0);
 	}
 }
 
-/*
-void YoloApplication::preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer)
-{
-	int image_index = (sample_index + batch_index) % dataset->getSize();
-
-	ImageData *image_data = dataset->getData(image_index);
-	int orignal_width = 0;
-	int original_height = 0;
-
-	if(letter_box == true)
-		loadImageLetterBox((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &orignal_width, &original_height, input_buffer);
-	else
-		loadImageResize((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &orignal_width, &original_height, input_buffer);
-
-	image_data->width = orignal_width;
-	image_data->height = original_height;
-}
-*/
 
 void YoloApplication::preprocessing2(char *path, bool letter_box, int *pwidth, int *pheight, float *input_buffer)
 {
@@ -215,25 +196,6 @@ void YoloApplication::preprocessing2(char *path, bool letter_box, int *pwidth, i
 	*pheight = original_height;
 }
 
-/*
-void YoloApplication::regionLayerDetect(int sampleIndex, int batch, float *output, Detection *dets, std::vector<int> &detections_num)
-{
-	int in_width = 0, in_height = 0;
-
-	in_width = input_dim.width / 32;
-	in_height = input_dim.height / 32;
-
-	for(int i = 0; i < batch; i++) {
-		ImageData *data = dataset->getData(sampleIndex * batch + i);
-		int orig_width = data->width;
-		int orig_height = data->height;
-		int count = 0;
-		get_region_detections(&output[i * in_width * in_height * NUM_ANCHOR * (NUM_CLASSES + 5)], CONFIDENCE_THRESH, input_dim, &dets[i * NBOXES], &count, orig_width, orig_height);
-		do_nms_sort(&dets[i * NBOXES], count, NMS);
-		detections_num[i] = count;
-	}
-}
-*/
 
 void YoloApplication::regionLayerDetect2(int width, int height, float *output, Detection *dets, std::vector<int> &detections_num)
 {
@@ -253,33 +215,6 @@ void YoloApplication::regionLayerDetect2(int width, int height, float *output, D
 	}
 }
 
-/*
-void YoloApplication::yoloLayerDetect(int sampleIndex, int batch, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num)
-{
-	int detection_num = 0;
-	int output_size = 0;
-	int yolo_num = yolos.size();
-
-	for (int iter1 = 0; iter1 < batch; iter1++) {
-		ImageData *data = dataset->getData(sampleIndex * batch + iter1);
-		int orig_width = data->width;
-		int orig_height = data->height;
-
-		detection_num = 0;
-
-		for(int iter2 = 0; iter2 < yolo_num; iter2++) {
-			int w = yolos[iter2].width;
-			int h = yolos[iter2].height;
-			int c = yolos[iter2].channel;
-
-			output_size = w * h * c;
-			yolo_computeDetections(output_buffers[iter2] + output_size * iter1, &dets[iter1 * NBOXES], &detection_num, w, h, c, CONFIDENCE_THRESH, yolos[iter2], orig_width, orig_height, input_dim.width, input_dim.height, letter_box);
-		}
-		yolo_mergeDetections(&dets[iter1 * NBOXES], detection_num, yolos[0].nms_thresh, yolos[0].nms_kind);
-		detections_num[iter1] = detection_num;
-	}
-}
-*/
 
 void YoloApplication::yoloLayerDetect2(int width, int height, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num)
 {
@@ -307,17 +242,6 @@ void YoloApplication::yoloLayerDetect2(int width, int height, float **output_buf
 	}
 }
 
-/*
-void YoloApplication::detectBox(float **output_buffers, int output_num, int sampleIndex, int batch, Detection *dets, std::vector<int> &detections_num)
-{
-	if(network_name == NETWORK_YOLOV2 || network_name == NETWORK_YOLOV2TINY || network_name == NETWORK_DENSENET) {
-		regionLayerDetect(sampleIndex, batch, output_buffers[0], dets, detections_num);
-	}
-	else {
-		yoloLayerDetect(sampleIndex, batch, output_buffers, output_num, dets, detections_num);
-	}
-}
-*/
 
 void YoloApplication::detectBox2(int width, int height, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num)
 {
@@ -329,18 +253,6 @@ void YoloApplication::detectBox2(int width, int height, float **output_buffers, 
 	}
 }
 
-/*
-void YoloApplication::printBox(int sample_index, int batch, Detection *dets, std::vector<int> detections_num)
-{
-	for(int iter1 = 0; iter1 < batch; iter1++) {
-		int image_index = (sample_index * batch + iter1) % dataset->getSize();
-		ImageData *data = dataset->getData(image_index);
-		char *path = (char *)(data->path.c_str());
-
-		detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
-	}
-}
-*/
 
 void YoloApplication::printBox2(int width, int height, Detection *dets, std::vector<int> detections_num)
 {
@@ -349,6 +261,7 @@ void YoloApplication::printBox2(int width, int height, Detection *dets, std::vec
 		detectCOCO2(&dets[iter1 * NBOXES], detections_num[iter1], width, height, input_dim.width, input_dim.height);
 	}
 }
+
 
 void YoloApplication::initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number)
 {
@@ -362,23 +275,18 @@ void YoloApplication::initializePostprocessing(std::string network_name, int max
 	}
 }
 
-/*
-void YoloApplication::postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied)
-{
-	detectBox(output_buffers, output_num, sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 
-	*buffer_occupied = 0;
-
-	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
-}
-*/
-
-void YoloApplication::postprocessing2(int width, int height, float **output_buffers, int output_num)
+void YoloApplication::postprocessing2(int width, int height, char *input_data, float **output_buffers, int output_num, char *result_file_name)
 {
 	detectBox2(width, height, output_buffers, output_num, dets_vec[0], detection_num_vec[0]);
 
 	printBox2(width, height, dets_vec[0], detection_num_vec[0]);
+
+	if(result_file_name != nullptr) {
+		drawBox(width, height, input_data, dets_vec[0], detection_num_vec[0], result_file_name);
+	}
 }
+
 
 YoloApplication::~YoloApplication()
 {
@@ -391,7 +299,4 @@ YoloApplication::~YoloApplication()
 		dets_vec.pop_back();
 	}
 	yolos.clear();
-	// delete dataset;
 }
-
-

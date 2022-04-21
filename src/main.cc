@@ -4,24 +4,26 @@ int main(int argc, char *argv[]) {
 	std::string config_file_name = "config.cfg";
 	std::vector<IInferenceApplication *> apps;
 
-	Runner runner(config_file_name);
+	Runner runner(config_file_name, 416, 416, 3);
 
 	runner.init();
-
-	// const char *path = "/sdcard/data/coco2017/images/000000283785.jpg";
-	// runner.run_with_path((char *)path);
 	
-	const char *filename = "tmp.bin";
+	const char *filename = "tmp2.bin";
+	float *input = (float *)malloc(sizeof(float) * 416 * 416 * 3);
+
     FILE *fp = fopen((char *)filename, "rb");
-	float *input = (float *)malloc(sizeof(float) * 416 * 416 * 3 * 4);
-    fread(input, sizeof(float), 416*416*3*4, fp);
+    fread(input, sizeof(float), 416*416*3, fp);
     fclose(fp);	
 
 	std::cout<<"first image"<<std::endl;
-	runner.run_with_data((char *)input, 416, 416, 3);
+	runner.run((char *)input, (char *)"image1.jpg");
+
+    fp = fopen((char *)filename, "rb");
+    fread(input, sizeof(float), 416*416*3, fp);
+    fclose(fp);	
 
 	std::cout<<"second image"<<std::endl;
-	runner.run_with_data((char *)input, 416, 416, 3);
+	runner.run((char *)input, (char *)"image2.jpg");
 
 	runner.wrapup();
 

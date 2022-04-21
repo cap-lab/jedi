@@ -22,10 +22,11 @@
 
 class Runner {
 	public:
-		Runner(std::string config_file_name);
+		Runner(std::string config_file_name, int width, int height, int channel);
 		~Runner();
 		void init();
-		void run_with_data(char *data, int width, int height, int channel);
+		void run(char *data);
+		void run(char *data, char *result_file_name);
 		void set_thread_cores(int pre_thread_core, int post_thread_core);
 		void wrapup();
 
@@ -33,6 +34,7 @@ class Runner {
 		void postProcess();
 
 		int device_num = 0;
+		float *input_buffer;
 		std::vector<Model *> models;
 		std::vector<int> signals;
 		bool exit_flag = false;
@@ -51,6 +53,7 @@ class Runner {
 		int height = 0;
 		int channel = 3;
 		char *image_data;	
+		char *result_file_name;
 		std::vector<std::thread> threads;
 };
 

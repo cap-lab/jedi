@@ -9,7 +9,7 @@
 // #include "dataset.h"
 
 void writeResultFile(std::string result_file_name);
-void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path);
 void detectCOCO2(Detection *dets, int nDets, int w, int h, int iw, int ih);
+void drawBox(int width, int height, char *input_data, Detection *dets, std::vector<int> detections_num, char *result_file_name);
 
 #endif 

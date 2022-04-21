@@ -1,6 +1,7 @@
 #include "runner.h"
+#include <iostream>
 
-int stickThisThreadToCore(int core_id) {
+static int stickThisThreadToCore(int core_id) {
 	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 	if (core_id < 0 || core_id >= num_cores)
 		return EINVAL;
@@ -65,9 +66,13 @@ void runPostProcess(void *d) {
 }
 
 
-Runner::Runner(std::string config_file_name) {
+Runner::Runner(std::string config_file_name, int width, int height, int channel) {
 	this->config_data = new ConfigData(config_file_name, this->apps);
 	this->device_num = this->config_data->instances.at(0).device_num;
+	this->width = width;
+	this->height = height;
+	this->channel = channel;
+	this->input_buffer = new float[width * height * channel];
 }
 
 
@@ -76,6 +81,7 @@ Runner::~Runner() {
 		wrapup();	
 	}
 	delete this->config_data;
+	delete this->input_buffer;
 }
 
 
@@ -118,9 +124,20 @@ void Runner::set_thread_cores(int pre_thread_core, int post_thread_core) {
 
 void Runner::setInputData() {
 	Model *model = this->models.at(0);
-	int input_size = this->width * this->height * this->channel * sizeof(float);
+	int w = this->width;
+	int h = this->height;
+	int c = this->channel;
+	int input_size =  w * h * c * sizeof(float);
+	int step = w*c;
 
-	memcpy(model->input_buffers.at(0), this->image_data, input_size);	
+	for (int y = 0; y < h; ++y) {
+		for (int k = 0; k < c; ++k) {
+			for (int x = 0; x < w; ++x) {
+				this->input_buffer[k*w*h + y*w + x] = this->image_data[y*step + x*c + k] / 255.0f;
+			}
+		}
+	}
+	memcpy(model->input_buffers.at(0), this->input_buffer, input_size);	
 }
 
 
@@ -135,7 +152,8 @@ void Runner::postProcess() {
 		output_pointers[iter] = model->output_buffers[iter];
 	}
 
-	((YoloApplication *)app)->postprocessing2(this->width, this->height, output_pointers, model->network_output_number);
+	((YoloApplication *)app)->postprocessing2(this->width, this->height, this->image_data, output_pointers, model->network_output_number, this->result_file_name);
+	this->result_file_name = nullptr;
 }
 
 
@@ -150,10 +168,7 @@ void Runner::runThreads() {
 }
 
 
-void Runner::run_with_data(char *data, int width, int height, int channel) {
-	this->width = width;
-	this->height = height;
-	this->channel = channel;
+void Runner::run(char *data) {
 	this->image_data = data;
 
 	signals.at(PRE_LOCK) = 0;
@@ -170,6 +185,11 @@ void Runner::run_with_data(char *data, int width, int height, int channel) {
 	while(!signals.at(POST_LOCK)) {
 		usleep(SLEEP_TIME);	
 	}
+}
+
+void Runner::run(char *data, char *result_file_name) {
+	this->result_file_name = result_file_name;
+	run(data);
 }
 
 
