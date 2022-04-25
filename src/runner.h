@@ -22,7 +22,7 @@
 
 class Runner {
 	public:
-		Runner(std::string config_file_name, int width, int height, int channel);
+		Runner(std::string config_file_name, int width, int height, int channel, int step);
 		~Runner();
 		void init();
 		void run(char *data);
@@ -52,6 +52,7 @@ class Runner {
 		int width = 0;
 		int height = 0;
 		int channel = 3;
+		int step = 0;
 		char *image_data;	
 		char *result_file_name;
 		std::vector<std::thread> threads;

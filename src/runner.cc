@@ -66,12 +66,13 @@ void runPostProcess(void *d) {
 }
 
 
-Runner::Runner(std::string config_file_name, int width, int height, int channel) {
+Runner::Runner(std::string config_file_name, int width, int height, int channel, int step) {
 	this->config_data = new ConfigData(config_file_name, this->apps);
 	this->device_num = this->config_data->instances.at(0).device_num;
 	this->width = width;
 	this->height = height;
 	this->channel = channel;
+	this->step = step;
 	this->input_buffer = new float[width * height * channel];
 }
 
@@ -127,8 +128,8 @@ void Runner::setInputData() {
 	int w = this->width;
 	int h = this->height;
 	int c = this->channel;
+	int step = this->step;
 	int input_size =  w * h * c * sizeof(float);
-	int step = w*c;
 
 	for (int y = 0; y < h; ++y) {
 		for (int k = 0; k < c; ++k) {
