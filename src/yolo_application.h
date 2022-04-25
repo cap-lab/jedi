@@ -32,7 +32,7 @@ class YoloApplication : public IInferenceApplication {
 		void readCustomOptions(libconfig::Setting &setting) override;
 
 		void preprocessing2(char *path, bool letter_box, int *pwidth, int *pheight, float *input_buffer) override;
-		void postprocessing2(int width, int height, char *input_data, float **output_buffers, int output_num, char *result_file_name) override;
+		void postprocessing2(int width, int height, int step, char *input_data, float **output_buffers, int output_num, char *result_file_name) override;
 
 	private:
 		YoloAppConfig yoloAppConfig;

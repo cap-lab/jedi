@@ -153,7 +153,7 @@ void Runner::postProcess() {
 		output_pointers[iter] = model->output_buffers[iter];
 	}
 
-	((YoloApplication *)app)->postprocessing2(this->width, this->height, this->image_data, output_pointers, model->network_output_number, this->result_file_name);
+	((YoloApplication *)app)->postprocessing2(this->width, this->height, this->step, this->image_data, output_pointers, model->network_output_number, this->result_file_name);
 	this->result_file_name = nullptr;
 }
 

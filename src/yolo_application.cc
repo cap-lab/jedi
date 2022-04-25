@@ -276,14 +276,14 @@ void YoloApplication::initializePostprocessing(std::string network_name, int max
 }
 
 
-void YoloApplication::postprocessing2(int width, int height, char *input_data, float **output_buffers, int output_num, char *result_file_name)
+void YoloApplication::postprocessing2(int width, int height, int step, char *input_data, float **output_buffers, int output_num, char *result_file_name)
 {
 	detectBox2(width, height, output_buffers, output_num, dets_vec[0], detection_num_vec[0]);
 
 	printBox2(width, height, dets_vec[0], detection_num_vec[0]);
 
 	if(result_file_name != nullptr) {
-		drawBox(width, height, input_data, dets_vec[0], detection_num_vec[0], result_file_name);
+		drawBox(width, height, step, input_data, dets_vec[0], detection_num_vec[0], result_file_name);
 	}
 }
 

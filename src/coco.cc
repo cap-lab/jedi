@@ -126,9 +126,9 @@ void detectCOCO2(Detection *dets, int nDets, int w, int h, int iw, int ih) {
 	image_id++;
 }
 
-void drawBox(int width, int height, char *input_data, Detection *dets, std::vector<int> detections_num, char *result_file_name)
+void drawBox(int width, int height, int step, char *input_data, Detection *dets, std::vector<int> detections_num, char *result_file_name)
 {
-	cv::Mat frame = cv::Mat(height, width, CV_8UC3, input_data);
+	cv::Mat frame = cv::Mat(height, width, CV_8UC3, input_data, step);
 	int x0, x1, y0, y1;
 	int baseline = 0;
 	float font_scale = 0.5;

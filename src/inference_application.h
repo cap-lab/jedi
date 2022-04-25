@@ -29,7 +29,7 @@ class IInferenceApplication {
 		virtual void referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT) {};
 		virtual void readCustomOptions(libconfig::Setting &setting) {};
 		virtual void preprocessing2(char *path, bool letter_box, int *pwidth, int *pheight, float *input_buffer) {};
-		virtual void postprocessing2(int width, int height, char *input_data, float **output_buffers, int output_num, char *result_file_name) {};
+		virtual void postprocessing2(int width, int height, int step, char *input_data, float **output_buffers, int output_num, char *result_file_name) {};
 
 	private:
 };
