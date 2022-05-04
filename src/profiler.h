@@ -172,9 +172,9 @@ class Profiler : public nvinfer1::IProfiler
 		bool isMappedDLA(std::string layer_name) {
 			std::string nvm("nvm");
 			std::string finish("finish");
-			std::string comma(",");
+			std::string foreign("Foreign");
 
-			bool not_found = (layer_name.find(nvm) == std::string::npos) && (layer_name.find(finish) == std::string::npos) && (layer_name.find(comma) == std::string::npos);
+			bool not_found = (layer_name.find(nvm) == std::string::npos) && (layer_name.find(finish) == std::string::npos) && (layer_name.find(foreign) == std::string::npos);
 
 			return !not_found;
 		}
