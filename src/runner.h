@@ -27,8 +27,9 @@ class Runner {
 		void init();
 		void run(char *data);
 		void run(char *data, char *result_file_name);
-		void set_thread_cores(int pre_thread_core, int post_thread_core);
+		void setThreadCores(int pre_thread_core, int post_thread_core);
 		void wrapup();
+		void saveProfileResults(char *max_filename, char *avg_filename, char *min_filename);
 
 		void setInputData();
 		void postProcess();

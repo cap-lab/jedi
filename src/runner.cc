@@ -1,6 +1,17 @@
 #include "runner.h"
 #include <iostream>
 
+std::vector<long> pre_time_vec, post_time_vec;
+
+static long getTime() {
+	struct timespec time;
+	if(0 != clock_gettime(CLOCK_REALTIME, &time)) {
+		std::cerr<<"Something wrong on clock_gettime()"<<std::endl;		
+		exit(-1);
+	}
+	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000; // us
+}
+
 static int stickThisThreadToCore(int core_id) {
 	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 	if (core_id < 0 || core_id >= num_cores)
@@ -16,6 +27,7 @@ static int stickThisThreadToCore(int core_id) {
 
 void runPreProcess(void *d) {
 	Runner *runner = (Runner *)d;
+	long curr_time = getTime();
 
 	stickThisThreadToCore(runner->pre_thread_core);
 
@@ -25,8 +37,10 @@ void runPreProcess(void *d) {
 		}
 		if(runner->exit_flag) break;
 
+		curr_time = getTime();
 		runner->setInputData();
 		runner->signals.at(PRE_LOCK) = 1;
+		pre_time_vec.push_back(getTime() - curr_time);
 	}
 }
 
@@ -51,6 +65,7 @@ void runInference(void *d) {
 
 void runPostProcess(void *d) {
 	Runner *runner = (Runner *)d;
+	long curr_time = getTime();
 
 	stickThisThreadToCore(runner->post_thread_core);
 
@@ -60,8 +75,10 @@ void runPostProcess(void *d) {
 		}
 		if(runner->exit_flag) break;
 
+		curr_time = getTime();
 		runner->postProcess();	
 		runner->signals.at(POST_LOCK) = 1;
+		post_time_vec.push_back(getTime() - curr_time);
 	}
 }
 
@@ -117,7 +134,7 @@ void Runner::init() {
 }
 
 
-void Runner::set_thread_cores(int pre_thread_core, int post_thread_core) {
+void Runner::setThreadCores(int pre_thread_core, int post_thread_core) {
 	this->pre_thread_core = pre_thread_core;
 	this->post_thread_core = post_thread_core;
 }
@@ -188,9 +205,17 @@ void Runner::run(char *data) {
 	}
 }
 
+
 void Runner::run(char *data, char *result_file_name) {
 	this->result_file_name = result_file_name;
 	run(data);
+}
+
+
+void Runner::saveProfileResults(char *max_filename, char *avg_filename, char *min_filename) {
+	Model *model = models.at(0);
+
+	model->printProfile(max_filename, avg_filename, min_filename);
 }
 
 

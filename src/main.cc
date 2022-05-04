@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
 
 	runner.init();
 	
-	const char *filename = "tmp3.bin";
+	const char *filename = "tmp.bin";
 	char *input = (char *)malloc(416 * 416 * 3);
 
     FILE *fp = fopen((char *)filename, "rb");
@@ -24,6 +24,8 @@ int main(int argc, char *argv[]) {
 
 	std::cout<<"second image"<<std::endl;
 	runner.run((char *)input, (char *)"image2.jpg");
+
+	runner.saveProfileResults("max.log", "avg.log", "min.log");
 
 	runner.wrapup();
 

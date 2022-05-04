@@ -9,6 +9,7 @@
 
 #include "variable.h"
 #include "config.h"
+#include "profiler.h"
 
 #include "inference_application.h"
 
@@ -36,6 +37,8 @@ class Model {
 		std::vector<float *> input_buffers;
 		std::vector<float *> output_buffers;
 		int network_output_number;
+		std::vector<std::vector<long>> dla_profile_vec;
+		Profiler profiler;
 
 		Model(ConfigData *config_data, int instance_id, IInferenceApplication *app);
 		~Model();
@@ -63,8 +66,7 @@ class Model {
 		void createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index);
 		void readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table, int device);
 		int getLayerNumberFromCalibrationKey(std::string key);
-
-
+		void printProfile(char *max_profile_file_name, char *avg_profile_file_name, char *min_profile_file_name);
 };
 
 #endif
