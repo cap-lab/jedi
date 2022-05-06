@@ -14,4 +14,4 @@ TARGET_LINK_LIBRARIES(tinyJEDI m config++ nvinfer tkDNN stdc++ ${CUDA_LIBRARIES}
 
 install(TARGETS tinyJEDI DESTINATION /usr/lib)
 
-install(FILES runner.h cuda.h coco.h model.h inference_application.h yolo_application.h region_wrapper.h yolo_wrapper.h image.h image_opencv.h variable.h config.h config_data.h box.h DESTINATION include/tinyJEDI)
+install(FILES runner.h cuda.h coco.h model.h inference_application.h yolo_application.h region_wrapper.h yolo_wrapper.h image.h image_opencv.h variable.h config.h config_data.h box.h profiler.h DESTINATION include/tinyJEDI)
