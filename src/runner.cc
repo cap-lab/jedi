@@ -91,6 +91,7 @@ Runner::Runner(std::string config_file_name, int width, int height, int channel,
 	this->channel = channel;
 	this->step = step;
 	this->input_buffer = new float[width * height * channel];
+	this->image_data = new char[width * height * channel];
 }
 
 
@@ -187,7 +188,8 @@ void Runner::runThreads() {
 
 
 void Runner::run(char *data) {
-	this->image_data = data;
+	int input_size = this->width * this->height * this->channel * sizeof(char);
+	memcpy(this->image_data, data, input_size);	
 
 	signals.at(PRE_LOCK) = 0;
 	while(!signals.at(PRE_LOCK)) {
