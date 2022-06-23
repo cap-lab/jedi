@@ -30,7 +30,7 @@ InferenceThread::~InferenceThread() {
 	threads_data.clear();
 }
 
-void PreProcessingThread::setThreadData(std::vector<int> *signals, Model *model, IInferenceApplication *app, std::vector<long> *latency) {
+void PreProcessingThread::setThreadData(Model *model, IInferenceApplication *app, std::vector<long> *latency) {
 	thread_num = config_data->instances.at(instance_id).pre_thread_num;	
 	this->cur_running_index.assign(thread_num, 0);
 
@@ -39,7 +39,6 @@ void PreProcessingThread::setThreadData(std::vector<int> *signals, Model *model,
 		thread_data.config_data = config_data;
 		thread_data.instance_id = instance_id;
 		thread_data.tid = iter;
-		thread_data.signals = signals;
 		thread_data.app = app;
 		thread_data.model = model;
 		thread_data.latency = latency;
@@ -63,7 +62,7 @@ void PreProcessingThread::joinThreads() {
 	}
 }
 
-void PostProcessingThread::setThreadData(std::vector<int> *signals, Model *model, IInferenceApplication *app, std::vector<long> *latency) {
+void PostProcessingThread::setThreadData(Model *model, IInferenceApplication *app, std::vector<long> *latency) {
 	thread_num = config_data->instances.at(instance_id).post_thread_num;	
 	this->cur_running_index.assign(thread_num, 0);
 
@@ -72,7 +71,6 @@ void PostProcessingThread::setThreadData(std::vector<int> *signals, Model *model
 		thread_data.config_data = config_data;
 		thread_data.instance_id = instance_id;
 		thread_data.tid = iter;
-		thread_data.signals = signals;
 		thread_data.model = model;
 		thread_data.app = app;
 		thread_data.latency = latency;
@@ -96,7 +94,7 @@ void PostProcessingThread::joinThreads() {
 	}
 }
 
-void InferenceThread::setThreadData(std::vector<int> *signals, Model *model) {
+void InferenceThread::setThreadData(Model *model) {
 	thread_num = config_data->instances.at(instance_id).device_num;	
 
 	for(int iter = 0; iter < thread_num; iter++) {
@@ -104,8 +102,6 @@ void InferenceThread::setThreadData(std::vector<int> *signals, Model *model) {
 		thread_data.config_data = config_data;
 		thread_data.instance_id = instance_id;
 		thread_data.tid = iter;
-		thread_data.curr_signals = &(signals[iter]);
-		thread_data.next_signals = &(signals[iter+1]);
 		thread_data.model = model;
 
 		threads_data.push_back(thread_data);

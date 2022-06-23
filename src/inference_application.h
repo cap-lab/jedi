@@ -26,7 +26,8 @@ class IInferenceApplication {
 		virtual void initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number) {};
 		virtual void preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer)  = 0;
 		virtual void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) {};
-		virtual void postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied) = 0;
+		virtual void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) = 0;
+		virtual void postprocessing2(int thread_id, int sample_index, int batch) = 0;
 		virtual tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) = 0;
 		virtual void referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT) {};
 		virtual void readCustomOptions(libconfig::Setting &setting) {};

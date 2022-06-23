@@ -266,20 +266,15 @@ void YoloApplication::initializePostprocessing(std::string network_name, int max
 	}
 }
 
-void YoloApplication::postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied)
+void YoloApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
 {
 	detectBox(output_buffers, output_num, sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 
-	*buffer_occupied = 0;
-
-	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 }
 
-
-//int YoloApplication::getInputSize()
-//{
-//
-//}
+void YoloApplication::postprocessing2(int thread_id, int sample_index, int batch) {
+	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
+}
 
 YoloApplication::~YoloApplication()
 {
@@ -294,5 +289,3 @@ YoloApplication::~YoloApplication()
 	yolos.clear();
 	delete dataset;
 }
-
-

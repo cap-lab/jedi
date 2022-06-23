@@ -28,7 +28,8 @@ class YoloApplication : public IInferenceApplication {
 		void initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
 		void preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer) override;
 		void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
-		void postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied) override;
+		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
+		void postprocessing2(int thread_id, int sample_index, int batch) override;
 		tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
 		void referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT) override;
 		void readCustomOptions(libconfig::Setting &setting) override;

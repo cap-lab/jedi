@@ -27,7 +27,6 @@ long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<lon
 
 	for(int iter = 0 ; iter < nSize ; iter++) {
 		sum += latency[iter];
-		// fprintf(stderr, "checking[%d]: %ld\n", iter, latency[iter]);	
 	}
 
 	return sum / (long) nSize;
@@ -69,14 +68,12 @@ static int getNewSampleIndex(std::mutex *mu, int *sample_index_global, int sampl
 	return sample_index;
 }
 
-
 void doPreProcessing(void *d) {
 	PreProcessingThreadData *data = (PreProcessingThreadData *)d;
 	ConfigData *config_data = data->config_data;
 	std::vector<long> *latency = data->latency;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
-	std::vector<int> *signals = data->signals;
 	IInferenceApplication *app = data->app;
 	int *sample_index_global = data->sample_index;
 	std::mutex *mu = data->mu;
@@ -95,14 +92,18 @@ void doPreProcessing(void *d) {
 	index = sample_index * batch;
 
 	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
-		while(((*signals)[sample_index % buffer_num] || sample_index >= getMinSampleIndex(cur_running_index_list, sample_index) + buffer_num) && exit_flag == false) {
+		int buffer_index = sample_index % buffer_num;	
+		bool is_runnable = data->model->isPreprocessingRunnable(buffer_index);
+
+		while((!is_runnable || sample_index >= getMinSampleIndex(cur_running_index_list, sample_index) + buffer_num) && exit_flag == false) {
 			usleep(SLEEP_TIME);
 			stuckWhile++;
+			is_runnable = data->model->isPreprocessingRunnable(buffer_index);
 		}
 
 		(*latency)[sample_index - sample_offset] = getTime();
-		readData(tid, data->model->input_buffers.at(sample_index % buffer_num), app, data->model->input_dim, batch, batch_thread_num, index, data->model->letter_box);
-		(*signals)[sample_index % buffer_num] = 1;
+		readData(tid, data->model->net_input_buffers[buffer_index][0], app, data->model->input_dim, batch, batch_thread_num, index, data->model->letter_box);
+		data->model->updateInputSignals(buffer_index, true);	
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 		index = sample_index * batch;
@@ -118,7 +119,6 @@ void doPostProcessing(void *d) {
 	std::vector<long> *latency = data->latency;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
-	std::vector<int> *signals = data->signals;
 	IInferenceApplication *app = data->app;
 	int instance_num = config_data->instance_num;
 	int sample_offset = config_data->instances.at(instance_id).offset;
@@ -139,19 +139,27 @@ void doPostProcessing(void *d) {
 	sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 
 	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
-		while(((!(*signals)[sample_index % buffer_num]) || sample_index >= getMinSampleIndex(cur_running_index_list, sample_index) + buffer_num) && exit_flag == false) {
+		int buffer_index = sample_index % buffer_num;	
+		bool is_runnable = data->model->isPostprocessingRunnable(buffer_index);
+
+		while((!is_runnable || sample_index >= getMinSampleIndex(cur_running_index_list, sample_index) + buffer_num) && exit_flag == false) {
 			usleep(SLEEP_TIME);	
 			stuckWhile++;
+			is_runnable = data->model->isPostprocessingRunnable(buffer_index);
 		}
 
 		buffer_id = sample_index % buffer_num;
 
 		for(int iter = 0 ; iter < data->model->network_output_number; iter++) {
-			output_pointers[iter] = data->model->output_buffers[buffer_id * (data->model->network_output_number) + iter];
+			output_pointers[iter] = data->model->net_output_buffers[buffer_id][iter];
 		}
 
-		app->postprocessing(tid, sample_index, output_pointers, data->model->network_output_number, batch, &((*signals)[sample_index % buffer_num]));
-		
+		app->postprocessing1(tid, sample_index, output_pointers, data->model->network_output_number, batch);
+
+		data->model->updateOutputSignals(buffer_index, false);	
+
+		app->postprocessing2(tid, sample_index, batch);
+
 		if(tid == 0 && instance_id == 0) {
 			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
 		}
@@ -171,8 +179,6 @@ void doInference(void *d) {
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
 	int device_id = data->tid;
-	std::vector<int> *curr_signals = data->curr_signals;
-	std::vector<int> *next_signals = data->next_signals;
 	Model *model = data->model;
 
 	int sample_offset = config_data->instances.at(instance_id).offset;
@@ -185,13 +191,10 @@ void doInference(void *d) {
 	std::vector<int> assignedSampleId(stream_num, -1);
 	int sleep_time = 0;
 	long stuckWhile = 0;
-	//std::vector<long> start_time(buffer_num, 0);
-	//long totalElapsedTime = 0;
 	int next_buffer_index = 0;
 	int assigned_buffer_id = 0;
 	int next_stream_index = 0;
 	int min_sample_index = 0;
-	//std::vector<bool> input_consumed(buffer_num, false);
 	std::vector<int> stream_balance(stream_num, 0);
 	std::list<int> available_streams;
 
@@ -201,7 +204,10 @@ void doInference(void *d) {
 
 	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
 		while(exit_flag == false) {
-			if((*curr_signals)[sample_index % buffer_num] == 1 && (*next_signals)[sample_index % buffer_num] == 0 && sample_index < min_sample_index + buffer_num) {
+			int buffer_index = sample_index % buffer_num;
+			bool is_runnable = model->stages[device_id]->isRunnable(buffer_index);
+
+			if(is_runnable && sample_index < min_sample_index + buffer_num) {
 				if(available_streams.size() > 0) {
 					next_buffer_index = sample_index % buffer_num;
 					next_stream_index = available_streams.front();
@@ -215,10 +221,8 @@ void doInference(void *d) {
 					if(model->checkInferenceDone(device_id, iter)) {
 						assigned_buffer_id = assignedSampleId[iter] % buffer_num;
 
-						(*curr_signals)[assigned_buffer_id] = 0;
-
-						//totalElapsedTime += (getTime() - start_time[iter]);
-						(*next_signals)[assigned_buffer_id] = 1;
+						model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
+						model->stages[device_id]->updateOutputSignals(assigned_buffer_id, true);
 						ready[iter] = 1;
 						assignedSampleId[iter] = -1;
 						available_streams.push_back(iter);
@@ -245,14 +249,9 @@ void doInference(void *d) {
 		
 		sleep_time = 0;
 		assignedSampleId[next_stream_index] = sample_index;
-		//start_time[next_buffer_index] = getTime();
 		model->infer(device_id, next_stream_index, next_buffer_index);
 		stream_balance[next_stream_index]++;
 		ready[next_stream_index] = 0;
-		//input_consumed[next_buffer_index] = false;
-
-		//model->waitUntilInputConsumed(device_id, next_buffer_index);
-		//curr_signals[next_buffer_index] = 0;	
 
 		sample_index++;
 	}
@@ -262,17 +261,14 @@ void doInference(void *d) {
 			if(exit_flag == false) 
 			{
 				model->waitUntilInferenceDone(device_id, iter);
-				//totalElapsedTime += (getTime() - start_time[iter]);
 			}
 			assigned_buffer_id = assignedSampleId[iter] % buffer_num;
-			(*curr_signals)[assigned_buffer_id] = 0;
-			(*next_signals)[assigned_buffer_id] = 1;
+			model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
+			model->stages[device_id]->updateOutputSignals(assigned_buffer_id, true);
 			ready[iter] = 1;
 		}	
 		fprintf(stderr, "device id: %d, stream_id: %d, executed_num: %d\n", device_id, iter, stream_balance[iter]);
 	}
 
 	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
-	//fprintf(stderr, "totalElapsedTime(device id: %d): %ld\n", device_id, totalElapsedTime);
-
 }

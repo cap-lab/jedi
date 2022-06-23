@@ -661,7 +661,7 @@ void CenternetApplication::initializePostprocessing(std::string network_name, in
 	}
 }
 
-void CenternetApplication::postprocessing(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch, IN OUT int *buffer_occupied)
+void CenternetApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
 {
 	float **rt_batch_out = (float **) malloc(sizeof(float *) * output_num);
 	//float **rt_out = (float **) malloc(sizeof(float *) * output_num);
@@ -760,13 +760,13 @@ void CenternetApplication::postprocessing(int thread_id, int sample_index, IN fl
         detection_num_vec[thread_id][iter] = count;
 	}
 
-    *buffer_occupied = 0;
-
-	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 	free(rt_batch_out);
 	//free(rt_out);
 }
 
+void CenternetApplication::postprocessing2(int thread_id, int sample_index, int batch) {
+	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
+}
 
 CenternetApplication::~CenternetApplication()
 {

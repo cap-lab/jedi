@@ -31,33 +31,14 @@ Model::Model(ConfigData *config_data, int instance_id, IInferenceApplication *ap
 	this->instance_id = instance_id;
 	this->network_output_number = 0;
 	this->app = app;
-
-	int device_num = config_data->instances.at(instance_id).device_num;
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		netRTs.push_back(std::vector<tk::dnn::NetworkRT *>());
-	}
 }
 
 Model::~Model() {
-	start_bindings.clear();
-	binding_size.clear();
-	is_net_output.clear();
-	stream_buffers.clear();
-	input_buffers.clear();
-	output_buffers.clear();
-
-	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
-		netRTs[iter1].clear();
+	for(unsigned int iter = 0; iter < stages.size(); iter++) {
+		Stage *stage = stages[iter];
+		delete stage;
 	}
-	netRTs.clear();
-
-	for(unsigned int iter1 = 0; iter1 < contexts.size(); iter1++) {
-		contexts.at(iter1).clear();	
-	}
-
-	for(unsigned int iter1 = 0; iter1 < streams.size(); iter1++) {
-		streams.at(iter1).clear();
-	}
+	stages.clear();
 }
 
 void Model::getModelFileName(int curr, std::string &plan_file_name) {
@@ -141,7 +122,6 @@ void Model::readFromCalibrationTable(std::string basic_calibration_table, int st
 	std::string key;
 	std::string value;
 	input >> title;
-	//std::cout << title << std::endl;
 	output << title << std::endl;
 	std::set<int> inputLayerSet = tk::dnn::NetworkRT::getInputLayers(net, start_index, end_index);
 	std::vector<CalibrationTable> calibration_vec;
@@ -151,12 +131,10 @@ void Model::readFromCalibrationTable(std::string basic_calibration_table, int st
 		input >> key;
 		input >> value;
 		CalibrationTable calib;
-		//std::cout << "key: " << key << ", value: " << value << std::endl;
 		if(key == "data:" && start_index > 0)  {
 			continue;			
 		}
 		else if(key == "out:" || key == "data:") {
-			//std::cout  << key << " " << value << std::endl;
 			calib.key = key;	
 			calib.value = value;
 			calibration_vec.push_back(calib);
@@ -165,7 +143,6 @@ void Model::readFromCalibrationTable(std::string basic_calibration_table, int st
 			int layer_number = getLayerNumberFromCalibrationKey(key);
 			if((layer_number >= start_index && layer_number <= end_index) || 
 				inputLayerSet.find(layer_number) != inputLayerSet.end()) {
-				//std::cout  << key << " " << value << std::endl;
 				calib.key = key;	
 				calib.value = value;
 				calibration_vec.push_back(calib);
@@ -234,7 +211,6 @@ void Model::initializeModel() {
 	int start_index = 0;
 
 	// parse a network using tkDNN darknetParser
-
 	net = app->createNetwork(&(config_data->instances.at(instance_id)));
 	net->print();
 	
@@ -255,235 +231,231 @@ void Model::initializeModel() {
 		setMaxBatchSize();
 		setDataType();
 
-		int duplication_num = dla_core <= 1/* && (buffer_num <= 4 || net->dla == false)*/  ? 1 : std::max(dla_core, 2); 
+		Stage *stage = new Stage(config_data, instance_id, iter1, start_index, cut_point);
+
+		int duplication_num = dla_core <= 1 ? 1 : std::max(dla_core, 2); 
 
 		for(int iter2 = 0; iter2 < duplication_num; iter2++) {
 			int core = dla_core <= 1 ? dla_core : iter2 % DLA_NUM;
 
 			tk::dnn::NetworkRT *netRT = new tk::dnn::NetworkRT(net, plan_file_name.c_str(), start_index, cut_point, core);
 			assert(netRT->engineRT != nullptr);
-
-			netRTs[iter1].push_back(netRT);
+			stage->netRTs.push_back(netRT);
 		}
 	
+		stages.push_back(stage);
+
 		start_index = cut_point + 1;
 	}
-	net->releaseLayers();
-	delete net;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		std::vector<nvinfer1::IExecutionContext *> context_vec;
-		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
-		for(int iter2 = 0; iter2 < stream_number; iter2++) {
-			int size = netRTs[iter1].size();
-			int index = size == 1 ? 0 : iter2 % DLA_NUM;
+		Stage *stage = stages[iter1];
+		stage->createExecutionContext();
+		stage->setInputOutputLayerId(net);
 
-			nvinfer1::IExecutionContext *context = netRTs[iter1][index]->engineRT->createExecutionContext();	
-			assert(context);
-
-			context_vec.push_back(context);
-		}
-		contexts.push_back(context_vec);
+		app->referNetworkRTInfo(iter1, stage->netRTs[0]);
 	}
+
+	net->releaseLayers();
+	delete net;
 }
 
 void Model::finalizeModel() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
-		for(int iter2 = 0; iter2 < stream_number; iter2++) {
-			nvinfer1::IExecutionContext *context = contexts[iter1][iter2];		
-			context->destroy();
-		}
-
-		for(unsigned int iter2 = 0; iter2 < netRTs[iter1].size(); iter2++) {
-			delete netRTs[iter1][iter2];
-		}
-	}
-}
-
-void Model::setBindingsNum(int curr, int &input_binding_num, int &output_binding_num) {
-	input_binding_num = 0;
-	output_binding_num = 0;
-
-	for(int iter = 0; iter < netRTs[curr][0]->engineRT->getNbBindings(); iter++) {
-		if(netRTs[curr][0]->engineRT->bindingIsInput(iter)) {
-			input_binding_num++;
-		}	
-		else {
-			output_binding_num++;	
-		}
-	}
-}
-
-void Model::initializeBindingVariables() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-
-	start_bindings.clear();
-	binding_size.clear();
-	is_net_output.clear();
-
-	start_bindings.push_back(1);
-	for(int iter = 1; iter <= device_num; iter++) {
-		start_bindings.push_back(-1);
-	}
-
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		int curr_binding_num = netRTs[iter1][0]->engineRT->getNbBindings();
-		for(int iter2 = 0; iter2 < curr_binding_num; iter2++) {
-			is_net_output.push_back(false);
-			binding_size.push_back(0);
-		}	
-	}
-	binding_size.at(0) = input_dim.width * input_dim.height * input_dim.channel;
-
-	total_binding_num = 1;
-}
-
-void Model::setBufferIndexing() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-	int input_binding_num = 0, output_binding_num = 0, curr_binding_num = 0;
-	
-	initializeBindingVariables();
-
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		setBindingsNum(iter1, input_binding_num, output_binding_num);
-		curr_binding_num = netRTs[iter1][0]->engineRT->getNbBindings();
-
-		start_bindings[iter1] = start_bindings[iter1] - input_binding_num;
-		start_bindings[iter1+1] = start_bindings[iter1] + curr_binding_num;
-
-
-		for(int iter2 = input_binding_num; iter2 < curr_binding_num; iter2++) {
-			int index = start_bindings[iter1];
-
-			nvinfer1::Dims dim = netRTs[iter1][0]->engineRT->getBindingDimensions(iter2);	
-			binding_size[index + iter2] = dim.d[0] * dim.d[1] * dim.d[2];
-			total_binding_num++;
-		}
-		app->referNetworkRTInfo(iter1, netRTs[iter1][0]);
-
-		if(iter1 == device_num -  1) {
-			int index = start_bindings[iter1] + curr_binding_num - output_binding_num;
-			for(int iter2 = index; iter2 < index + output_binding_num; iter2++) {
-				is_net_output[iter2] = true;
-				this->network_output_number++;
-			}
-		}
+	for(unsigned int iter1 = 0; iter1 < stages.size(); iter1++) {
+		Stage *stage = stages[iter1];
+		stage->finalizeStage();
 	}
 }
 
 void Model::allocateStream() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-
-	streams.clear();
-	events.clear();
-
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		std::vector<cudaStream_t> stream_vec;
-		std::vector<cudaEvent_t> event_vec;
-		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
-		for(int iter2 = 0; iter2 < stream_number; iter2++) {
-			cudaStream_t stream;
-			cudaEvent_t event;
-			check_error(cudaStreamCreate(&stream));
-			check_error(cudaEventCreate(&event));
-			stream_vec.push_back(stream);
-			event_vec.push_back(event);
-		}
-		streams.push_back(stream_vec);
-		events.push_back(event_vec);
-
+	for(unsigned int iter1 = 0; iter1 < stages.size(); iter1++) {
+		Stage *stage = stages[iter1];
+		stage->allocateStream();
 	}
 }
 
 void Model::deallocateStream() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		int stream_number = config_data->instances.at(instance_id).stream_numbers[iter1];
-		for(int iter2 = 0; iter2 < stream_number; iter2++) {
-			cudaStream_t stream = streams[iter1].back();
-			cudaStreamDestroy(stream);
-			streams[iter1].pop_back();
-			cudaEvent_t event = events[iter1].back();
-			cudaEventDestroy(event);
-		}
-		streams[iter1].clear();
-		events[iter1].clear();
+	for(unsigned int iter1 = 0; iter1 < stages.size(); iter1++) {
+		Stage *stage = stages[iter1];
+		stage->deallocateStream();
 	}
-	streams.clear();
-	events.clear();
 }
 
-void Model::setStreamBuffer() {
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+void* Model::makeCUDAArray(int size) {
+	int data_type = config_data->instances.at(instance_id).data_type;
+	void *space;
 
-	for(int iter1 = 0; iter1 < total_binding_num; iter1++) {
-		for(int iter2 = 0; iter2 < buffer_num; iter2++) {
-			stream_buffers.push_back(nullptr);	
+	if(data_type == TYPE_INT8) {
+		space = (void *)cuda_make_array_8(NULL, size);
+	}
+	else {
+		space = (void *)cuda_make_array_16(NULL, size);
+	}
+	
+	return space;
+}
+
+void Model::allocateInputStreamBuffer(std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& input_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& input_signal) {
+	int batch = config_data->instances.at(instance_id).batch;
+	void *space = nullptr;
+	int size = input_dim.width * input_dim.height * input_dim.channel;
+	bool *signal = new bool(false);
+
+	float *buf = cuda_make_array_host(batch * size);
+	cudaHostGetDevicePointer(&(space), buf, 0);
+	input_buffer.push_back(buf);
+	stream_buffers_map.insert(std::make_pair(std::make_pair(-1, 0), space));
+
+	input_signal.push_back(signal);
+	signals_map.insert(std::make_pair(std::make_pair(-1, 0), signal));
+}
+
+void Model::allocateStreamBuffer(std::map<std::pair<int, int>, int> size_map, std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& output_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& output_signal) {
+	int batch = config_data->instances.at(instance_id).batch;
+	void *space = nullptr;
+	int size = -1;
+	bool *signal = nullptr;
+
+	for(auto iter = size_map.begin(); iter != size_map.end(); iter++) {
+		auto pair_ids = iter->first;
+		int src_id = pair_ids.first, dst_id = pair_ids.second;
+
+		if(stream_buffers_map.find(std::make_pair(src_id, dst_id)) == stream_buffers_map.end()) {
+			size = iter->second;	
+			space = nullptr;
+			signal = new bool(false);
+
+			if(src_id != -1 && dst_id != -1)	
+				space = makeCUDAArray(batch * size);
+			else if(dst_id == -1) {
+				float *buf = cuda_make_array_host(batch * size);
+				cudaHostGetDevicePointer(&(space), buf, 0);
+				output_buffer.push_back(buf);
+				output_signal.push_back(signal);
+			}
+
+			stream_buffers_map.insert(std::make_pair(std::make_pair(src_id, dst_id), space));
+			signals_map.insert(std::make_pair(std::make_pair(src_id, dst_id), signal));
 		}
 	}
 }
 
 void Model::allocateBuffer() {
-	int batch = config_data->instances.at(instance_id).batch;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
-	int data_type = config_data->instances.at(instance_id).data_type;
 
-	input_buffers.clear();
-	output_buffers.clear();
+	for(int buffer_id = 0; buffer_id < buffer_num; buffer_id++) {
+		std::map<std::pair<int, int>, void*> stream_buffers_map;
+		std::map<std::pair<int, int>, bool*> signals_map;
+		std::vector<float*> input_buffer;
+		std::vector<float*> output_buffer;
+		std::vector<bool*> input_signal;
+		std::vector<bool*> output_signal;
 
-	for(int iter1 = 0; iter1 < buffer_num; iter1++) {
-		float *input_buffer = cuda_make_array_host(batch * binding_size[0]);
-		cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num]), input_buffer, 0);
-		input_buffers.push_back(input_buffer);
+		allocateInputStreamBuffer(stream_buffers_map, input_buffer, signals_map, input_signal);
 
-		for(int iter2 = 1; iter2 < total_binding_num; iter2++) {
-			if(!is_net_output[iter2]) {
-				if(data_type == TYPE_INT8) {
-					stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_8(NULL, batch * binding_size[iter2]);
-				}
-				else {
-					stream_buffers[iter1 * total_binding_num + iter2] = cuda_make_array_16(NULL, batch * binding_size[iter2]);
-				}
-			}
-			else {
-				float *output_buffer = cuda_make_array_host(batch * binding_size[iter2]);
-				cudaHostGetDevicePointer(&(stream_buffers[iter1 * total_binding_num + iter2]), output_buffer, 0);
-				output_buffers.push_back(output_buffer);
-			}
-		}	
+		for(unsigned int stage_id = 0; stage_id < stages.size(); stage_id++) {
+			Stage *stage = stages[stage_id];	
+
+			allocateStreamBuffer(stage->input_size_map, stream_buffers_map, output_buffer, signals_map, output_signal);
+			allocateStreamBuffer(stage->output_size_map, stream_buffers_map, output_buffer, signals_map, output_signal);
+		}
+
+		net_input_buffers.push_back(input_buffer);
+		net_output_buffers.push_back(output_buffer);
+		all_stream_buffers.push_back(stream_buffers_map);
+
+		net_input_signals.push_back(input_signal);
+		net_output_signals.push_back(output_signal);
+		all_signals.push_back(signals_map);
+
+		this->network_output_number = output_buffer.size();
 	}
 }
 
 void Model::deallocateBuffer() {
-	while(!input_buffers.empty()) {
-		float *buffer = input_buffers.back();	
-		cudaFreeHost(buffer);
-		input_buffers.pop_back();
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+
+	for(int buffer_id = 0; buffer_id < buffer_num; buffer_id++) {
+		auto stream_buffers_map = all_stream_buffers[buffer_id];
+		auto signals_map = all_signals[buffer_id];
+
+		for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
+			auto pair_ids = iter->first;
+			int src_id = pair_ids.first, dst_id = pair_ids.second;
+
+			if(src_id == -1 || dst_id == -1) {
+				void *buffer = iter->second;
+				if(buffer != nullptr)
+					cudaFreeHost(buffer);
+			}
+			else {
+				void *buffer = iter->second;
+				if(buffer != nullptr)
+					cudaFree(buffer);
+			}
+		}
+
+		for(auto iter = signals_map.begin(); iter != signals_map.end(); iter++) {
+			delete iter->second;
+		}
+	}
+}
+
+void Model::setBufferForStage() {
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+	int device_num = config_data->instances.at(instance_id).device_num;
+
+	for(int iter1 = 0; iter1 < buffer_num; iter1++) {
+		for(int iter2 = 0; iter2 < device_num; iter2++) {
+			Stage *stage = stages[iter2];
+			stage->setBuffers(iter1, all_stream_buffers[iter1]);
+			stage->setSignals(iter1, all_signals[iter1]);
+		}
+	}
+}
+
+bool Model::isPreprocessingRunnable(int buffer_id) {
+	std::vector<bool*> input_signal = net_input_signals[buffer_id];
+
+	for(unsigned int iter = 0; iter < input_signal.size(); iter++) {
+		if(*(input_signal[iter]) == true)	
+			return false;
 	}
 
-	while(!output_buffers.empty()) {
-		float *buffer = output_buffers.back();	
-		cudaFreeHost(buffer);
-		output_buffers.pop_back();
+	return true;
+}
+
+bool Model::isPostprocessingRunnable(int buffer_id) {
+	std::vector<bool*> output_signal = net_output_signals[buffer_id];
+
+	for(unsigned int iter = 0; iter < output_signal.size(); iter++) {
+		if(*(output_signal[iter]) == false)	
+			return false;
 	}
 
-	while(!stream_buffers.empty()) {
-		void *buffer = stream_buffers.back();
-		if(buffer != nullptr)
-			cudaFree(buffer);
-		stream_buffers.pop_back();
+	return true;
+}
+
+void Model::updateInputSignals(int buffer_id, bool value) {
+	std::vector<bool*> input_signal = net_input_signals[buffer_id];
+
+	for(unsigned int iter = 0; iter < input_signal.size(); iter++) {
+		*(input_signal[iter]) = value;	
+	}
+}
+
+void Model::updateOutputSignals(int buffer_id, bool value) {
+	std::vector<bool*> output_signal = net_output_signals[buffer_id];
+
+	for(unsigned int iter = 0; iter < output_signal.size(); iter++) {
+		*(output_signal[iter]) = value;	
 	}
 }
 
 void Model::initializeBuffers() {
-	setBufferIndexing();	
 	allocateStream();
-	setStreamBuffer();
 	allocateBuffer();
+	setBufferForStage();
 }
 
 void Model::finalizeBuffers() {
@@ -492,7 +464,8 @@ void Model::finalizeBuffers() {
 }
 
 bool Model::checkInputConsumed(int device_id, int stream_id) {
-	cudaError_t error = cudaEventQuery(events[device_id][stream_id]);
+	Stage *stage = stages[device_id];
+	cudaError_t error = cudaEventQuery(stage->events[stream_id]);
 
 	if(error == cudaSuccess)
 	{
@@ -505,7 +478,8 @@ bool Model::checkInputConsumed(int device_id, int stream_id) {
 }
 
 bool Model::checkInferenceDone(int device_id, int stream_id) {
-	cudaError_t error = cudaStreamQuery(streams[device_id][stream_id]);	
+	Stage *stage = stages[device_id];
+	cudaError_t error = cudaStreamQuery(stage->streams[stream_id]);	
 
 	if(error == cudaSuccess)
 	{
@@ -518,12 +492,12 @@ bool Model::checkInferenceDone(int device_id, int stream_id) {
 }
 
 void Model::infer( int device_id, int stream_id, int buffer_id) {
-	int start_binding = start_bindings[device_id] + total_binding_num * buffer_id;
+	Stage *stage = stages[device_id];
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
 
-	enqueueSuccess = contexts[device_id][stream_id]->enqueue(batch, &(stream_buffers[start_binding]), streams[device_id][stream_id], &(events[device_id][stream_id]));
-	// contexts[device_id][buffer_id]->execute(batch, &(stream_buffers[start_binding]));
+	enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
+	// stage->contexts[stream_id]->execute(batch, &(stage->stage_buffers[buffer_id][0]));
 	if(enqueueSuccess == false)
 	{
 		printf("enqueue error happened: %d, %d\n", device_id, buffer_id);
@@ -532,9 +506,10 @@ void Model::infer( int device_id, int stream_id, int buffer_id) {
 }
 
 void Model::waitUntilInputConsumed(int device_id, int stream_id) {
+	Stage *stage = stages[device_id];
 	cudaError_t error;
 
-	error = cudaEventSynchronize(events[device_id][stream_id]);
+	error = cudaEventSynchronize(stage->events[stream_id]);
 	if(error != cudaSuccess)
 	{
 		printf("error happened in synchronize: %d, %d: %d\n", device_id, stream_id, error);
@@ -543,9 +518,10 @@ void Model::waitUntilInputConsumed(int device_id, int stream_id) {
 }
 
 void Model::waitUntilInferenceDone(int device_id, int stream_id) {
+	Stage *stage = stages[device_id];
 	cudaError_t error;
 
-	error = cudaStreamSynchronize(streams[device_id][stream_id]);
+	error = cudaStreamSynchronize(stage->streams[stream_id]);
 	if(error != cudaSuccess)
 	{
 		printf("error happened in synchronize: %d, %d: %d\n", device_id, stream_id, error);
