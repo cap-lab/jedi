@@ -93,13 +93,18 @@ void* Stage::getBufferWithIds(std::map<std::pair<int, int>, void*> stream_buffer
 
 void Stage::setBuffers(int buffer_id, std::map<std::pair<int, int>, void*> stream_buffers_map) {
 	std::vector<void *> buffers;
+	std::vector<int> input_indexes, output_indexes;
 
 	for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
 		auto pair_ids = iter->first;
+		int src_id = pair_ids.first;
 		int dst_id = pair_ids.second;
 
 		if(dst_id >= start_index && dst_id <= end_index) {
-			buffers.push_back(iter->second);
+			if(std::find(input_indexes.begin(), input_indexes.end(), src_id) == input_indexes.end()) {
+				buffers.push_back(iter->second);
+				input_indexes.push_back(src_id);
+			}
 		}
 	}
 
@@ -108,7 +113,10 @@ void Stage::setBuffers(int buffer_id, std::map<std::pair<int, int>, void*> strea
 		int src_id = pair_ids.first;
 
 		if(src_id >= start_index && src_id <= end_index) {
-			buffers.push_back(iter->second);
+			if(std::find(output_indexes.begin(), output_indexes.end(), src_id) == output_indexes.end()) {
+				buffers.push_back(iter->second);
+				output_indexes.push_back(src_id);
+			}
 		}
 	}
 
