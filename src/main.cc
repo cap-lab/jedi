@@ -29,9 +29,22 @@ static void printHelpMessage() {
 	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
 }
 
+static void turnOffTegrastats() {
+	int result = -1;
+	std::string cmd;
+	
+	cmd = "tegrastats --stop";
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+	}
+}
+
 static void turnOnTegrastats(std::string power_file_name) {
 	int result = -1;
 	std::string cmd;
+
+	turnOffTegrastats();
 
 	cmd = std::string("rm -f ") + power_file_name;
 	result = system(cmd.c_str());
@@ -40,17 +53,6 @@ static void turnOnTegrastats(std::string power_file_name) {
 	}
 
 	cmd = "tegrastats --start --logfile " + power_file_name + " --interval " + std::to_string(LOG_INTERVAL);
-	result = system(cmd.c_str());
-	if(result == -1 || result == 127) {
-		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
-	}
-}
-
-static void turnOffTegrastats() {
-	int result = -1;
-	std::string cmd;
-	
-	cmd = "tegrastats --stop";
 	result = system(cmd.c_str());
 	if(result == -1 || result == 127) {
 		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	

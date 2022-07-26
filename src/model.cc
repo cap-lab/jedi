@@ -497,7 +497,7 @@ void Model::infer( int device_id, int stream_id, int buffer_id) {
 	bool enqueueSuccess = false;
 
 	enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
-	// stage->contexts[stream_id]->execute(batch, &(stage->stage_buffers[buffer_id][0]));
+	// enqueueSuccess = stage->contexts[stream_id]->execute(batch, &(stage->stage_buffers[buffer_id][0]));
 	if(enqueueSuccess == false)
 	{
 		printf("enqueue error happened: %d, %d\n", device_id, buffer_id);

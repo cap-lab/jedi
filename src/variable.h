@@ -24,6 +24,7 @@ typedef struct _InputDim {
 #define NETWORK_YOLOV3TINY "yolo3tiny"
 #define NETWORK_YOLOV4 "yolo4"
 #define NETWORK_YOLOV4TINY "yolo4tiny"
+#define NETWORK_YOLOV7TINY "yolo7tiny"
 #define NETWORK_RESNEXT "cspresnext"
 #define NETWORK_DENSENET "densenet"
 

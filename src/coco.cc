@@ -56,12 +56,14 @@ void writeResultFile(std::string result_file_name) {
 
 	result_file.open(result_file_name);
 	result_file<<"["<<std::endl;
-	auto it = results_vec.begin();
-	for(; it != std::prev(results_vec.end()); it++) {
-		result_file<<*it;	
-		result_file<<","<<std::endl;
+	if(results_vec.size() > 0) {
+		auto it = results_vec.begin();
+		for(; it != std::prev(results_vec.end()); it++) {
+			result_file<<*it;	
+			result_file<<","<<std::endl;
+		}
+		result_file<<*it<<std::endl;
 	}
-	result_file<<*it<<std::endl;
 	result_file<<"]";
 	result_file.close();
 }
