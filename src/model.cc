@@ -12,6 +12,7 @@
 #include "model.h"
 #include "variable.h"
 
+
 typedef struct _CalibrationTable {
 	std::string key;
 	std::string value;

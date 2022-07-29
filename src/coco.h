@@ -6,7 +6,6 @@
 #include "box.h"
 #include "config.h"
 #include "variable.h"
-// #include "dataset.h"
 
 void writeResultFile(std::string result_file_name);
 void detectCOCO2(Detection *dets, int nDets, int w, int h, int iw, int ih);

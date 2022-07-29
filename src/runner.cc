@@ -1,7 +1,7 @@
 #include "runner.h"
 #include <iostream>
 
-std::vector<long> pre_time_vec, post_time_vec;
+extern std::vector<long> pre_time_vec, post_time_vec;
 
 static long getTime() {
 	struct timespec time;
@@ -218,6 +218,13 @@ void Runner::saveProfileResults(char *max_filename, char *avg_filename, char *mi
 	Model *model = models.at(0);
 
 	model->printProfile(max_filename, avg_filename, min_filename);
+}
+
+void Runner::saveResults(char *result_file_name) {
+	IInferenceApplication *app = this->apps.at(0);
+	std::string file_name(result_file_name);
+
+	((YoloApplication *)app)->saveResults(file_name);
 }
 
 

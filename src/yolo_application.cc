@@ -282,9 +282,14 @@ void YoloApplication::postprocessing2(int width, int height, int step, char *inp
 
 	printBox2(width, height, dets_vec[0], detection_num_vec[0]);
 
-	if(result_file_name != nullptr) {
+	if(input_data != nullptr && result_file_name != nullptr) {
 		drawBox(width, height, step, input_data, dets_vec[0], detection_num_vec[0], result_file_name);
 	}
+}
+
+
+void YoloApplication::saveResults(std::string file_name) {
+	writeResultFile(file_name);
 }
 
 

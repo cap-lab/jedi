@@ -1,5 +1,5 @@
-#ifndef RUNNER_H_
-#define RUNNER_H_
+#ifndef RUNNER2_H_
+#define RUNNER2_H_
 
 #include <iostream>
 #include <vector>
@@ -15,27 +15,25 @@
 #include "inference_application.h"
 #include "yolo_application.h"
 
-#define PRE_LOCK 0
-#define INFER_LOCK 1
-#define POST_LOCK 2
-#define LOCK_NUM 3
-
-class Runner {
+class Runner2 {
 	public:
-		Runner(std::string config_file_name, int width, int height, int channel, int step);
-		~Runner();
+		Runner2(std::string config_file_name, int width, int height, int channel, int step);
+		~Runner2();
 		void init();
-		void run(char *data);
-		void run(char *data, char *result_file_name);
-		void setThreadCores(int pre_thread_core, int post_thread_core);
+		void loadImage(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input); 
 		void wrapup();
+		void setInputData(float *input_buffer);
+		void setInputData2(char *image_data);
+		void runInference();
+		void getOutputData(float **output_buffers);
+		void doPostProcessing(char *input_data, char *result_file_name);
+		void doPostProcessing(float **output_data, char *input_data, char *result_file_name);
 		void saveProfileResults(char *max_filename, char *avg_filename, char *min_filename);
+		void setThreadCores(int core_id);
 		void saveResults(char *result_file_name);
 
-		void setInputData();
-		void postProcess();
-
 		int device_num = 0;
+		int input_size = 0;
 		float *input_buffer;
 		std::vector<Model *> models;
 		std::vector<int> signals;
@@ -47,7 +45,6 @@ class Runner {
 		void generateModels();
 		void initializePreAndPostprocessing();
 		void finalizeData();
-		void runThreads();
 
 		ConfigData *config_data;
 		std::vector<IInferenceApplication *> apps;
@@ -55,8 +52,7 @@ class Runner {
 		int height = 0;
 		int channel = 3;
 		int step = 0;
-		char *image_data;	
-		char *result_file_name;
+		float **output_pointers;
 		std::vector<std::thread> threads;
 };
 

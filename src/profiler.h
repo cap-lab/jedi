@@ -26,7 +26,7 @@ T variance(const std::vector<T> &vec) {
 
 	// Now calculate the variance
 	auto variance_func = [&mean, &sz](T accumulator, const T& val) {
-		return accumulator + ((val - mean)*(val - mean) / (sz - 1));
+		return accumulator + ((val - mean)*(val - mean) / sz);
 	};  
 
 	return std::accumulate(vec.begin(), vec.end(), 0.0, variance_func);
@@ -65,13 +65,12 @@ class Profiler : public nvinfer1::IProfiler
 			FILE *min_fp = fopen(min_filename, "w");
 
 			auto it2 = pre_time_vec.begin();
-			it2++;
 			avg_value = std::accumulate(it2, pre_time_vec.end(), 0.0) / (pre_time_vec.size());
 			max_value2 = (float)(*std::max_element(it2, pre_time_vec.end()));
 			min_value2 = (float)(*std::min_element(it2, pre_time_vec.end()));
 			var = variance(pre_time_vec);
 			max_value = avg_value + SIGMA * sqrt(var);
-			max_value = max_value > max_value2 ? max_value : max_value2;
+			// max_value = max_value > max_value2 ? max_value : max_value2;
 			min_value = min_value2;
 			// min_value = avg_value - SIGMA * sqrt(var);
 			// min_value = min_value < min_value2 ? min_value : min_value2;
@@ -91,13 +90,12 @@ class Profiler : public nvinfer1::IProfiler
 					int n = (profile_[i].second).size();
 					if(n > 1) {
 						auto it = (profile_[i].second).begin();
-						it++;
 						avg_value = std::accumulate(it, (profile_[i].second).end(), 0.0) / (n-1);
 						max_value2 = (float)(*std::max_element(it, (profile_[i].second).end()));
 						min_value2 = (float)(*std::min_element(it, (profile_[i].second).end()));
 						var = variance(profile_[i].second);
 						max_value = avg_value + SIGMA * sqrt(var);
-						max_value = max_value > max_value2 ? max_value : max_value2;
+						// max_value = max_value > max_value2 ? max_value : max_value2;
 						min_value = min_value2;
 						// min_value = avg_value - SIGMA * sqrt(var);
 						// min_value = min_value < min_value2 ? min_value : min_value2;
@@ -121,13 +119,12 @@ class Profiler : public nvinfer1::IProfiler
 
 						if (n > 1) {
 							auto it = (dla_profile_vec.at(iter)).begin();
-							it++;
 							avg_value = std::accumulate(it, (dla_profile_vec.at(iter)).end(), 0.0) / (n-1);
 							max_value2 = (float)(*std::max_element(it, (dla_profile_vec.at(iter)).end()));
 							min_value2 = (float)(*std::min_element(it, (dla_profile_vec.at(iter)).end()));
 							var = variance(dla_profile_vec.at(iter));
 							max_value = avg_value + SIGMA * sqrt(var);
-							max_value = max_value > max_value2 ? max_value : max_value2;
+							// max_value = max_value > max_value2 ? max_value : max_value2;
 							min_value = min_value2;
 							// min_value = avg_value - SIGMA * sqrt(var);
 							// min_value = min_value < min_value2 ? min_value : min_value2;
@@ -149,13 +146,12 @@ class Profiler : public nvinfer1::IProfiler
 			}
 
 			it2 = post_time_vec.begin();
-			it2++;
 			avg_value = std::accumulate(it2, post_time_vec.end(), 0.0) / (post_time_vec.size());
 			max_value2 = (float)(*std::max_element(it2, post_time_vec.end()));
 			min_value2 = (float)(*std::min_element(it2, post_time_vec.end()));
 			var = variance(post_time_vec);
 			max_value = avg_value + SIGMA * sqrt(var);
-			max_value = max_value > max_value2 ? max_value : max_value2;
+			// max_value = max_value > max_value2 ? max_value : max_value2;
 			min_value = min_value2;
 			// min_value = avg_value - SIGMA * sqrt(var);
 			// min_value = min_value < min_value2 ? min_value : min_value2;

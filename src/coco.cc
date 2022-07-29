@@ -117,12 +117,19 @@ void detectCOCO2(Detection *dets, int nDets, int w, int h, int iw, int ih) {
 
 			for (j = 0; j < NUM_CLASSES; ++j) {
 				if (dets[i].prob[j] >= PRINT_THRESH) {
-					std::cout<<"{\"image_id\":"<<image_id<<", \"category_id\":"<<coco_ids[j]<<", \"bbox\":["<<bx<<", "<<by<<", "<<bw<<", "<<bh<<"], \"score\":"<<dets[i].prob[j]<<"}"<<std::endl;
+					std::stringstream result;
+
+					result<<"{\"image_id\":"<<image_id<<", \"category_id\":"<<coco_ids[j]<<", \"bbox\":["<<bx<<", "<<by<<", "<<bw<<", "<<bh<<"], \"score\":"<<dets[i].prob[j]<<"}";
+					// std::cout<<"{\"image_id\":"<<image_id<<", \"category_id\":"<<coco_ids[j]<<", \"bbox\":["<<bx<<", "<<by<<", "<<bw<<", "<<bh<<"], \"score\":"<<dets[i].prob[j]<<"}"<<std::endl;
+
+					detected.push_back(result.str());
+					detected_num++;
 				}
 			}
 		}
 	}
 
+	detected_map.insert(std::pair<int,std::list<std::string>>(image_id, detected));
 	image_id++;
 }
 
