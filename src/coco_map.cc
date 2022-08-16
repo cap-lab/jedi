@@ -6,7 +6,13 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <boost/gil/extension/io/jpeg_io.hpp>
+
+#include <boost/version.hpp>
+#if BOOST_VERSION >= 107100
+    #include <boost/gil/extension/io/jpeg/old.hpp>
+#else
+    #include <boost/gil/extension/io/jpeg_io.hpp>
+#endif
 
 #include <tkDNN/utils.h>
 
