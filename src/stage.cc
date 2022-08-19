@@ -78,19 +78,6 @@ void Stage::deallocateStream() {
 	events.clear();
 }
 
-void* Stage::getBufferWithIds(std::map<std::pair<int, int>, void*> stream_buffers_map, int tsrc_id, int tdst_id) {
-	for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
-		auto pair_ids = iter->first;
-		int src_id = pair_ids.first, dst_id = pair_ids.second;
-
-		if(src_id == tsrc_id && dst_id == tdst_id) {
-			return (void *)(iter->second); 		
-		}
-	}
-
-	return nullptr;
-}
-
 void Stage::setBuffers(int buffer_id, std::map<std::pair<int, int>, void*> stream_buffers_map) {
 	std::vector<void *> buffers;
 	std::vector<int> input_indexes, output_indexes;

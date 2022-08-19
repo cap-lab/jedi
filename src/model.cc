@@ -310,6 +310,22 @@ void Model::allocateInputStreamBuffer(std::map<std::pair<int, int>, void*>& stre
 	signals_map.insert(std::make_pair(std::make_pair(-1, 0), signal));
 }
 
+void* Model::getOutputBufferOfLayer(std::map<std::pair<int, int>, void*>& stream_buffers_map, int tsrc_id) {
+	void *space = nullptr;
+
+	for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
+		auto pair_ids = iter->first;
+		int src_id = pair_ids.first;
+
+		if(src_id == tsrc_id) {
+			space = iter->second;
+			break;
+		}
+	}
+
+	return space;
+}
+
 void Model::allocateStreamBuffer(std::map<std::pair<int, int>, int> size_map, std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& output_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& output_signal) {
 	int batch = config_data->instances.at(instance_id).batch;
 	void *space = nullptr;
@@ -325,8 +341,12 @@ void Model::allocateStreamBuffer(std::map<std::pair<int, int>, int> size_map, st
 			space = nullptr;
 			signal = new bool(false);
 
-			if(src_id != -1 && dst_id != -1)	
-				space = makeCUDAArray(batch * size);
+			if(src_id != -1 && dst_id != -1) {
+				space = getOutputBufferOfLayer(stream_buffers_map, src_id);
+				if(space == nullptr) {
+					space = makeCUDAArray(batch * size);
+				}
+			}
 			else if(dst_id == -1) {
 				float *buf = cuda_make_array_host(batch * size);
 				cudaHostGetDevicePointer(&(space), buf, 0);

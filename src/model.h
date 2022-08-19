@@ -68,6 +68,7 @@ class Model {
 		void deallocateStream();
 		void* makeCUDAArray(int size);
 		void allocateInputStreamBuffer(std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& input_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& input_signal);
+		void* getOutputBufferOfLayer(std::map<std::pair<int, int>, void*>& stream_buffers_map, int tsrc_id);
 		void allocateStreamBuffer(std::map<std::pair<int, int>, int> size_map, std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& output_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& output_signal); 
 };
 

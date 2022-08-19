@@ -48,7 +48,6 @@ class Stage {
 
 		std::vector<std::vector<bool *>> stage_input_signals;
 		std::vector<std::vector<bool *>> stage_output_signals;
-		void* getBufferWithIds(std::map<std::pair<int, int>, void*> stream_buffers_map, int tsrc_id, int tdst_id);
 };
 
 #endif
