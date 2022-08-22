@@ -253,6 +253,8 @@ void Model::initializeModel() {
 		stage->createExecutionContext();
 		stage->setInputOutputLayerId(net);
 
+		// stage->getBindingsDataType();
+
 		app->referNetworkRTInfo(iter1, stage->netRTs[0]);
 	}
 
@@ -282,15 +284,9 @@ void Model::deallocateStream() {
 }
 
 void* Model::makeCUDAArray(int size) {
-	int data_type = config_data->instances.at(instance_id).data_type;
 	void *space;
 
-	if(data_type == TYPE_INT8) {
-		space = (void *)cuda_make_array_8(NULL, size);
-	}
-	else {
-		space = (void *)cuda_make_array_16(NULL, size);
-	}
+	space = (void *)cuda_make_array_16(NULL, size);
 	
 	return space;
 }

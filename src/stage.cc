@@ -81,7 +81,7 @@ void Stage::deallocateStream() {
 void Stage::setBuffers(int buffer_id, std::map<std::pair<int, int>, void*> stream_buffers_map) {
 	std::vector<void *> buffers;
 	std::vector<int> input_indexes, output_indexes;
-
+	
 	for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
 		auto pair_ids = iter->first;
 		int src_id = pair_ids.first;
@@ -167,10 +167,21 @@ void Stage::updateOutputSignals(int buffer_id, bool value) {
 void Stage::finalizeStage() {
 	for(unsigned int iter1 = 0; iter1 < contexts.size(); iter1++) {
 		nvinfer1::IExecutionContext *context = contexts[iter1];		
-		context->destroy();
+		delete context;
 	}
 
 	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
 		delete netRTs[iter1];
 	}
+}
+
+void Stage::getBindingsDataType() {
+	std::cerr<<"stage_id: "<<stage_id<<std::endl;
+
+    for(int iter = 0; iter < netRTs[0]->engineRT->getNbBindings(); iter++) {
+		int type = (int)netRTs[0]->engineRT->getBindingDataType(iter);	
+		int format = (int)netRTs[0]->engineRT->getBindingFormat(iter);	
+		std::cerr<<"iter: "<<iter<<" type: "<<type<<std::endl;
+		std::cerr<<"iter: "<<iter<<" binding format: "<<format<<std::endl;
+    }
 }

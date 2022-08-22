@@ -36,6 +36,7 @@ class Stage {
 		void updateInputSignals(int buffer_id, bool value);
 		void updateOutputSignals(int buffer_id, bool value);
 		void finalizeStage();
+		void getBindingsDataType();
 	
 	private:
 		ConfigData *config_data;
