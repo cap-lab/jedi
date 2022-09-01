@@ -26,8 +26,9 @@ static int coco_ids[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 static int get_coco_image_id(char *filename) {
     char *p = strrchr(filename, '/');
     char *c = strrchr(filename, '_');
-    if (c)
-        p = c;
+
+    if (c && c > p)
+    	p = c;
     return atoi(p + 1);
 }
 

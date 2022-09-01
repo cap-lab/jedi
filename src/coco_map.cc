@@ -1,4 +1,6 @@
 #include <iostream>
+#include <functional>
+#include <algorithm>
 
 #include <json-c/json.h>
 #include <opencv2/core/core.hpp>
@@ -32,6 +34,44 @@ int get_index_from_coco_id(int classes, int id)
 	return i;
 }
 
+void makeFrameMap(const char *labels_path, std::map<int, tk::dnn::Frame>& frame_map)
+{
+	std::string l_filename;
+    std::ifstream all_labels(labels_path);
+
+    for (int index=0 ; std::getline(all_labels, l_filename); ++index) {
+		tk::dnn::Frame f;
+        f.lFilename = l_filename;
+        f.iFilename = l_filename;
+
+        if(!fileExist(l_filename.c_str())) {
+			std::string error_log = "label file " + l_filename + " is not exist";
+        	FatalError(error_log);
+		}
+
+		convertFilename(f.iFilename, "labels", "images", ".txt", ".jpg");
+
+		auto dims = boost::gil::jpeg_read_dimensions(f.iFilename);
+		f.width = dims.x;
+		f.height = dims.y;
+
+		std::string id = l_filename.substr(l_filename.find("labels/")+7, l_filename.find(".txt") - l_filename.find("labels/") -7);
+		int image_id = std::stoi(id);
+
+		std::ifstream labels(l_filename);
+		for(std::string line; std::getline(labels, line); ){
+			std::istringstream in(line); 
+			tk::dnn::BoundingBox b;
+			in >> b.cl >> b.x >> b.y >> b.w >> b.h;  
+			b.prob = 1;
+			b.truthFlag = 1;
+			f.gt.push_back(b);
+		}
+
+		frame_map.insert(std::pair<int, tk::dnn::Frame>(image_id, f));
+	}
+}
+
 
 int main(int argc, char *argv[]) 
 {
@@ -43,14 +83,17 @@ int main(int argc, char *argv[])
 	const char *coco_result_path = "results/coco_results.json";
 	json_object * pJsonObject = NULL;
 	bool verbose = true;
-	int n_images = 5000;
 
-    if(argc > 1)
-        labels_path = argv[1]; 
-    if(argc > 2)
-        config_filename = argv[2]; 
-	if(argc > 3)
-		coco_result_path = argv[3];
+	if(argc < 4) {
+		std::cerr<<"---- usage ----"<<std::endl;
+		std::cerr<<"./compute_coco_map <labels_path> <yaml file> <results file>"<<std::endl;
+		std::cerr<<"ex) ./compute_coco_map ./all_labels.txt ./config.yaml ./result.json"<<std::endl;
+		FatalError("The number of arguments is less than four");	
+	}
+
+	labels_path = argv[1]; 
+	config_filename = argv[2]; 
+	coco_result_path = argv[3];
 
     //check if files needed exist
     if(!fileExist(config_filename))
@@ -60,9 +103,13 @@ int main(int argc, char *argv[])
     if(!fileExist(coco_result_path))
         FatalError("Wrong coco result file path.");
 
-    std::ifstream all_labels(labels_path);
-    std::string l_filename;
-	int coco_length;
+    // std::ifstream all_labels(labels_path);
+    // std::string l_filename;
+	std::map<int, tk::dnn::Frame> frame_map;
+	int index = 0, coco_length = 0;
+
+	// read label info
+	makeFrameMap(labels_path, frame_map);
 
     //read mAP parameters
     tk::dnn::readmAPParams( config_filename, classes,  map_points, map_levels, map_step, IoU_thresh, conf_thresh, verbose);
@@ -71,84 +118,45 @@ int main(int argc, char *argv[])
 
 	coco_length = json_object_array_length(pJsonObject);
 
+	while(index < coco_length)
+	{
+		json_object *temp = json_object_array_get_idx(pJsonObject, index);
+		json_object *imageIdObj = json_object_object_get(temp,"image_id");
+		int image_id_json = json_object_get_int(imageIdObj);
 
-    int images_done;
-	int index = 0;
-    for (images_done=0 ; std::getline(all_labels, l_filename) && images_done < n_images ; ++images_done) {
-		tk::dnn::Frame f;
-        f.lFilename = l_filename;
-        f.iFilename = l_filename;
-		convertFilename(f.iFilename, "labels", "images", ".txt", ".jpg");
+		auto it = frame_map.find(image_id_json);
+		if(it != frame_map.end()) {
+			tk::dnn::Frame* f = &(it->second);
 
-        //cv::Mat frame = cv::imread(f.iFilename.c_str(), cv::IMREAD_COLOR);
-        //int height = frame.rows;
-        //int width = frame.cols;
-		auto dims = boost::gil::jpeg_read_dimensions(f.iFilename);
-		int width = dims.x;
-		int height = dims.y;
-		
+			tk::dnn::BoundingBox b;
+			json_object *categoryIdObj = json_object_object_get(temp,"category_id");
+			int category_id_json = json_object_get_int(categoryIdObj);
 
-		std::string image_path = f.iFilename.c_str();
+			json_object *scoreObj = json_object_object_get(temp,"score");
+			float score_json = (float) json_object_get_double(scoreObj);
+			json_object *bboxObj = json_object_object_get(temp,"bbox");
 
-		if(!fileExist(f.iFilename.c_str())) continue;
+			b.x = (float) (json_object_get_double(json_object_array_get_idx(bboxObj,0)) + (float) json_object_get_int(json_object_array_get_idx(bboxObj,2))/2) / (float) f->width;
+			b.y = (float) (json_object_get_double(json_object_array_get_idx(bboxObj,1)) + (float) json_object_get_int(json_object_array_get_idx(bboxObj,3))/2) / (float) f->height;
+			b.w = (float) json_object_get_double(json_object_array_get_idx(bboxObj,2)) / (float) f->width;
+			b.h = (float) json_object_get_double(json_object_array_get_idx(bboxObj,3)) / (float) f->height;
+			//b.x = (d.x + d.w/2) / f.width;
+			//b.y = (d.y + d.h/2) / f.height;
+			//b.w = d.w / f.width;
+			//b.h = d.h / f.height;
 
-		//std::string id = image_path.substr(image_path.find("images/val2014/COCO_val2014_")+28, image_path.find(".jpg") - image_path.find("images/val2014/COCO_val2014_") -28);
-		std::string id = image_path.substr(image_path.find("images/")+7, image_path.find(".jpg") - image_path.find("images/") -7);
-		int image_id = std::stoi(id);
-		//printf("id: %s\n", id.c_str());
-
-		while(index < coco_length)
-		{
-			json_object *temp = json_object_array_get_idx(pJsonObject,index);
-			json_object *imageIdObj = json_object_object_get(temp,"image_id");
-			int image_id_json = json_object_get_int(imageIdObj);
-			if(image_id_json == image_id)
-			{
-				tk::dnn::BoundingBox b;
-				json_object *categoryIdObj = json_object_object_get(temp,"category_id");
-				int category_id_json = json_object_get_int(categoryIdObj);
-
-				json_object *scoreObj = json_object_object_get(temp,"score");
-				float score_json = (float) json_object_get_double(scoreObj);
-				json_object *bboxObj = json_object_object_get(temp,"bbox");
-	
-				b.x = (float) (json_object_get_double(json_object_array_get_idx(bboxObj,0)) + (float) json_object_get_int(json_object_array_get_idx(bboxObj,2))/2) / (float) width;
-				b.y = (float) (json_object_get_double(json_object_array_get_idx(bboxObj,1)) + (float) json_object_get_int(json_object_array_get_idx(bboxObj,3))/2) / (float) height;
-				b.w = (float) json_object_get_double(json_object_array_get_idx(bboxObj,2)) / (float) width;
-				b.h = (float) json_object_get_double(json_object_array_get_idx(bboxObj,3)) / (float) height;
-	            //b.x = (d.x + d.w/2) / width;
-    	        //b.y = (d.y + d.h/2) / height;
-        	    //b.w = d.w / width;
-            	//b.h = d.h / height;
-
-		        b.prob = score_json;
-		        b.cl = get_index_from_coco_id(classes, category_id_json);
-				//printf("id: %d, category: %d, x: %lf, y: %lf, w: %lf, h: %lf, prob: %f\n", image_id_json, category_id_json, b.x, b.y, b.w, b.h, b.prob);
-				f.det.push_back(b);
-				index++;
-			}
-			else
-			{
-				break;
-			}
+			b.prob = score_json;
+			b.cl = get_index_from_coco_id(classes, category_id_json);
+			//printf("id: %d, category: %d, x: %lf, y: %lf, w: %lf, h: %lf, prob: %f\n", image_id_json, category_id_json, b.x, b.y, b.w, b.h, b.prob);
+			f->det.push_back(b);
 		}
-
-        if(fileExist(f.lFilename.c_str()))
-        {
-            std::ifstream labels(l_filename);
-            for(std::string line; std::getline(labels, line); ){
-                std::istringstream in(line); 
-                tk::dnn::BoundingBox b;
-                in >> b.cl >> b.x >> b.y >> b.w >> b.h;  
-                b.prob = 1;
-                b.truthFlag = 1;
-                f.gt.push_back(b);
-            }
-        }    
-
-        images.push_back(f);
+		
+		index++;	
 	}
-	
+
+	for(auto it = frame_map.begin(); it != frame_map.end(); it++) {
+		images.push_back(it->second);
+	}
 
     //compute mAP
     double AP = tk::dnn::computeMapNIoULevels(images,classes,IoU_thresh,conf_thresh, map_points, map_step, map_levels, verbose, false, "coco_trained_network");
