@@ -11,8 +11,11 @@
 
 #include "inference_application.h"
 
+
 #include "config.h"
 #include "cuda.h"
+
+#include "tkdnn_network.h"
 
 typedef struct _CenternetAppConfig {
 	std::string image_path;
@@ -65,9 +68,9 @@ class CenternetApplication : public IInferenceApplication {
 		void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
 		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
 		void postprocessing2(int thread_id, int sample_index, int batch) override;
-		tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
-		void referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT) override;
 		void readCustomOptions(libconfig::Setting &setting) override;
+		//tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
+		IJediNetwork* createNetwork(ConfigInstance *basic_config_data) override;
 
 	private:
 		cv::Mat dst = cv::Mat(cv::Size(2,3), CV_32F);

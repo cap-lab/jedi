@@ -32,10 +32,9 @@ long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<lon
 	return sum / (long) nSize;
 }
 
-static void readData(int thread_id, float *input_buffer, IInferenceApplication *app, InputDim input_dim, int batch, int batch_thread_num, int index, bool letter_box)
+static void readData(int thread_id, float *input_buffer, IInferenceApplication *app, int total_input_size, int batch, int batch_thread_num, int index)
 {
-	int input_width = input_dim.width, input_height = input_dim.height, input_channel = input_dim.channel;
-	int input_size = input_width * input_height * input_channel;
+	int input_size = total_input_size / batch;
 	#pragma omp parallel num_threads(batch_thread_num)
 	#pragma omp for
 	for(int iter = 0; iter < batch; iter++) {
@@ -102,7 +101,7 @@ void doPreProcessing(void *d) {
 		}
 
 		(*latency)[sample_index - sample_offset] = getTime();
-		readData(tid, data->model->net_input_buffers[buffer_index][0], app, data->model->input_dim, batch, batch_thread_num, index, data->model->letter_box);
+		readData(tid, data->model->net_input_buffers[buffer_index][0], app, data->model->total_input_size, batch, batch_thread_num, index);
 		data->model->updateInputSignals(buffer_index, true);	
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);

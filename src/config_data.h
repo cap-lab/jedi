@@ -9,6 +9,7 @@
 typedef struct _ConfigInstance {
 	std::string network_name;
 	std::string app_type;
+	std::string model_type;
 	std::string model_dir;
 	std::string bin_path;
 	std::string calib_table;

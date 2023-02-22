@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 
-#include <tkDNN/tkdnn.h>
+//#include <tkDNN/tkdnn.h>
 
 #include "config.h"
 #include "variable.h"
@@ -70,8 +70,8 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 
 static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models, std::vector<IInferenceApplication *> &apps) {
 	for(int iter = 0; iter < instance_num; iter++) {
-		Model *model = new Model(&config_data, iter, apps[iter]);
-
+		Model *model = nullptr;
+		model = g_NetworkModelRegistry.create(config_data.instances.at(iter).model_type, &config_data, iter, apps[iter]);
 		model->initializeModel();
 		model->initializeBuffers();
 

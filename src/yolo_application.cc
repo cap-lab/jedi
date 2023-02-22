@@ -1,6 +1,7 @@
 #include <libconfig.h++>
 #include <cstring>
 #include <sstream>
+#include <math.h>
 
 #include <opencv2/opencv.hpp>
 
@@ -11,6 +12,8 @@
 #include "box.h"
 #include "yolo_wrapper.h"
 #include "region_wrapper.h"
+
+#include "tkdnn_network.h"
 
 #include "yolo_application.h"
 
@@ -116,28 +119,29 @@ void YoloApplication::readCustomOptions(libconfig::Setting &setting)
 	readOpenCVParallelNum(setting);
 }
 
-tk::dnn::Network *YoloApplication::createNetwork(ConfigInstance *basic_config_data)
+IJediNetwork *YoloApplication::createNetwork(ConfigInstance *basic_config_data)
 {
 	std::string cfg_path = yoloAppConfig.cfg_path;
 	std::string name_path = yoloAppConfig.name_path;
 	std::string bin_path(basic_config_data->bin_path);
 	std::string wgs_path  = bin_path + "/layers";
 
-	tk::dnn::Network *net;
-	net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
+	TkdnnNetwork *jedi_network = new TkdnnNetwork();
 
-	letter_box = net->letterBox;
-	input_dim.width = net->input_dim.w;
-	input_dim.height = net->input_dim.h;
-	input_dim.channel = net->input_dim.c;
+	jedi_network->net = tk::dnn::darknetParser(cfg_path, wgs_path, name_path);
 
-	net->fileImgList = yoloAppConfig.calib_image_path;
-	net->num_calib_images = yoloAppConfig.calib_images_num;
+	letter_box = jedi_network->net->letterBox;
+	input_dim.width = jedi_network->net->input_dim.w;
+	input_dim.height = jedi_network->net->input_dim.h;
+	input_dim.channel = jedi_network->net->input_dim.c;
 
-	for (int iter = 0 ; iter < net->num_layers; iter++) {
-		if(net->layers[iter]->getLayerType() == LAYER_YOLO) {
+	jedi_network->net->fileImgList = yoloAppConfig.calib_image_path;
+	jedi_network->net->num_calib_images = yoloAppConfig.calib_images_num;
+
+	for (int iter = 0 ; iter < jedi_network->net->num_layers; iter++) {
+		if(jedi_network->net->layers[iter]->getLayerType() == LAYER_YOLO) {
 			YoloData yolo;
-			tk::dnn::Yolo *yoloTKDNN = (tk::dnn::Yolo *) net->layers[iter];
+			tk::dnn::Yolo *yoloTKDNN = (tk::dnn::Yolo *) jedi_network->net->layers[iter];
 			yolo.n_masks = yoloTKDNN->n_masks;
 			yolo.bias = yoloTKDNN->bias_h;
 			yolo.mask = yoloTKDNN->mask_h;
@@ -147,35 +151,15 @@ tk::dnn::Network *YoloApplication::createNetwork(ConfigInstance *basic_config_da
 			yolo.height = yoloTKDNN->input_dim.h;
 			yolo.width = yoloTKDNN->input_dim.w;
 			yolo.channel = yoloTKDNN->input_dim.c;
+			yolo.scale_x_y = yoloTKDNN->scaleXY;
+			yolo.num = yoloTKDNN->num;
 
 			yolos.push_back(yolo);
 		}
 	}
 
-	return net;
+	return jedi_network;
 }
-
-void YoloApplication::referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT)
-{
-	/*
-	for(int iter = 0; iter < networkRT->pluginFactory->n_yolos; iter++) {
-		YoloData yolo;
-		tk::dnn::YoloRT *yRT = networkRT->pluginFactory->yolos[iter];
-		yolo.n_masks = yRT->n_masks;
-		yolo.bias = yRT->bias;
-		yolo.mask = yRT->mask;
-		yolo.new_coords = yRT->new_coords;
-		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) yRT->nms_kind;
-		yolo.nms_thresh = yRT->nms_thresh;
-		yolo.height = yRT->h;
-		yolo.width = yRT->w;
-		yolo.channel = yRT->c;
-
-		yolos.push_back(yolo);
-	}
-	*/
-}
-
 
 void YoloApplication::initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number)
 {

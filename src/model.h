@@ -5,8 +5,9 @@
 #include <vector>
 #include <map>
 #include <cassert>
+#include <boost/function/function3.hpp>
 
-#include <tkDNN/tkdnn.h>
+//#include <tkDNN/tkdnn.h>
 
 #include "variable.h"
 #include "config.h"
@@ -14,17 +15,15 @@
 
 #include "inference_application.h"
 
-
-
 class Model {
 	public:
-		InputDim input_dim;
-		bool letter_box;
+		//InputDim input_dim;
+		int total_input_size;
 
-		tk::dnn::Network *net;
 		std::vector<Stage *> stages;
-		std::vector<std::map<std::pair<int, int>, void*>> all_stream_buffers;
-		std::vector<std::map<std::pair<int, int>, bool*>> all_signals;
+        std::vector<std::map<std::string, void*>> all_stream_buffers;
+        std::vector<std::map<std::string, bool*>> all_signals;
+
 
 		std::vector<std::vector<float *>> net_input_buffers;
 		std::vector<std::vector<float *>> net_output_buffers;
@@ -34,8 +33,8 @@ class Model {
 
 		Model(ConfigData *config_data, int instance_id, IInferenceApplication *app);
 		~Model();
-		void initializeModel();
-		void finalizeModel();
+		virtual void initializeModel() = 0;
+		virtual void finalizeModel() = 0;
 		void initializeBuffers();
 		void finalizeBuffers();
 		bool checkInferenceDone(int device_id, int stream_id);
@@ -49,27 +48,70 @@ class Model {
 		void updateInputSignals(int buffer_id, bool value);
 		void updateOutputSignals(int buffer_id, bool value);
 
-	private:
+	protected:
 		ConfigData *config_data;
 		int instance_id;
 		IInferenceApplication *app;
 
-		void getModelFileName(int curr, std::string &plan_file_name);
-		void setDataType();
-		void setDevice(int curr);
-		void setMaxBatchSize();
-		void createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index);
-		void readFromCalibrationTable(std::string basic_calibration_table, int start_index, int end_index, std::string out_calib_table, int device);
-		int getLayerNumberFromCalibrationKey(std::string key);
 		void allocateStream();
 		void allocateBuffer();
 		void setBufferForStage();
 		void deallocateBuffer();
 		void deallocateStream();
 		void* makeCUDAArray(int size);
-		void allocateInputStreamBuffer(std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& input_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& input_signal);
-		void* getOutputBufferOfLayer(std::map<std::pair<int, int>, void*>& stream_buffers_map, int tsrc_id);
-		void allocateStreamBuffer(std::map<std::pair<int, int>, int> size_map, std::map<std::pair<int, int>, void*>& stream_buffers_map, std::vector<float *>& output_buffer, std::map<std::pair<int, int>, bool*>& signals_map, std::vector<bool*>& output_signal); 
+
+        void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::vector<float *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
+        void* getOutputBufferOfLayer(std::map<std::string, void*>& stream_buffers_map, std::string target_tensor_name);
+        void allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
 };
+
+class NetworkModelRegistry
+{
+  typedef boost::function3<Model *, ConfigData *, int, IInferenceApplication *> Creator;
+  typedef std::map<std::string, Creator> Creators;
+  Creators m_Creators;
+
+public:
+  template <class NetworkModelType>
+  void registerNetworkModel(const std::string &identifier)
+  {
+    ConstructorWrapper<NetworkModelType> wrapper;
+    Creator creator = wrapper;
+    m_Creators[identifier] = creator;
+	//printf("merong3\n");
+
+  }
+
+  Model *create(std::string &identifier, ConfigData *config_data, int instance_id, IInferenceApplication *app)
+  {
+	Model *result = nullptr;
+    auto it = m_Creators.find(identifier);
+    if (it != m_Creators.end())
+    {
+      result = it->second(config_data, instance_id, app);
+    }
+    return result;
+  }
+
+protected:
+  template<class NetworkModelType>
+  struct ConstructorWrapper
+  {
+	  Model *operator()(ConfigData *config_data, int instance_id, IInferenceApplication *app) const { return new NetworkModelType(config_data, instance_id, app); }
+  };
+};
+
+extern NetworkModelRegistry g_NetworkModelRegistry;
+
+template <typename T>
+class NetworkModelRegisterar
+{
+public:
+	NetworkModelRegisterar(std::string name) { g_NetworkModelRegistry.registerNetworkModel<T>(name); }
+};
+
+#define REGISTER_JEDI_NETWORK_MODEL(name) \
+	static NetworkModelRegisterar<name> NetworkModelRegistrar_##name = NetworkModelRegisterar<name>(#name)
+
 
 #endif

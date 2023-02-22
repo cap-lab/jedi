@@ -12,6 +12,8 @@
 
 #include "cnet_application.h"
 
+#include "tkdnn_network.h"
+
 const std::string conv1_bin = "base-base_layer-0.bin";
 const std::string conv2_bin = "base-level0-0.bin";
 const std::string conv3_bin = "base-level1-0.bin";
@@ -174,11 +176,12 @@ void CenternetApplication::readCustomOptions(libconfig::Setting &setting)
 	readNamePath(setting);
 }
 
-tk::dnn::Network *CenternetApplication::createNetwork(ConfigInstance *basic_config_data)
+IJediNetwork *CenternetApplication::createNetwork(ConfigInstance *basic_config_data)
 {
 	std::string name_path = centernetAppConfig.name_path;
 	std::string bin_path(basic_config_data->bin_path);
     std::string wgs_path  = bin_path + "/layers/";
+	TkdnnNetwork *jedi_network = new TkdnnNetwork();
 
 	tk::dnn::dataDim_t dim(1, 3, 512, 512, 1);
     tk::dnn::Network *net = new tk::dnn::Network(dim);
@@ -552,14 +555,392 @@ tk::dnn::Network *CenternetApplication::createNetwork(ConfigInstance *basic_conf
 	net->fileImgList = centernetAppConfig.calib_image_path;
 	net->num_calib_images = centernetAppConfig.calib_images_num;
 
-	return net;
+	jedi_network->net = net;
+
+	return jedi_network;
 }
 
-void CenternetApplication::referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT)
-{
 
-}
-
+//tk::dnn::Network *CenternetApplication::createNetwork(ConfigInstance *basic_config_data)
+//{
+//	std::string name_path = centernetAppConfig.name_path;
+//	std::string bin_path(basic_config_data->bin_path);
+//    std::string wgs_path  = bin_path + "/layers/";
+//
+//	tk::dnn::dataDim_t dim(1, 3, 512, 512, 1);
+//    tk::dnn::Network *net = new tk::dnn::Network(dim);
+//    tk::dnn::Layer *last1, *last2, *last3, *last4;
+//    tk::dnn::Layer *base2, *base3, *base4, *base5, *ida1, *ida2_1, *ida2_2, *ida3_1, *ida3_2, *ida3_3, *idaup_1, *idaup_2;
+//#pragma GCC diagnostic push
+//#pragma GCC diagnostic ignored "-Wunused-variable"
+//    tk::dnn::Conv2d *conv1 = new tk::dnn::Conv2d(net, 16, 7, 7, 1, 1, 3, 3, (wgs_path + conv1_bin).c_str(), true);
+//    tk::dnn::Activation *relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//    tk::dnn::Conv2d *conv2 = new tk::dnn::Conv2d(net, 16, 3, 3, 1, 1, 1, 1, (wgs_path + conv2_bin).c_str(), true);
+//    tk::dnn::Activation *relu2 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    //base1 = relu2;
+//
+//    tk::dnn::Conv2d *conv3 = new tk::dnn::Conv2d(net, 32, 3, 3, 2, 2, 1, 1, (wgs_path + conv3_bin).c_str(), true);
+//    tk::dnn::Activation *relu3 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    base2 = relu3;
+//    
+//    // level 2
+//    // tree 1
+//        tk::dnn::Conv2d     *s1_t1_conv1 = new tk::dnn::Conv2d(net, 64, 3, 3, 2, 2, 1, 1, (wgs_path + s1_t1_conv1_bin).c_str(), true);
+//        tk::dnn::Activation *s1_t1_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//       
+//        tk::dnn::Conv2d     *s1_t1_conv2 = new tk::dnn::Conv2d(net, 64, 3, 3, 1, 1, 1, 1, (wgs_path + s1_t1_conv2_bin).c_str(), true);
+//        last2 = s1_t1_conv2;
+//
+//        // get the basicblock input and apply maxpool conv2d and relu
+//        tk::dnn::Layer      *route_s1_t1_layers[1] = { base2 };
+//        tk::dnn::Route      *route_s1_t1 = new tk::dnn::Route(net, route_s1_t1_layers, 1);
+//        // downsample
+//        tk::dnn::Pooling   *s1_t1_maxpool = new tk::dnn::Pooling(net, 2, 2, 2, 2, 0, 0, tk::dnn::POOLING_MAX);
+//        // project
+//        tk::dnn::Conv2d    *s1_t1_residual1_conv1 = new tk::dnn::Conv2d(net, 64, 1, 1, 1, 1, 0, 0, (wgs_path + s1_t1_project).c_str(), true);
+//        
+//        tk::dnn::Shortcut  *s1_t1_s1 = new tk::dnn::Shortcut(net, last2);
+//        tk::dnn::Activation *s1_t1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    
+//    last1 = s1_t1_relu;
+//    // tree 2
+//        tk::dnn::Conv2d     *s1_t2_conv1 = new tk::dnn::Conv2d(net, 64, 3, 3, 1, 1, 1, 1, (wgs_path + s1_t2_conv1_bin).c_str(), true);
+//        tk::dnn::Activation *s1_t2_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//       
+//        tk::dnn::Conv2d     *s1_t2_conv2 = new tk::dnn::Conv2d(net, 64, 3, 3, 1, 1, 1, 1, (wgs_path + s1_t2_conv2_bin).c_str(), true);
+//        
+//        tk::dnn::Shortcut   *s1_t2_s1 = new tk::dnn::Shortcut(net, last1);
+//        tk::dnn::Activation *s1_t2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//        last2 = s1_t2_relu;
+//
+//    // root
+//        // join last1 and net in single input 128, 56, 56
+//        tk::dnn::Layer      *route_s1_root_layers[2] = { last2, last1 };
+//        tk::dnn::Route      *route_s1_root = new tk::dnn::Route(net, route_s1_root_layers, 2);
+//        tk::dnn::Conv2d     *s1_root_conv1 = new tk::dnn::Conv2d(net, 64, 1, 1, 1, 1, 0, 0, (wgs_path + s1_root_conv1_bin).c_str(), true);
+//        tk::dnn::Activation *s1_root_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//    base3 = s1_root_relu;
+//
+//    // level 3
+//    // tree 1
+//        // tree 1
+//            tk::dnn::Conv2d     *s2_t1_t1_conv1 = new tk::dnn::Conv2d(net, 128, 3, 3, 2, 2, 1, 1, (wgs_path + s2_t1_t1_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s2_t1_t1_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);      
+//        
+//            tk::dnn::Conv2d     *s2_t1_t1_conv2 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t1_t1_conv2_bin).c_str(), true);
+//            last2 = s2_t1_t1_conv2;
+//
+//            // get the basicblock input and apply maxpool conv2d and relu
+//            tk::dnn::Layer      *route_s2_t1_t1_layers[1] = { base3 };
+//            tk::dnn::Route      *route_s2_t1_t1 = new tk::dnn::Route(net, route_s2_t1_t1_layers, 1);
+//            // downsample
+//            tk::dnn::Pooling    *s2_t1_t1_maxpool1 = new tk::dnn::Pooling(net, 2, 2, 2, 2, 0, 0, tk::dnn::POOLING_MAX);
+//            last4 = s2_t1_t1_maxpool1;
+//            // project
+//            tk::dnn::Conv2d     *s2_t1_t1_residual1_conv1 = new tk::dnn::Conv2d(net, 128, 1, 1, 1, 1, 0, 0, (wgs_path + s2_t1_t1_project).c_str(), true);
+//            
+//            tk::dnn::Shortcut   *s2_t1_t1_s1 = new tk::dnn::Shortcut(net, last2);
+//            tk::dnn::Activation *s2_t1_t1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//        last1 = s2_t1_t1_relu;
+//        
+//        // tree 2
+//            tk::dnn::Conv2d     *s2_t1_t2_conv1 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t1_t2_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s2_t1_t2_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//        
+//            tk::dnn::Conv2d     *s2_t1_t2_conv2 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t1_t2_conv2_bin).c_str(), true);
+//            
+//            tk::dnn::Shortcut   *s2_t1_t2_s1 = new tk::dnn::Shortcut(net, last1);
+//            tk::dnn::Activation *s2_t1_t2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//            last2 = s2_t1_t2_relu;
+//
+//        // root
+//            // join last1 and net in single input 128, 56, 56
+//            tk::dnn::Layer      *route_s2_t1_root_layers[2] = { last2, last1 };
+//            tk::dnn::Route      *route_s2_t1_root = new tk::dnn::Route(net, route_s2_t1_root_layers, 2);
+//            tk::dnn::Conv2d     *s2_t1_root_conv1 = new tk::dnn::Conv2d(net, 128, 1, 1, 1, 1, 0, 0, (wgs_path + s2_t1_root_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s2_t1_root_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    
+//    last1 = s2_t1_root_relu;
+//    last3 = s2_t1_root_relu;
+//    // tree 2
+//        // tree 1
+//            tk::dnn::Conv2d     *s2_t2_t1_conv1 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t2_t1_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s2_t2_t1_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//        
+//            tk::dnn::Conv2d     *s2_t2_t1_conv2 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t2_t1_conv2_bin).c_str(), true);
+//            tk::dnn::Shortcut   *s2_t2_t1_s1 = new tk::dnn::Shortcut(net, last1);
+//            tk::dnn::Activation *s2_t2_t1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//        last1 = s2_t2_t1_relu;
+//        
+//        // tree 2
+//            tk::dnn::Conv2d     *s2_t2_t2_conv1 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t2_t2_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s2_t2_t2_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//        
+//            tk::dnn::Conv2d     *s2_t2_t2_conv2 = new tk::dnn::Conv2d(net, 128, 3, 3, 1, 1, 1, 1, (wgs_path + s2_t2_t2_conv2_bin).c_str(), true);
+//            
+//            tk::dnn::Shortcut   *s2_t2_t2_s1 = new tk::dnn::Shortcut(net, last1);
+//            tk::dnn::Activation *s2_t2_t2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//            last2 = s2_t2_t2_relu;
+//
+//        // root
+//            // join last1 and net in single input 128, 56, 56
+//            tk::dnn::Layer      *route_s2_t2_root_layers[4] = { last2, last1, last4, last3};
+//            tk::dnn::Route      *route_s2_t2_root = new tk::dnn::Route(net, route_s2_t2_root_layers, 4);
+//            tk::dnn::Conv2d     *s2_t2_root_conv1 = new tk::dnn::Conv2d(net, 128, 1, 1, 1, 1, 0, 0, (wgs_path + s2_t2_root_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s2_t2_root_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    
+//    base4 = s2_t2_root_relu;
+//
+//    // level 4
+//    // tree 1
+//        // tree 1
+//            tk::dnn::Conv2d     *s3_t1_t1_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 2, 2, 1, 1, (wgs_path + s3_t1_t1_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s3_t1_t1_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);      
+//        
+//            tk::dnn::Conv2d     *s3_t1_t1_conv2 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t1_t1_conv2_bin).c_str(), true);
+//            last2 = s3_t1_t1_conv2;
+//
+//            // get the basicblock input and apply maxpool conv2d and relu
+//            tk::dnn::Layer      *route_s3_t1_t1_layers[1] = { base4 };
+//            tk::dnn::Route      *route_s3_t1_t1 = new tk::dnn::Route(net, route_s3_t1_t1_layers, 1);
+//            // downsample
+//            tk::dnn::Pooling    *s3_t1_t1_maxpool1 = new tk::dnn::Pooling(net, 2, 2, 2, 2, 0, 0, tk::dnn::POOLING_MAX);
+//            last4 = s3_t1_t1_maxpool1;
+//            // project
+//            tk::dnn::Conv2d     *s3_t1_t1_residual1_conv1 = new tk::dnn::Conv2d(net, 256, 1, 1, 1, 1, 0, 0, (wgs_path + s3_t1_t1_project).c_str(), true);
+//            
+//            tk::dnn::Shortcut   *s3_t1_t1_s1 = new tk::dnn::Shortcut(net, last2);
+//            tk::dnn::Activation *s3_t1_t1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//        last1 = s3_t1_t1_relu;
+//        
+//        // tree 2
+//            tk::dnn::Conv2d     *s3_t1_t2_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t1_t2_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s3_t1_t2_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//        
+//            tk::dnn::Conv2d     *s3_t1_t2_conv2 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t1_t2_conv2_bin).c_str(), true);
+//            
+//            tk::dnn::Shortcut   *s3_t1_t2_s1 = new tk::dnn::Shortcut(net, last1);
+//            tk::dnn::Activation *s3_t1_t2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//            last2 = s3_t1_t2_relu;
+//
+//        // root
+//            // join last1 and net in single input 256, 56, 56
+//            tk::dnn::Layer      *route_s3_t1_root_layers[2] = { last2, last1 };
+//            tk::dnn::Route      *route_s3_t1_root = new tk::dnn::Route(net, route_s3_t1_root_layers, 2);
+//            tk::dnn::Conv2d     *s3_t1_root_conv1 = new tk::dnn::Conv2d(net, 256, 1, 1, 1, 1, 0, 0, (wgs_path + s3_t1_root_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s3_t1_root_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    
+//    last1 = s3_t1_root_relu;
+//    last3 = s3_t1_root_relu;
+//    // tree 2
+//        // tree 1
+//            tk::dnn::Conv2d     *s3_t2_t1_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t2_t1_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s3_t2_t1_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//        
+//            tk::dnn::Conv2d     *s3_t2_t1_conv2 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t2_t1_conv2_bin).c_str(), true);
+//            tk::dnn::Shortcut   *s3_t2_t1_s1 = new tk::dnn::Shortcut(net, last1);
+//            tk::dnn::Activation *s3_t2_t1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//        last1 = s3_t2_t1_relu;
+//        
+//        // tree 2
+//            tk::dnn::Conv2d     *s3_t2_t2_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t2_t2_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s3_t2_t2_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//        
+//            tk::dnn::Conv2d     *s3_t2_t2_conv2 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + s3_t2_t2_conv2_bin).c_str(), true);
+//            
+//            tk::dnn::Shortcut   *s3_t2_t2_s1 = new tk::dnn::Shortcut(net, last1);
+//            tk::dnn::Activation *s3_t2_t2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//            last2 = s3_t2_t2_relu;
+//
+//        // root
+//            // join last1 and net in single input 256, 56, 56
+//            tk::dnn::Layer      *route_s3_t2_root_layers[4] = { last2, last1, last4, last3};
+//            tk::dnn::Route      *route_s3_t2_root = new tk::dnn::Route(net, route_s3_t2_root_layers, 4);
+//            tk::dnn::Conv2d     *s3_t2_root_conv1 = new tk::dnn::Conv2d(net, 256, 1, 1, 1, 1, 0, 0, (wgs_path + s3_t2_root_conv1_bin).c_str(), true);
+//            tk::dnn::Activation *s3_t2_root_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    
+//    base5 = s3_t2_root_relu;
+//
+//    // level 5
+//    // tree 1
+//        tk::dnn::Conv2d     *s4_t1_conv1 = new tk::dnn::Conv2d(net, 512, 3, 3, 2, 2, 1, 1, (wgs_path + s4_t1_conv1_bin).c_str(), true);
+//        tk::dnn::Activation *s4_t1_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//       
+//        tk::dnn::Conv2d     *s4_t1_conv2 = new tk::dnn::Conv2d(net, 512, 3, 3, 1, 1, 1, 1, (wgs_path + s4_t1_conv2_bin).c_str(), true);
+//        last2 = s4_t1_conv2;
+//
+//        // get the basicblock input and apply maxpool conv2d and relu
+//        tk::dnn::Layer      *route_s4_t1_layers[1] = { base5 };
+//        tk::dnn::Route      *route_s4_t1 = new tk::dnn::Route(net, route_s4_t1_layers, 1);
+//        // downsample
+//        tk::dnn::Pooling    *s4_t1_maxpool1 = new tk::dnn::Pooling(net, 2, 2, 2, 2, 0, 0, tk::dnn::POOLING_MAX);
+//        last4 = s4_t1_maxpool1;
+//        // project
+//        tk::dnn::Conv2d     *s4_t1_residual1_conv1 = new tk::dnn::Conv2d(net, 512, 1, 1, 1, 1, 0, 0, (wgs_path + s4_t1_project).c_str(), true);
+//        
+//        tk::dnn::Shortcut   *s4_t1_s1 = new tk::dnn::Shortcut(net, last2);
+//        tk::dnn::Activation *s4_t1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//    last1 = s4_t1_relu;
+//    
+//    // tree 2
+//        tk::dnn::Conv2d     *s4_t2_conv1 = new tk::dnn::Conv2d(net, 512, 3, 3, 1, 1, 1, 1, (wgs_path + s4_t2_conv1_bin).c_str(), true);
+//        tk::dnn::Activation *s4_t2_relu1 = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);       
+//       
+//        tk::dnn::Conv2d     *s4_t2_conv2 = new tk::dnn::Conv2d(net, 512, 3, 3, 1, 1, 1, 1, (wgs_path + s4_t2_conv2_bin).c_str(), true);
+//        
+//        tk::dnn::Shortcut   *s4_t2_s1 = new tk::dnn::Shortcut(net, last1);
+//        tk::dnn::Activation *s4_t2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//        last2 = s4_t2_relu;
+//
+//    // root
+//        // join last1 and net in single input 128, 56, 56
+//        tk::dnn::Layer      *route_s4_root_layers[3] = { last2, last1, last4 };
+//        tk::dnn::Route      *route_s4_root = new tk::dnn::Route(net, route_s4_root_layers, 3);
+//        tk::dnn::Conv2d     *s4_root_conv1 = new tk::dnn::Conv2d(net, 512, 1, 1, 1, 1, 0, 0, (wgs_path + s4_root_conv1_bin).c_str(), true);
+//        tk::dnn::Activation *s4_root_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//
+//    //base6 = s4_root_relu;
+//    
+//    //final
+//    // tk::dnn::Pooling avgpool(net, 7, 7, 7, 7, 0, 0, tk::dnn::POOLING_AVERAGE);
+//    // tk::dnn::Dense   fc(net, 1000, fc_bin);
+//    
+//    //ida 0 
+//    tk::dnn::DeformConv2d   *ida_0_p_1_dcn = new tk::dnn::DeformConv2d(net, 256, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_0_p_1_dcn_bin).c_str(), (wgs_path + ida_0_p_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_0_p_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *ida_0_up_1_deconv = new tk::dnn::DeConv2d(net, 256, 4, 4, 2, 2, 1, 1, (wgs_path + ida_0_up_1_deconv_bin).c_str(), false, 256);
+//    tk::dnn::Shortcut       *ida_0_shortcut = new tk::dnn::Shortcut(net, base5);    
+//    tk::dnn::DeformConv2d   *ida_0_n_1_dcn = new tk::dnn::DeformConv2d(net, 256, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_0_n_1_dcn_bin).c_str(), (wgs_path + ida_0_n_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_0_n_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    ida1 = ida_0_n_1_relu;
+//
+//    //ida1-1
+//    tk::dnn::Layer          *route_ida1_layers_1[1] = { base5 };
+//    tk::dnn::Route          *route_ida1_1 = new tk::dnn::Route(net, route_ida1_layers_1, 1);
+//    
+//    tk::dnn::DeformConv2d   *ida_1_p_1_dcn = new tk::dnn::DeformConv2d(net, 128, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_1_p_1_dcn_bin).c_str(), (wgs_path + ida_1_p_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_1_p_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *ida_1_up_1_deconv = new tk::dnn::DeConv2d(net, 128, 4, 4, 2, 2, 1, 1, (wgs_path + ida_1_up_1_deconv_bin).c_str(), false, 128);
+//    tk::dnn::Shortcut       *ida_1_shortcut1 = new tk::dnn::Shortcut(net, base4);    
+//    tk::dnn::DeformConv2d   *ida_1_n_1_dcn = new tk::dnn::DeformConv2d(net, 128, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_1_n_1_dcn_bin).c_str(), (wgs_path + ida_1_n_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_1_n_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    ida2_1 = ida_1_n_1_relu;
+//
+//    //ida1-2
+//    tk::dnn::Layer          *route_ida1_layers_2[1] = { ida1 };
+//    tk::dnn::Route          *route_ida1_2 = new tk::dnn::Route(net, route_ida1_layers_2, 1);
+//
+//    tk::dnn::DeformConv2d   *ida_1_p_2_dcn = new tk::dnn::DeformConv2d(net, 128, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_1_p_2_dcn_bin).c_str(), (wgs_path + ida_1_p_2_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_1_p_2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *ida_1_up_2_deconv = new tk::dnn::DeConv2d(net, 128, 4, 4, 2, 2, 1, 1, (wgs_path + ida_1_up_2_deconv_bin).c_str(), false, 128);
+//    tk::dnn::Shortcut       *ida_1_shortcut2 = new tk::dnn::Shortcut(net, ida2_1);    
+//    tk::dnn::DeformConv2d   *ida_1_n_2_dcn = new tk::dnn::DeformConv2d(net, 128, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_1_n_2_dcn_bin).c_str(), (wgs_path + ida_1_n_2_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_1_n_2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    ida2_2 = ida_1_n_2_relu;
+//
+//    //ida2-1
+//    tk::dnn::Layer          *route_ida2_layers_1[1] = { base4 };
+//    tk::dnn::Route          *route_ida2_1 = new tk::dnn::Route(net, route_ida2_layers_1, 1);
+//    
+//    tk::dnn::DeformConv2d   *ida_2_p_1_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_2_p_1_dcn_bin).c_str(), (wgs_path + ida_2_p_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_2_p_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *ida_2_up_1_deconv = new tk::dnn::DeConv2d(net, 64, 4, 4, 2, 2, 1, 1, (wgs_path + ida_2_up_1_deconv_bin).c_str(), false, 64);
+//    tk::dnn::Shortcut       *ida_2_shortcut1 = new tk::dnn::Shortcut(net, base3);    
+//    tk::dnn::DeformConv2d   *ida_2_n_1_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_2_n_1_dcn_bin).c_str(), (wgs_path + ida_2_n_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_2_n_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    ida3_1 = ida_2_n_1_relu;
+//
+//    //ida2-2
+//    tk::dnn::Layer          *route_ida2_layers_2[1] = { ida2_1 };
+//    tk::dnn::Route          *route_ida2_2 = new tk::dnn::Route(net, route_ida2_layers_2, 1);
+//    
+//    tk::dnn::DeformConv2d   *ida_2_p_2_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_2_p_2_dcn_bin).c_str(), (wgs_path + ida_2_p_2_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_2_p_2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *ida_2_up_2_deconv = new tk::dnn::DeConv2d(net, 64, 4, 4, 2, 2, 1, 1, (wgs_path + ida_2_up_2_deconv_bin).c_str(), false, 64);
+//    tk::dnn::Shortcut       *ida_2_shortcut2 = new tk::dnn::Shortcut(net, ida3_1);    
+//    tk::dnn::DeformConv2d   *ida_2_n_2_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_2_n_2_dcn_bin).c_str(), (wgs_path + ida_2_n_2_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_2_n_2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    ida3_2 = ida_2_n_2_relu;
+//
+//    //ida2-3
+//    tk::dnn::Layer          *route_ida2_layers_3[1] = { ida2_2 };
+//    tk::dnn::Route          *route_ida2_3 = new tk::dnn::Route(net, route_ida2_layers_3, 1);
+//    
+//    tk::dnn::DeformConv2d   *ida_2_p_3_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_2_p_3_dcn_bin).c_str(), (wgs_path + ida_2_p_3_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_2_p_3_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *ida_2_up_3_deconv = new tk::dnn::DeConv2d(net, 64, 4, 4, 2, 2, 1, 1, (wgs_path + ida_2_up_3_deconv_bin).c_str(), false, 64);
+//    tk::dnn::Shortcut       *ida_2_shortcut3 = new tk::dnn::Shortcut(net, ida3_2);    
+//    tk::dnn::DeformConv2d   *ida_2_n_3_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_2_n_3_dcn_bin).c_str(), (wgs_path + ida_2_n_3_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *ida_2_n_3_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    ida3_3 = ida_2_n_3_relu;
+//
+//    //idaup-1
+//    tk::dnn::Layer          *route_idaup_layers_1[1] = { ida2_2 };
+//    tk::dnn::Route          *route_idaup_1 = new tk::dnn::Route(net, route_idaup_layers_1, 1);
+//    
+//    tk::dnn::DeformConv2d   *idaup_p_1_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_up_p_1_dcn_bin).c_str(), (wgs_path + ida_up_p_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *idaup_p_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *idaup_up_1_deconv = new tk::dnn::DeConv2d(net, 64, 4, 4, 2, 2, 1, 1, (wgs_path + ida_up_up_1_deconv_bin).c_str(), false, 64);
+//    tk::dnn::Shortcut       *idaup_shortcut1 = new tk::dnn::Shortcut(net, ida3_3);    
+//    tk::dnn::DeformConv2d   *idaup_n_1_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_up_n_1_dcn_bin).c_str(), (wgs_path + ida_up_n_1_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *idaup_n_1_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    idaup_1 = idaup_n_1_relu;
+//
+//    //idaup-2
+//    tk::dnn::Layer          *route_idaup_layers_2[1] = { ida1 };
+//    tk::dnn::Route          *route_idaup_2 = new tk::dnn::Route(net, route_idaup_layers_2, 1);
+//
+//    tk::dnn::DeformConv2d   *idaup_p_2_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_up_p_2_dcn_bin).c_str(), (wgs_path + ida_up_p_2_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *idaup_p_2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::DeConv2d       *idaup_up_2_deconv = new tk::dnn::DeConv2d(net, 64, 8, 8, 4, 4, 2, 2, (wgs_path + ida_up_up_2_deconv_bin).c_str(), false, 64);
+//    tk::dnn::Shortcut       *idaup_shortcut2 = new tk::dnn::Shortcut(net, idaup_1);    
+//    tk::dnn::DeformConv2d   *idaup_n_2_dcn = new tk::dnn::DeformConv2d(net, 64, 1, 3, 3, 1, 1, 1, 1, (wgs_path + ida_up_n_2_dcn_bin).c_str(), (wgs_path + ida_up_n_2_conv_bin).c_str(), true);
+//    tk::dnn::Activation     *idaup_n_2_relu = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    idaup_2 = idaup_n_2_relu;
+//
+//    tk::dnn::Layer    *route_1_0_layers[1] = { idaup_2 };
+//
+//    // hm
+//    tk::dnn::Conv2d     *hm_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + hm_conv1_bin).c_str(), false);
+//    tk::dnn::Activation *hm_relu1      = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::Conv2d     *hm = new tk::dnn::Conv2d(net, 80, 1, 1, 1, 1, 0, 0, (wgs_path + hm_conv2_bin).c_str(), false);
+//    int kernel = 3; 
+//    int pad = (kernel - 1)/2;
+//    tk::dnn::Activation *hm_sig      = new tk::dnn::Activation(net, tk::dnn::ACTIVATION_LOGISTIC);
+//    hm_sig->setFinal();
+//    tk::dnn::Pooling  *hmax                 = new tk::dnn::Pooling(net, kernel, kernel, 1, 1, pad, pad, tk::dnn::POOLING_MAX);
+//    hmax->setFinal();
+//
+//    // // wh
+//    tk::dnn::Route    *route_1_0             = new tk::dnn::Route(net, route_1_0_layers, 1);
+//    tk::dnn::Conv2d     *wh_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + wh_conv1_bin).c_str(), false);
+//    tk::dnn::Activation *wh_relu1      = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::Conv2d     *wh = new tk::dnn::Conv2d(net, 2, 1, 1, 1, 1, 0, 0, (wgs_path + wh_conv2_bin).c_str(), false);        
+//    wh->setFinal();
+//    
+//    // // reg
+//    tk::dnn::Route    *route_2_0             = new tk::dnn::Route(net, route_1_0_layers, 1);
+//    tk::dnn::Conv2d     *reg_conv1 = new tk::dnn::Conv2d(net, 256, 3, 3, 1, 1, 1, 1, (wgs_path + reg_conv1_bin).c_str(), false);
+//    tk::dnn::Activation *reg_relu1      = new tk::dnn::Activation(net, CUDNN_ACTIVATION_RELU);
+//    tk::dnn::Conv2d     *reg = new tk::dnn::Conv2d(net, 2, 1, 1, 1, 1, 0, 0, (wgs_path + reg_conv2_bin).c_str(), false);
+//    reg->setFinal();
+//#pragma GCC diagnostic pop
+//	input_dim.width = net->input_dim.w;
+//	input_dim.height = net->input_dim.h;
+//	input_dim.channel = net->input_dim.c;
+//
+//	net->fileImgList = centernetAppConfig.calib_image_path;
+//	net->num_calib_images = centernetAppConfig.calib_images_num;
+//
+//	return net;
+//}
 
 void CenternetApplication::initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number)
 {

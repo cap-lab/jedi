@@ -9,9 +9,11 @@
 
 #include "config.h"
 #include "variable.h"
-#include "model.h"
+//#include "model.h"
 
 #include "inference_application.h"
+
+#include "tkdnn_network.h"
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
@@ -24,8 +26,11 @@ bool exit_flag = false;
 static void printRouteShortCutRange(ConfigData *config_data, std::string output_file_name, int instance_id, std::vector<IInferenceApplication *> apps)
 {
 	tk::dnn::Network *net = NULL;
+	TkdnnNetwork *tkdnn_network = nullptr;
 
-	net = apps[instance_id]->createNetwork(&(config_data->instances.at(instance_id)));
+
+	tkdnn_network = dynamic_cast<TkdnnNetwork *>(apps[instance_id]->createNetwork(&(config_data->instances.at(instance_id))));
+	net = tkdnn_network->net;
 	std::ofstream writeFile(output_file_name.data());
 
 	if(writeFile.is_open())

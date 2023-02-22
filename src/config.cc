@@ -98,6 +98,23 @@ void ConfigData::readApplicationType(Setting &setting, ConfigInstance &config_in
 	}
 }
 
+void ConfigData::readNetworkModelType(Setting &setting, ConfigInstance &config_instance) {
+	try{
+		const char *tmp = setting["model_type"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+		config_instance.model_type = data.c_str();
+
+		std::cerr<<"model_type: "<< config_instance.model_type << std::endl;
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'model_type' setting in configuration file. Set TkdnnModel as a default." << std::endl;
+		config_instance.model_type = "TkdnnModel";
+	}
+}
+
+
 
 void ConfigData::readBatch(Setting &setting, ConfigInstance &config_instance){
 	try {
@@ -330,6 +347,7 @@ ConfigData::ConfigData(std::string config_file_path, std::vector<IInferenceAppli
 			ConfigInstance config_instance;	
 			instances.push_back(config_instance);
 
+			readNetworkModelType(settings[iter], instances.at(iter));
 			readApplicationType(settings[iter], instances.at(iter));
 			readNetworkName(settings[iter], instances.at(iter));
 			readModelDir(settings[iter], instances.at(iter));

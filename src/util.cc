@@ -1,6 +1,6 @@
 #include "config.h"
 #include "variable.h"
-#include "model.h"
+//#include "model.h"
 #include "dataset.h"
 #include "thread.h"
 #include "coco.h"
@@ -12,6 +12,14 @@ long getTime() {
 		exit(-1);
 	}
 	return (time.tv_nsec) / 1000 + time.tv_sec * 1000000;
+}
+
+
+bool fileExist(std::string fname) {
+    std::ifstream dataFile (fname.c_str(), std::ios::in | std::ios::binary);
+    if(!dataFile)
+    	return false;
+    return true;
 }
 
 

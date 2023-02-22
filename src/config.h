@@ -36,6 +36,7 @@ class ConfigData {
 		void readStreams(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readCalibTable(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readApplicationType(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readNetworkModelType(libconfig::Setting &setting, ConfigInstance &config_instance);
 };
 
 #endif

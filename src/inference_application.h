@@ -7,9 +7,10 @@
 #include <boost/function/function0.hpp>
 
 #include <libconfig.h++>
-#include <tkDNN/tkdnn.h>
 
 #include "config_data.h"
+
+#include "jedi_network.h"
 
 #ifndef IN
 	#define IN
@@ -18,6 +19,7 @@
 #ifndef OUT
 	#define OUT
 #endif
+
 
 class IInferenceApplication {
 	public:
@@ -28,10 +30,16 @@ class IInferenceApplication {
 		virtual void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) {};
 		virtual void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) = 0;
 		virtual void postprocessing2(int thread_id, int sample_index, int batch) = 0;
-		virtual tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) = 0;
-		virtual void referNetworkRTInfo(int device_id, tk::dnn::NetworkRT *networkRT) {};
+		//virtual std::string getInputModelName() = 0;
+		//virtual tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) = 0;
+		virtual IJediNetwork *createNetwork(ConfigInstance *basic_config_data) = 0;
+
 		virtual void readCustomOptions(libconfig::Setting &setting) {};
+		//virtual void initializeInference() = 0;
+		//virtual void finalizeInference() {};
+		//void registerModel(std::string model_type) { g_InputModelRegistry.create(model_type); }
 	private:
+		//IInputModel *input_model;
 };
 
 

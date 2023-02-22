@@ -5,12 +5,13 @@
 #include <cctype>
 
 #include <NvInfer.h>
-#include <tkDNN/tkdnn.h>
-#include <tkDNN/DarknetParser.h>
+//#include <tkDNN/tkdnn.h>
+//#include <tkDNN/DarknetParser.h>
 
 #include "cuda.h"
 
 #include "model.h"
+#include "stage.h"
 #include "variable.h"
 
 Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_index, int end_index) {
@@ -23,12 +24,14 @@ Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_i
 	this->stream_num = config_data->instances.at(instance_id).stream_numbers[stage_id];
 	this->buffer_num = config_data->instances.at(instance_id).buffer_num;
 
-	this->input_size_map = std::map<std::pair<int, int>, int>();
-	this->output_size_map = std::map<std::pair<int, int>, int>();
+	this->input_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
+	this->output_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
+
+	this->batch = this->config_data->instances.at(instance_id).batch;
 }
 
 Stage::~Stage() {
-	netRTs.clear();
+	engines.clear();
 	contexts.clear();
 	streams.clear();
 	events.clear();
@@ -36,19 +39,38 @@ Stage::~Stage() {
 
 void Stage::createExecutionContext() {
 	for(int iter1 = 0; iter1 < stream_num; iter1++) {
-		int size = netRTs.size();
+		int size = engines.size();
 		int index = size == 1 ? 0 : iter1 % DLA_NUM;
+		bool isImplicit = engines[index]->hasImplicitBatchDimension();
 
-		nvinfer1::IExecutionContext *context = netRTs[index]->engineRT->createExecutionContext();
+		nvinfer1::IExecutionContext *context = engines[index]->createExecutionContext();
 		assert(context);
+
+		binding_num = engines[index]->getNbIOTensors();
+		for(int iter2 = 0; iter2 < binding_num; iter2++) {
+			auto const& name = engines[index]->getIOTensorName(iter2);
+			auto const& mode = engines[index]->getTensorIOMode(name);
+			nvinfer1::Dims dims = engines[index]->getTensorShape(name);
+
+			if(mode == nvinfer1::TensorIOMode::kINPUT) {
+				if(!isImplicit) {
+					context->setInputShape(name, dims);
+				}
+				if(iter1 == 0) {
+					std::string _name(name);
+					input_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
+				}
+			}
+			else {
+				if(iter1 == 0) {
+					std::string _name(name);
+					output_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
+				}
+			}
+		}
 
 		contexts.push_back(context);
 	}
-}
-
-void Stage::setInputOutputLayerId(tk::dnn::Network *net) {
-	input_size_map = tk::dnn::NetworkRT::getInputPair(net, start_index, end_index);
-	output_size_map = tk::dnn::NetworkRT::getOutputPair(net, start_index, end_index);
 }
 
 void Stage::allocateStream() {
@@ -78,57 +100,56 @@ void Stage::deallocateStream() {
 	events.clear();
 }
 
-void Stage::setBuffers(int buffer_id, std::map<std::pair<int, int>, void*> stream_buffers_map) {
-	std::vector<void *> buffers;
-	std::vector<int> input_indexes, output_indexes;
-	
-	for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
-		auto pair_ids = iter->first;
-		int src_id = pair_ids.first;
-		int dst_id = pair_ids.second;
+void Stage::setBuffers(int buffer_id, std::map<std::string, void*> stream_buffers_map) {
+    std::vector<void *> buffers;
 
-		if(dst_id >= start_index && dst_id <= end_index) {
-			if(std::find(input_indexes.begin(), input_indexes.end(), src_id) == input_indexes.end()) {
-				buffers.push_back(iter->second);
-				input_indexes.push_back(src_id);
-			}
-		}
-	}
+    for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
+        std::string tensor_name = iter->first;
 
-	for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
-		auto pair_ids = iter->first;
-		int src_id = pair_ids.first;
+        auto iter2 = stream_buffers_map.find(tensor_name);
+        if(iter2 != stream_buffers_map.end()) {
+            void *space = iter2->second;
+            buffers.push_back(space);
+        }
+    }
 
-		if(src_id >= start_index && src_id <= end_index) {
-			if(std::find(output_indexes.begin(), output_indexes.end(), src_id) == output_indexes.end()) {
-				buffers.push_back(iter->second);
-				output_indexes.push_back(src_id);
-			}
-		}
-	}
+    for(auto iter = output_size_vec.begin(); iter != output_size_vec.end(); iter++) {
+        std::string tensor_name = iter->first;
 
-	stage_buffers.push_back(buffers);
+        auto iter2 = stream_buffers_map.find(tensor_name);
+        if(iter2 != stream_buffers_map.end()) {
+            void *space = iter2->second;
+            buffers.push_back(space);
+        }
+    }
+
+    stage_buffers.push_back(buffers);
 }
 
-void Stage::setSignals(int buffer_id, std::map<std::pair<int, int>, bool*> signals_map) {
-	std::vector<bool *> input_signals;
-	std::vector<bool *> output_signals;
+void Stage::setSignals(int buffer_id, std::map<std::string, bool*> signals_map) {
+    std::vector<bool *> input_signals;
+    std::vector<bool *> output_signals;
 
-	for(auto iter = signals_map.begin(); iter != signals_map.end(); iter++) {
-		auto pair_ids = iter->first;
-		int src_id = pair_ids.first;
-		int dst_id = pair_ids.second;
+    for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
+        std::string tensor_name = iter->first;
 
-		if(dst_id >= start_index && dst_id <= end_index) {
-			input_signals.push_back(iter->second);
-		}
-		if(src_id >= start_index && src_id <= end_index) {
-			output_signals.push_back(iter->second);
-		}
-	}
+        auto iter2 = signals_map.find(tensor_name);
+        if(iter2 != signals_map.end()) {
+            input_signals.push_back(iter2->second);
+        }
+    }
 
-	stage_input_signals.push_back(input_signals);
-	stage_output_signals.push_back(output_signals);
+    for(auto iter = output_size_vec.begin(); iter != output_size_vec.end(); iter++) {
+        std::string tensor_name = iter->first;
+
+        auto iter2 = signals_map.find(tensor_name);
+        if(iter2 != signals_map.end()) {
+            output_signals.push_back(iter2->second);
+        }
+    }
+
+    stage_input_signals.push_back(input_signals);
+    stage_output_signals.push_back(output_signals);
 }
 
 bool Stage::isRunnable(int buffer_id) {
@@ -169,19 +190,18 @@ void Stage::finalizeStage() {
 		nvinfer1::IExecutionContext *context = contexts[iter1];		
 		delete context;
 	}
-
-	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
-		delete netRTs[iter1];
-	}
 }
 
 void Stage::getBindingsDataType() {
-	std::cerr<<"stage_id: "<<stage_id<<std::endl;
+    std::cerr<<"stage_id: "<<stage_id<<std::endl;
 
-    for(int iter = 0; iter < netRTs[0]->engineRT->getNbBindings(); iter++) {
-		int type = (int)netRTs[0]->engineRT->getBindingDataType(iter);	
-		int format = (int)netRTs[0]->engineRT->getBindingFormat(iter);	
-		std::cerr<<"iter: "<<iter<<" type: "<<type<<std::endl;
-		std::cerr<<"iter: "<<iter<<" binding format: "<<format<<std::endl;
+    for(int iter = 0; iter < engines[0]->getNbIOTensors(); iter++) {
+        auto const& name = engines[0]->getIOTensorName(iter);
+        int type = (int)engines[0]->getTensorDataType(name);
+        int format = (int)engines[0]->getTensorFormat(name);
+        std::cerr<<"iter: "<<iter<<" type: "<<type<<std::endl;
+        std::cerr<<"iter: "<<iter<<" binding format: "<<format<<std::endl;
     }
 }
+
+

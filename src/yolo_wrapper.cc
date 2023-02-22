@@ -108,7 +108,7 @@ static int yolo_nms_comparator(const void *pa, const void *pb)
 	return 0;
 }
 
-static int entry_yolo_index(int b, int location, int entry, int width, int height, int channel) {
+int entry_yolo_index(int b, int location, int entry, int width, int height, int channel) {
 	int n =   location / (width*height);
 	int loc = location % (width*height);
 
