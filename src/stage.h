@@ -15,6 +15,7 @@
 #include "config.h"
 
 #include "cuda.h"
+#include "binding.h"
 
 class Stage {
 	public:
@@ -23,6 +24,7 @@ class Stage {
 		std::vector<cudaStream_t> streams;
 		std::vector<cudaEvent_t> events;
 
+		std::vector<TensorAllocator *> tensor_allocators;
 
 		std::vector<std::vector<void *>> stage_buffers;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> input_size_vec;
@@ -38,6 +40,8 @@ class Stage {
 		void allocateStream();
 		void deallocateStream();
 		void setBuffers(int buffer_id, std::map<std::string, void*> stream_buffers_map);
+		uint64_t getSizeByTensorName(bool isInput, std::string name);
+		void setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<float *> input_buffers, std::vector<float *> output_buffers);
 		void setSignals(int buffer_id, std::map<std::string, bool*> signals_map);
 		bool isRunnable(int buffer_id);
 		void updateInputSignals(int buffer_id, bool value);
@@ -53,6 +57,7 @@ class Stage {
 		int end_index;
 		int stream_num;
 		int buffer_num;
+		int device_num;
 
 		std::vector<std::vector<bool *>> stage_input_signals;
 		std::vector<std::vector<bool *>> stage_output_signals;

@@ -48,6 +48,8 @@ class Model {
 		void updateInputSignals(int buffer_id, bool value);
 		void updateOutputSignals(int buffer_id, bool value);
 
+		void setTensorAllocator();
+
 	protected:
 		ConfigData *config_data;
 		int instance_id;
@@ -62,6 +64,8 @@ class Model {
 
 		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::vector<float *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
 		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
+		void setBindingForContext(Stage *stage, int stream_id, int buffer_id);
+		void setStreamBuffers(Stage *stage, int stream_id, int buffer_id);
 };
 
 class NetworkModelRegistry

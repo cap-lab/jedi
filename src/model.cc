@@ -72,6 +72,7 @@ void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::
 		cudaHostGetDevicePointer(&(space), buf, 0); 
 		buffers.push_back(buf);
 		stream_buffers_map.insert(std::make_pair(tensor_name, space));
+		// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space, buf);
 
 		signals.push_back(signal);
 		signals_map.insert(std::make_pair(tensor_name, signal));
@@ -97,6 +98,7 @@ void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vecto
 			bool *signal = new bool(false);
 
 			space = makeCUDAArray(size);
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space);
 
 			stream_buffers_map.insert(std::make_pair(tensor_name, space));
 			signals_map.insert(std::make_pair(tensor_name, signal));
@@ -181,6 +183,30 @@ void Model::setBufferForStage() {
 			Stage *stage = stages[iter2];
 			stage->setBuffers(iter1, all_stream_buffers[iter1]);
 			stage->setSignals(iter1, all_signals[iter1]);
+
+			/*
+			fprintf(stderr, "[%s:%s:%d] iter2: %d\n", __FILE__, __func__, __LINE__, iter2);
+			if(iter2 == 0) {
+				stage->setTensorAllocators(iter1, all_stream_buffers[iter1], net_input_buffers[iter1]);
+			}
+			else if(iter2 == device_num-1) {
+				stage->setTensorAllocators(iter1, all_stream_buffers[iter1], net_output_buffers[iter1]);
+			}
+			*/
+		}
+	}
+}
+
+void Model::setTensorAllocator() {
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+	int stage_num = stages.size();
+
+	for(int iter1 = 0; iter1 < buffer_num; iter1++) {
+		for(int iter2 = 0; iter2 < stage_num; iter2++) {
+			Stage *stage = stages[iter2];
+
+			// fprintf(stderr, "[%s:%s:%d] iter2: %d\n", __FILE__, __func__, __LINE__, iter2);
+			stage->setTensorAllocators(iter1, all_stream_buffers[iter1], net_input_buffers[iter1], net_output_buffers[iter1]);
 		}
 	}
 }
@@ -227,6 +253,7 @@ void Model::initializeBuffers() {
 	allocateStream();
 	allocateBuffer();
 	setBufferForStage();
+	setTensorAllocator();
 }
 
 void Model::finalizeBuffers() {
@@ -262,14 +289,56 @@ bool Model::checkInferenceDone(int device_id, int stream_id) {
 	}
 }
 
-void Model::infer( int device_id, int stream_id, int buffer_id) {
+void Model::setBindingForContext(Stage *stage, int stream_id, int buffer_id) {
+	auto context = stage->contexts[stream_id];
+	int binding_num = context->getEngine().getNbIOTensors();
+	
+	for(int iter1 = 0; iter1 < binding_num; iter1++) {
+		auto const& name = context->getEngine().getIOTensorName(iter1);
+		auto const& mode = context->getEngine().getTensorIOMode(name);
+		bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
+		bool result = false;
+		std::string _name(name);
+
+		if(!isInput) {
+			result = context->setOutputAllocator(name, stage->tensor_allocators[iter1]);
+			assert(result);
+
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, stage->tensor_allocators[iter1]->getBuf(), stage->tensor_allocators[iter1]->getHostBuf());
+		}
+		else {
+			result = context->setTensorAddress(name, stage->tensor_allocators[iter1]->getBuf());	
+			assert(result);
+
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, stage->tensor_allocators[iter1]->getBuf(), stage->tensor_allocators[iter1]->getHostBuf());
+		}		
+		all_stream_buffers[buffer_id][_name] = stage->tensor_allocators[iter1]->getBuf();
+	}
+}
+
+void Model::setStreamBuffers(Stage *stage, int stream_id, int buffer_id) {
+	auto context = stage->contexts[stream_id];
+	for(int iter = 0; iter < stage->binding_num; iter++) {
+		auto const& name = context->getEngine().getIOTensorName(iter);
+		std::string _name(name);
+		stage->stage_buffers[buffer_id][iter] = all_stream_buffers[buffer_id][_name];
+	}
+}
+
+void Model::infer(int device_id, int stream_id, int buffer_id) {
 	Stage *stage = stages[device_id];
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
 
-
 	if(!stage->contexts[stream_id]->getEngine().hasImplicitBatchDimension()) {
-		enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
+		stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
+		setBindingForContext(stage, stream_id, buffer_id);
+		enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
+
+		// std::cerr<<"["<<__FILE__<<"::"<<__func__<<"::"<<__LINE__<<"]"<<std::endl;
+
+		// setStreamBuffers(stage, stream_id, buffer_id);
+		// enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 	}
 	else {
 		enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
