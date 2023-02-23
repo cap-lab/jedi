@@ -20,6 +20,11 @@
 
 #include "yolo_onnx_application.h"
 
+
+#include <tkDNN/tkdnn.h>
+#include <tkDNN/Int8BatchStream.h>
+#include <tkDNN/Int8Calibrator.h>
+
 #define NMS 0.45
 
 
@@ -70,6 +75,34 @@ void YoloOnnxApplication::readOnnxFilePath(libconfig::Setting &setting) {
 		std::cerr << "No 'onnx_file_path' setting in configuration file." << std::endl;
 	}
 }
+
+void YoloOnnxApplication::readCalibImagePath(libconfig::Setting &setting) {
+	try{	
+		const char *tmp = setting["calib_image_path"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+		yoloOnnxAppConfig.calib_image_path = data.c_str();
+
+		std::cerr<<"calib_image_path: "<<yoloOnnxAppConfig.calib_image_path<<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'calib_image_path' setting in configuration file." << std::endl;
+	}
+}
+
+void YoloOnnxApplication::readCalibImagesNum(libconfig::Setting &setting){
+	try {
+		const char *data = setting["calib_images_num"];
+		yoloOnnxAppConfig.calib_images_num = atoi(data);
+
+		std::cerr<<"calib_images_num: "<<yoloOnnxAppConfig.calib_images_num<<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'calib_images_num' setting in configuration file." <<std::endl;
+	}
+}
+
 
 
 void YoloOnnxApplication::readImagePath(libconfig::Setting &setting) {
@@ -124,6 +157,8 @@ void YoloOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readImagePath(setting);
 	readNamePath(setting);
 	readOpenCVParallelNum(setting);
+	readCalibImagePath(setting);
+	readCalibImagesNum(setting);
 }
 
 IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_data)
@@ -167,6 +202,11 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	input_dim.channel = tensor_dim.d[1];
 	input_dim.width = tensor_dim.d[2];
 	input_dim.height = tensor_dim.d[3];
+	dataDim_t dim(tensor_dim.d[0],tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
+	BatchStream *calibrationStream = new BatchStream(dim, 1, yoloOnnxAppConfig.calib_images_num, yoloOnnxAppConfig.calib_image_path);
+	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, yoloOnnxAppConfig.onnx_file_path + "-calibration.table" , "data");
+	jedi_network->calibrator = calibrator;
+
 	{
 		YoloData yolo;
 
@@ -176,8 +216,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 19;
-		yolo.width = 19;
+		yolo.height = 13; // image height / 32
+		yolo.width = 13; // image width / 32
 		yolo.channel = 255;
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
@@ -194,8 +234,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 38;
-		yolo.width = 38;
+		yolo.height = 26;  // image height / 16
+		yolo.width = 26; // image width / 16
 		yolo.channel = 255;
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
@@ -212,8 +252,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 76;
-		yolo.width = 76;
+		yolo.height = 52;  // image height / 8
+		yolo.width = 52;  // image width / 8
 		yolo.channel = 255;
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
