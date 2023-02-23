@@ -60,14 +60,13 @@ class Model {
 		void deallocateStream();
 		void* makeCUDAArray(int size);
 
-        void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::vector<float *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
-        void* getOutputBufferOfLayer(std::map<std::string, void*>& stream_buffers_map, std::string target_tensor_name);
-        void allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
+		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::vector<float *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
+		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
 };
 
 class NetworkModelRegistry
 {
-  typedef boost::function3<Model *, ConfigData *, int, IInferenceApplication *> Creator;
+	typedef boost::function3<Model *, ConfigData *, int, IInferenceApplication *> Creator;
   typedef std::map<std::string, Creator> Creators;
   Creators m_Creators;
 

@@ -101,55 +101,55 @@ void Stage::deallocateStream() {
 }
 
 void Stage::setBuffers(int buffer_id, std::map<std::string, void*> stream_buffers_map) {
-    std::vector<void *> buffers;
+	std::vector<void *> buffers;
 
-    for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
-        std::string tensor_name = iter->first;
+	for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
+		std::string tensor_name = iter->first;
 
-        auto iter2 = stream_buffers_map.find(tensor_name);
-        if(iter2 != stream_buffers_map.end()) {
-            void *space = iter2->second;
-            buffers.push_back(space);
-        }
-    }
+		auto iter2 = stream_buffers_map.find(tensor_name);
+		if(iter2 != stream_buffers_map.end()) {
+			void *space = iter2->second;
+			buffers.push_back(space);
+		}
+	}
 
-    for(auto iter = output_size_vec.begin(); iter != output_size_vec.end(); iter++) {
-        std::string tensor_name = iter->first;
+	for(auto iter = output_size_vec.begin(); iter != output_size_vec.end(); iter++) {
+		std::string tensor_name = iter->first;
 
-        auto iter2 = stream_buffers_map.find(tensor_name);
-        if(iter2 != stream_buffers_map.end()) {
-            void *space = iter2->second;
-            buffers.push_back(space);
-        }
-    }
+		auto iter2 = stream_buffers_map.find(tensor_name);
+		if(iter2 != stream_buffers_map.end()) {
+			void *space = iter2->second;
+			buffers.push_back(space);
+		}
+	}
 
-    stage_buffers.push_back(buffers);
+	stage_buffers.push_back(buffers);
 }
 
 void Stage::setSignals(int buffer_id, std::map<std::string, bool*> signals_map) {
-    std::vector<bool *> input_signals;
-    std::vector<bool *> output_signals;
+	std::vector<bool *> input_signals;
+	std::vector<bool *> output_signals;
 
-    for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
-        std::string tensor_name = iter->first;
+	for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
+		std::string tensor_name = iter->first;
 
-        auto iter2 = signals_map.find(tensor_name);
-        if(iter2 != signals_map.end()) {
-            input_signals.push_back(iter2->second);
-        }
-    }
+		auto iter2 = signals_map.find(tensor_name);
+		if(iter2 != signals_map.end()) {
+			input_signals.push_back(iter2->second);
+		}
+	}
 
-    for(auto iter = output_size_vec.begin(); iter != output_size_vec.end(); iter++) {
-        std::string tensor_name = iter->first;
+	for(auto iter = output_size_vec.begin(); iter != output_size_vec.end(); iter++) {
+		std::string tensor_name = iter->first;
 
-        auto iter2 = signals_map.find(tensor_name);
-        if(iter2 != signals_map.end()) {
-            output_signals.push_back(iter2->second);
-        }
-    }
+		auto iter2 = signals_map.find(tensor_name);
+		if(iter2 != signals_map.end()) {
+			output_signals.push_back(iter2->second);
+		}
+	}
 
-    stage_input_signals.push_back(input_signals);
-    stage_output_signals.push_back(output_signals);
+	stage_input_signals.push_back(input_signals);
+	stage_output_signals.push_back(output_signals);
 }
 
 bool Stage::isRunnable(int buffer_id) {
