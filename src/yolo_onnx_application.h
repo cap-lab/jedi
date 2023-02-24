@@ -13,8 +13,10 @@
 
 typedef struct _YoloOnnxAppConfig {
 	std::string onnx_file_path;
+	std::string calib_image_path;
 	std::string image_path;
 	std::string name_path;
+	int calib_images_num;
 	int opencv_parallel_num;
 } YoloOnnxAppConfig;
 
@@ -43,6 +45,8 @@ class YoloOnnxApplication : public IInferenceApplication {
 		std::string network_name;
 
 		void readOnnxFilePath(libconfig::Setting &setting);
+		void readCalibImagePath(libconfig::Setting &setting);
+		void readCalibImagesNum(libconfig::Setting &setting);
 		void readImagePath(libconfig::Setting &setting);
 		void readNamePath(libconfig::Setting &setting);
 		void readOpenCVParallelNum(libconfig::Setting &setting);

@@ -11,7 +11,6 @@
 #include "variable.h"
 #include "util.h"
 
-//#include "tkdnn_network.h"
 
 #include "onnx_model.h"
 
@@ -159,18 +158,9 @@ void OnnxModel::initializeModel() {
 			if(data_type == TYPE_FP16 && builder->platformHasFastFp16()) {
 				config->setFlag(BuilderFlag::kFP16);
 			}
-			else if(data_type == TYPE_INT8) {  	// int8 option
-				/*
-				   config->setFlag(BuilderFlag::kINT8);
-				   dataDim_t dim = net->layers[start_index]->input_dim;
-				   BatchStream calibrationStream(dim, 1, net->num_calib_images, net->fileImgList);
-
-				   std::string calib_table_name = std::string(name);
-				   calib_table_name = calib_table_name.substr(0, calib_table_name.rfind('.')) + "-calibration.table";
-
-				   calibrator.reset(new Int8EntropyCalibrator(calibrationStream, 1, calib_table_name, "data"));
-				   config->setInt8Calibrator(calibrator.get());
-				   */
+			else if(data_type == TYPE_INT8 && builder->platformHasFastInt8()) {  	// int8 option
+				config->setFlag(BuilderFlag::kINT8);
+				config->setInt8Calibrator(tensorrt_network->calibrator);
 			}
 
 			IHostMemory *serializedModel = builder->buildSerializedNetwork(*network, *config);
@@ -183,6 +173,7 @@ void OnnxModel::initializeModel() {
 			//delete builder;
 
 			delete serializedModel;
+			delete tensorrt_network->calibrator;
 		}
 
 		
@@ -227,8 +218,6 @@ void OnnxModel::initializeModel() {
 	//delete config;
 	delete builder;
 
-	//config->canRunOnDLA(Ilay) == true
-	//config->setDeviceType(Ilay, DeviceType::kDLA)
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		Stage *stage = stages[iter1];
