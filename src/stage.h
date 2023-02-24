@@ -24,13 +24,13 @@ class Stage {
 		std::vector<cudaStream_t> streams;
 		std::vector<cudaEvent_t> events;
 
-		std::vector<TensorAllocator *> tensor_allocators;
+		// std::vector<std::vector<TensorAllocator *>> tensor_allocators;
+		std::vector<std::vector<std::vector<TensorAllocator *>>> tensor_allocators;
 
 		std::vector<std::vector<void *>> stage_buffers;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> input_size_vec;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> output_size_vec;
 
-		int batch;
 		int binding_num;
 
 		Stage(ConfigData *config_data, int instance_id, int stage_id, int start_index, int end_index);
@@ -58,6 +58,10 @@ class Stage {
 		int stream_num;
 		int buffer_num;
 		int device_num;
+		int batch;
+		int input_binding_num;
+		int output_binding_num;
+		int data_type;
 
 		std::vector<std::vector<bool *>> stage_input_signals;
 		std::vector<std::vector<bool *>> stage_output_signals;

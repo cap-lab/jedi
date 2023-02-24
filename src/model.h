@@ -48,8 +48,6 @@ class Model {
 		void updateInputSignals(int buffer_id, bool value);
 		void updateOutputSignals(int buffer_id, bool value);
 
-		void setTensorAllocator();
-
 	protected:
 		ConfigData *config_data;
 		int instance_id;

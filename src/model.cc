@@ -183,29 +183,6 @@ void Model::setBufferForStage() {
 			Stage *stage = stages[iter2];
 			stage->setBuffers(iter1, all_stream_buffers[iter1]);
 			stage->setSignals(iter1, all_signals[iter1]);
-
-			/*
-			fprintf(stderr, "[%s:%s:%d] iter2: %d\n", __FILE__, __func__, __LINE__, iter2);
-			if(iter2 == 0) {
-				stage->setTensorAllocators(iter1, all_stream_buffers[iter1], net_input_buffers[iter1]);
-			}
-			else if(iter2 == device_num-1) {
-				stage->setTensorAllocators(iter1, all_stream_buffers[iter1], net_output_buffers[iter1]);
-			}
-			*/
-		}
-	}
-}
-
-void Model::setTensorAllocator() {
-	int buffer_num = config_data->instances.at(instance_id).buffer_num;
-	int stage_num = stages.size();
-
-	for(int iter1 = 0; iter1 < buffer_num; iter1++) {
-		for(int iter2 = 0; iter2 < stage_num; iter2++) {
-			Stage *stage = stages[iter2];
-
-			// fprintf(stderr, "[%s:%s:%d] iter2: %d\n", __FILE__, __func__, __LINE__, iter2);
 			stage->setTensorAllocators(iter1, all_stream_buffers[iter1], net_input_buffers[iter1], net_output_buffers[iter1]);
 		}
 	}
@@ -253,7 +230,6 @@ void Model::initializeBuffers() {
 	allocateStream();
 	allocateBuffer();
 	setBufferForStage();
-	setTensorAllocator();
 }
 
 void Model::finalizeBuffers() {
@@ -299,20 +275,24 @@ void Model::setBindingForContext(Stage *stage, int stream_id, int buffer_id) {
 		bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
 		bool result = false;
 		std::string _name(name);
+		TensorAllocator *allocator = stage->tensor_allocators[buffer_id][stream_id][iter1];
 
 		if(!isInput) {
-			result = context->setOutputAllocator(name, stage->tensor_allocators[iter1]);
+			result = context->setOutputAllocator(name, allocator);
 			assert(result);
 
-			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, stage->tensor_allocators[iter1]->getBuf(), stage->tensor_allocators[iter1]->getHostBuf());
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, allocator->getBuf(), allocator->getHostBuf());
 		}
 		else {
-			result = context->setTensorAddress(name, stage->tensor_allocators[iter1]->getBuf());	
+			result = context->setTensorAddress(name, allocator->getBuf());	
 			assert(result);
 
-			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, stage->tensor_allocators[iter1]->getBuf(), stage->tensor_allocators[iter1]->getHostBuf());
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, allocator->getBuf(), allocator->getHostBuf());
 		}		
-		all_stream_buffers[buffer_id][_name] = stage->tensor_allocators[iter1]->getBuf();
+
+		if(allocator->getIsReallocated()) {
+			all_stream_buffers[buffer_id][_name] = allocator->getBuf();
+		}
 	}
 }
 
@@ -331,14 +311,12 @@ void Model::infer(int device_id, int stream_id, int buffer_id) {
 	bool enqueueSuccess = false;
 
 	if(!stage->contexts[stream_id]->getEngine().hasImplicitBatchDimension()) {
-		stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
-		setBindingForContext(stage, stream_id, buffer_id);
-		enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
-
-		// std::cerr<<"["<<__FILE__<<"::"<<__func__<<"::"<<__LINE__<<"]"<<std::endl;
+		// stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
+		// setBindingForContext(stage, stream_id, buffer_id);
+		// enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
 
 		// setStreamBuffers(stage, stream_id, buffer_id);
-		// enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
+		enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 	}
 	else {
 		enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));

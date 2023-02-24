@@ -9,7 +9,7 @@
 
 class TensorAllocator : public nvinfer1::IOutputAllocator {
 	public:
-		TensorAllocator(bool is_host_allocated, void *_buf, float *_host_buf, uint64_t _size) : is_host_allocated(is_host_allocated), buf(_buf), host_buf(_host_buf), size(_size) {}
+		TensorAllocator(bool is_host_allocated, void *_buf, float *_host_buf, uint64_t _size, nvinfer1::DataType _data_type) : is_host_allocated(is_host_allocated), buf(_buf), host_buf(_host_buf), size(_size), data_type(_data_type) {}
 
 		void allocate(uint64_t _size)
 		{
@@ -29,11 +29,14 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 				host_buf = nullptr;
 			}
 			size = _size;
+			is_reallocated = true;
 		}
 
 		void* reallocateOutput(char const* tensorName, void* currentMemory, uint64_t size, uint64_t alignment) noexcept override
 		{
 			// std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" size: "<<size<<std::endl;
+
+			is_reallocated = false;
 
 			size = std::max(size, static_cast<uint64_t>(1));
 			if (size > this->size) {
@@ -50,6 +53,8 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 
 		float* getHostBuf() { return host_buf; }
 
+		bool getIsReallocated() { return is_reallocated; }
+
 		virtual ~TensorAllocator() {}
 
 	private:
@@ -58,6 +63,7 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 		float *host_buf{nullptr};
 		uint64_t size{0};
 		nvinfer1::DataType data_type{nvinfer1::DataType::kFLOAT};
+		bool is_reallocated{false};
 };
 
 #endif

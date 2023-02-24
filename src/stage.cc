@@ -24,11 +24,22 @@ Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_i
 	this->stream_num = config_data->instances.at(instance_id).stream_numbers[stage_id];
 	this->buffer_num = config_data->instances.at(instance_id).buffer_num;
 	this->device_num = config_data->instances.at(instance_id).device_num;
+	this->data_type = config_data->instances.at(instance_id).data_type;
 
 	this->input_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
 	this->output_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
 
 	this->batch = this->config_data->instances.at(instance_id).batch;
+
+	this->binding_num = 0;
+	this->input_binding_num = 0;
+	this->output_binding_num = 0;
+
+	this->tensor_allocators = std::vector<std::vector<std::vector<TensorAllocator *>>>();
+	for(int iter = 0; iter < buffer_num; iter++) {
+		std::vector<std::vector<TensorAllocator *>> tensor_allocator;
+		this->tensor_allocators.push_back(tensor_allocator);
+	}
 }
 
 Stage::~Stage() {
@@ -61,12 +72,14 @@ void Stage::createExecutionContext() {
 				if(iter1 == 0) {
 					std::string _name(name);
 					input_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
+					input_binding_num++;
 				}
 			}
 			else {
 				if(iter1 == 0) {
 					std::string _name(name);
 					output_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
+					output_binding_num++;
 				}
 			}
 		}
@@ -136,7 +149,7 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 	uint64_t size = 1;
 
 	if(isInput) {
-		for(int iter1 = 0; iter1 < input_size_vec.size(); iter1++) {
+		for(unsigned int iter1 = 0; iter1 < input_size_vec.size(); iter1++) {
 			if(name.compare(input_size_vec[iter1].first) == 0) {
 				dims = input_size_vec[iter1].second;
 
@@ -148,7 +161,7 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 		}
 	}
 	else {
-		for(int iter1 = 0; iter1 < output_size_vec.size(); iter1++) {
+		for(unsigned int iter1 = 0; iter1 < output_size_vec.size(); iter1++) {
 			if(name.compare(output_size_vec[iter1].first) == 0) {
 				dims = output_size_vec[iter1].second;
 
@@ -166,25 +179,29 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<float *> input_buffers, std::vector<float *> output_buffers) {
 	for(int iter1 = 0; iter1 < stream_num; iter1++) {
 		auto context = contexts[iter1];
+		std::vector<TensorAllocator *> tensor_allocator;
+		nvinfer1::DataType dtype = (data_type == TYPE_FP32) ? nvinfer1::DataType::kFLOAT : nvinfer1::DataType::kHALF;
 
 		for(int iter2 = 0; iter2 < binding_num; iter2++) {
 			auto const& name = context->getEngine().getIOTensorName(iter2);
 			auto const& mode = context->getEngine().getTensorIOMode(name);
-			bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
+			bool is_input = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
 			std::string _name(name);
 
 			bool is_host_allocated = false;
-			if( (stage_id == 0 && isInput) || ((stage_id == (device_num-1)) && !isInput) ) 
+			if( (stage_id == 0 && is_input) || ((stage_id == (device_num-1)) && !is_input) ) 
 				is_host_allocated = true;
-			uint64_t size = getSizeByTensorName(isInput, _name);
+			uint64_t size = getSizeByTensorName(is_input, _name);
 			void *buf = stream_buffers_map[_name];
-			float *host_buf = !is_host_allocated ? nullptr : (isInput ? input_buffers[iter2] : output_buffers[iter2-1]);
+			float *host_buf = !is_host_allocated ? nullptr : (is_input ? input_buffers[iter2] : output_buffers[iter2-input_binding_num]);
 
-			// fprintf(stderr, "tensor name: %s, is_host_allocated: %d, host_buf: %p, size: %d\n", name, is_host_allocated, host_buf, size);
-			TensorAllocator *tensor_allocator = new TensorAllocator(is_host_allocated, buf, host_buf, size);	
+			// fprintf(stderr, "tensor name: %s, is_host_allocated: %d, host_buf: %p, size: %ld\n", name, is_host_allocated, host_buf, size);
+			TensorAllocator *allocator = new TensorAllocator(is_host_allocated, buf, host_buf, size, dtype);	
 
-			tensor_allocators.push_back(tensor_allocator);
+			tensor_allocator.push_back(allocator);
 		}
+
+		tensor_allocators[buffer_id].push_back(tensor_allocator);
 	}
 }
 
