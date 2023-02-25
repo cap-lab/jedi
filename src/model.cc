@@ -311,12 +311,12 @@ void Model::infer(int device_id, int stream_id, int buffer_id) {
 	bool enqueueSuccess = false;
 
 	if(!stage->contexts[stream_id]->getEngine().hasImplicitBatchDimension()) {
-		// stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
-		// setBindingForContext(stage, stream_id, buffer_id);
-		// enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
+		stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
+		setBindingForContext(stage, stream_id, buffer_id);
+		enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
 
-		// setStreamBuffers(stage, stream_id, buffer_id);
-		enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
+		setStreamBuffers(stage, stream_id, buffer_id);
+		//enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 	}
 	else {
 		enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));

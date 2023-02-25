@@ -216,8 +216,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 13; // image height / 32
-		yolo.width = 13; // image width / 32
+		yolo.height = 19; // image height / 32
+		yolo.width = 19; // image width / 32
 		yolo.channel = 255;
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
@@ -234,8 +234,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 26;  // image height / 16
-		yolo.width = 26; // image width / 16
+		yolo.height = 38;  // image height / 16
+		yolo.width = 38; // image width / 16
 		yolo.channel = 255;
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
@@ -252,8 +252,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 52;  // image height / 8
-		yolo.width = 52;  // image width / 8
+		yolo.height = 76;  // image height / 8
+		yolo.width = 76;  // image width / 8
 		yolo.channel = 255;
 		yolo.scale_x_y = 1;
 		yolo.num = 3;

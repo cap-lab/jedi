@@ -3,6 +3,7 @@
 #include <vector>
 #include <cassert>
 #include <cctype>
+#include <sstream>
 
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
@@ -41,7 +42,7 @@ class Logger : public ILogger
     }
 } logger;
 
-void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network) {
+void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix) {
 	std::string model_dir = config_data->instances.at(instance_id).model_dir;
 	std::string cut_points_name;
 	std::string device_name;
@@ -87,7 +88,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	}
 
 
-	plan_file_name = model_dir + "/model_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name + ".rt";
+	plan_file_name = model_dir + "/model_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name + postfix;
 	std::cerr<<"plan_file_name: "<<plan_file_name<<std::endl;
 }
 
@@ -107,6 +108,160 @@ bool OnnxModel::serialize(const char *filename, nvinfer1::IHostMemory *ptr){
     return true;
 }
 
+void OnnxModel::getIOTensorNamesOfLayer(INetworkDefinition *network, int layer_id, std::vector<std::string>& tensor_name_vec, bool is_input) {
+	ILayer *layer = network->getLayer(layer_id);
+
+	if(is_input) {
+		for (int iter1 = 0; iter1 < layer->getNbOutputs(); iter1++) {
+			ITensor *tensor = layer->getInput(iter1);	
+			tensor_name_vec.push_back(tensor->getName());
+		}
+	}
+	else {
+		for (int iter1 = 0; iter1 < layer->getNbOutputs(); iter1++) {
+			ITensor *tensor = layer->getOutput(iter1);	
+			tensor_name_vec.push_back(tensor->getName());
+		}
+	}
+}
+
+bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition *network, int end_index, int layer_id, std::string tensor_name) {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int layer_num = network->getNbLayers();
+
+	if(device_id+1 == device_num) {
+		ILayer *layer = network->getLayer(layer_id);
+		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+			ITensor *tensor = layer->getOutput(iter2);
+			if(tensor->isNetworkOutput()) {
+				return true;	
+			}
+		}
+	}
+
+	for (int iter1 = end_index+1; iter1 < layer_num; iter1++) {
+		ILayer *layer = network->getLayer(iter1);
+
+		std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
+		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+			ITensor *tensor = layer->getInput(iter2);
+			std::cerr<<"tensor name: "<<tensor->getName()<<", target tensor name: "<<tensor_name<<std::endl;
+			std::cerr<<"tensor isNetworkOutput: "<<tensor->isNetworkOutput()<<std::endl;
+			if(tensor_name.compare(tensor->getName()) == 0) {
+				return true;					
+			}
+		}
+	}
+
+	return false;
+}
+
+void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<int>& output_index_vec) {
+	for (int iter1 = start_index ; iter1 <= end_index; iter1++) {
+		ILayer *layer = network->getLayer(iter1);
+		
+		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+			ITensor *tensor = layer->getOutput(iter2);
+			auto tensor_name = tensor->getName();
+
+			if(checkTensorIsUsedInNextStages(device_id, network, end_index, iter1, tensor_name)) {
+				output_index_vec.push_back(iter1);	
+			}
+		}
+	}
+}
+
+void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *network, std::string model_name, std::string onnx_file_name, int start_index, int end_index) {
+	int result = -1;
+	std::string cmd = "polygraphy surgeon extract " + model_name + " -o " + onnx_file_name;
+	std::string inputs = " --inputs ";
+	std::string outputs = " --outputs ";
+
+	std::vector<std::string> input_name_vec, output_name_vec;
+	std::vector<int> output_index_vec;
+
+	getIOTensorNamesOfLayer(network, start_index, input_name_vec, true);
+	getOutputIndexOfStage(device_id, network, start_index, end_index, output_index_vec);
+	std::cerr<<"output_index_vec size: "<<output_index_vec.size()<<std::endl;
+	for(int output_index : output_index_vec) {
+		std::cerr<<"\toutput_index: "<<output_index<<std::endl;
+		getIOTensorNamesOfLayer(network, output_index, output_name_vec, false);
+	}
+
+	for(auto name :input_name_vec) {
+		inputs.append(name + ":auto:auto ");	
+	}
+	for(auto name :output_name_vec) {
+		outputs.append(name + ":auto ");	
+	}
+
+	cmd = cmd + inputs + outputs;
+	std::cerr<<"cmd: "<<cmd<<std::endl;
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+	}
+}
+
+void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_name, std::vector<std::string>& onnx_file_name_vec) {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int prev_cut_point = 0, curr_cut_point = 0;
+
+	for(int iter1 = 0; iter1 < device_num; iter1++) {
+		std::string onnx_file_name;
+
+		getModelFileName(iter1, onnx_file_name, network, ".onnx");
+
+		onnx_file_name_vec.push_back(onnx_file_name);
+		if(iter1 > 0) {
+			prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
+		}
+		curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
+
+		if(fileExist(onnx_file_name) == false && device_num > 1)  {
+			surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
+		}
+	}
+}
+
+void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int data_type = config_data->instances.at(instance_id).data_type;
+
+	builder = createInferBuilder(logger);
+
+	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); 
+	network =  (builder)->createNetworkV2(flag);
+
+	parser = createParser(*network, logger);
+
+	// TODO: onnx file path
+	(parser)->parseFromFile(onnx_file_name.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
+	for (int32_t i = 0; i < (parser)->getNbErrors(); ++i)
+	{
+		std::cout << "TENSORRT ONNX ERROR: "  << parser->getError(i)->desc() << std::endl;
+	}
+
+	if((parser)->getNbErrors() > 0) {
+		FatalError("Onnx parsing failed");
+	}
+
+	if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  cur_iter > 0) {
+		int input_num = network->getNbInputs();
+		for (int  index = 0 ; index < input_num ; index++) {
+			ITensor *tensor = network->getInput(index);
+			tensor->setType(nvinfer1::DataType::kHALF);
+		}
+	}
+
+	if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  device_num > 1 && cur_iter < device_num - 1) {
+		int output_num = network->getNbOutputs();
+		for (int  index = 0 ; index < output_num ; index++) {
+			ITensor *tensor = network->getOutput(index);
+			tensor->setType(nvinfer1::DataType::kHALF);
+		}
+	}
+}
 
 void OnnxModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
@@ -131,18 +286,28 @@ void OnnxModel::initializeModel() {
 	}
 
 	// TODO: polygraphy might be called here to make separate onnx_file
+	std::vector<std::string> onnx_file_name_vec;	
+	separateOnnxFile(network, tensorrt_network->onnx_file_path, onnx_file_name_vec);
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 		int device = config_data->instances.at(instance_id).devices.at(iter1);
+		// std::string plan_file_name;
 		std::string plan_file_name;
+		getModelFileName(iter1, plan_file_name, network, ".rt");
 
 		// TODO: separate network definition for partial onnx and engine building is needed here
 
-		getModelFileName(iter1, plan_file_name, network);
+		std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" path_file_name: "<<plan_file_name<<std::endl;
+		// getModelFileName(iter1, plan_file_name, network, ".rt");
 		if(fileExist(plan_file_name) == false)  {
-			IBuilderConfig* config = builder->createBuilderConfig();
+			IBuilder *partial_builder;
+			INetworkDefinition *partial_network;
+			IParser *partial_parser;
+			createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
+
+			IBuilderConfig* config = partial_builder->createBuilderConfig();
 			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1U << 30);
 			config->setFlag(BuilderFlag::kDEBUG);
 
@@ -155,25 +320,24 @@ void OnnxModel::initializeModel() {
 				config->setFlag(BuilderFlag::kSTRICT_TYPES);
 			}
 
-			if(data_type == TYPE_FP16 && builder->platformHasFastFp16()) {
+			if(data_type == TYPE_FP16 && partial_builder->platformHasFastFp16()) {
 				config->setFlag(BuilderFlag::kFP16);
 			}
-			else if(data_type == TYPE_INT8 && builder->platformHasFastInt8()) {  	// int8 option
+			else if(data_type == TYPE_INT8 && partial_builder->platformHasFastInt8()) {  	// int8 option
 				config->setFlag(BuilderFlag::kINT8);
 				config->setInt8Calibrator(tensorrt_network->calibrator);
 			}
 
-			IHostMemory *serializedModel = builder->buildSerializedNetwork(*network, *config);
+			IHostMemory *serializedModel = partial_builder->buildSerializedNetwork(*partial_network, *config);
 
 			serialize(plan_file_name.c_str(), serializedModel);
 
-			//delete parser;
-			//delete network;
+			delete partial_parser;
+			delete partial_network;
 			delete config;
-			//delete builder;
+			delete partial_builder;
 
 			delete serializedModel;
-			delete tensorrt_network->calibrator;
 		}
 
 		
@@ -184,6 +348,7 @@ void OnnxModel::initializeModel() {
 
 			char *gieModelStream{nullptr};
 			size_t size{0};
+			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" plan_file_name: "<<plan_file_name<<std::endl;
 			std::ifstream file(plan_file_name, std::ios::binary);
 			if (file.good()) {
 				file.seekg(0, file.end);
@@ -194,14 +359,18 @@ void OnnxModel::initializeModel() {
 				file.close();
 			}
 
+			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
+
 			IRuntime* runtime = createInferRuntime(logger);
 			if(device == DEVICE_DLA) {
 				runtime->setDLACore(core);
 			}
 			ICudaEngine* engine = runtime->deserializeCudaEngine(gieModelStream, size);
+			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
 
 			assert(engine != nullptr);
 			stage->engines.push_back(engine);
+			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
 
 			if (gieModelStream) delete [] gieModelStream;
 
@@ -218,10 +387,13 @@ void OnnxModel::initializeModel() {
 	//delete config;
 	delete builder;
 
-
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		Stage *stage = stages[iter1];
 		stage->createExecutionContext();
+	}
+
+	if(tensorrt_network->calibrator != nullptr ) {
+		delete tensorrt_network->calibrator;
 	}
 
 	delete tensorrt_network;
