@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cctype>
 #include <sstream>
+#include <set>
 
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
@@ -112,7 +113,7 @@ void OnnxModel::getIOTensorNamesOfLayer(INetworkDefinition *network, int layer_i
 	ILayer *layer = network->getLayer(layer_id);
 
 	if(is_input) {
-		for (int iter1 = 0; iter1 < layer->getNbOutputs(); iter1++) {
+		for (int iter1 = 0; iter1 < layer->getNbInputs(); iter1++) {
 			ITensor *tensor = layer->getInput(iter1);	
 			tensor_name_vec.push_back(tensor->getName());
 		}
@@ -143,7 +144,7 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 		ILayer *layer = network->getLayer(iter1);
 
 		std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
-		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+		for (int iter2 = 0; iter2 < layer->getNbInputs(); iter2++) {
 			ITensor *tensor = layer->getInput(iter2);
 			std::cerr<<"tensor name: "<<tensor->getName()<<", target tensor name: "<<tensor_name<<std::endl;
 			std::cerr<<"tensor isNetworkOutput: "<<tensor->isNetworkOutput()<<std::endl;
@@ -171,6 +172,31 @@ void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network
 	}
 }
 
+void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec) {
+	std::set<ITensor *> output_set;
+	for(int iter1 = 0 ; iter1 < start_index ; iter1++) {
+		ILayer *layer = network->getLayer(iter1);
+		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+			ITensor *tensor = layer->getOutput(iter2);
+			if(output_set.find(tensor) == output_set.end()) {
+				output_set.insert(tensor);
+			}
+		}
+	}
+
+	for(int iter1 = start_index ; iter1 <= end_index ; iter1++) {
+		ILayer *layer = network->getLayer(iter1);
+		for(int iter2 = 0 ; iter2 < layer->getNbInputs() ; iter2++) {
+			ITensor *tensor = layer->getInput(iter2);
+			if(output_set.find(tensor) != output_set.end() || iter1 == 0) {
+				input_name_vec.push_back(tensor->getName());
+				output_set.erase(tensor);
+			}
+		}
+	}
+
+}
+
 void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *network, std::string model_name, std::string onnx_file_name, int start_index, int end_index) {
 	int result = -1;
 	std::string cmd = "polygraphy surgeon extract " + model_name + " -o " + onnx_file_name;
@@ -180,7 +206,8 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 	std::vector<std::string> input_name_vec, output_name_vec;
 	std::vector<int> output_index_vec;
 
-	getIOTensorNamesOfLayer(network, start_index, input_name_vec, true);
+	//getIOTensorNamesOfLayer(network, start_index, input_name_vec, true);
+	fillInputs(device_id, network, start_index, end_index, input_name_vec);
 	getOutputIndexOfStage(device_id, network, start_index, end_index, output_index_vec);
 	std::cerr<<"output_index_vec size: "<<output_index_vec.size()<<std::endl;
 	for(int output_index : output_index_vec) {
