@@ -39,6 +39,7 @@ void Model::deallocateStream() {
 	for(unsigned int iter1 = 0; iter1 < stages.size(); iter1++) {
 		Stage *stage = stages[iter1];
 		stage->deallocateStream();
+		stage->finalizeStage();
 	}
 }
 
@@ -315,7 +316,7 @@ void Model::infer(int device_id, int stream_id, int buffer_id) {
 		setBindingForContext(stage, stream_id, buffer_id);
 		enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
 
-		setStreamBuffers(stage, stream_id, buffer_id);
+		// setStreamBuffers(stage, stream_id, buffer_id);
 		//enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 	}
 	else {

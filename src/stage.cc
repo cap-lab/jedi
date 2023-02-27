@@ -269,6 +269,15 @@ void Stage::finalizeStage() {
 		nvinfer1::IExecutionContext *context = contexts[iter1];		
 		delete context;
 	}
+
+	for(unsigned int iter1 = 0; iter1 < tensor_allocators.size(); iter1++) {
+		for(unsigned int iter2 = 0; iter2 < tensor_allocators[iter1].size(); iter2++) {
+			for(unsigned int iter3 = 0; iter3 < tensor_allocators[iter1][iter2].size(); iter3++) {
+				// buffers are deallocated in the class model
+				delete tensor_allocators[iter1][iter2][iter3];
+			}
+		}
+	}
 }
 
 void Stage::getBindingsDataType() {
