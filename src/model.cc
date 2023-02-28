@@ -39,7 +39,6 @@ void Model::deallocateStream() {
 	for(unsigned int iter1 = 0; iter1 < stages.size(); iter1++) {
 		Stage *stage = stages[iter1];
 		stage->deallocateStream();
-		stage->finalizeStage();
 	}
 }
 

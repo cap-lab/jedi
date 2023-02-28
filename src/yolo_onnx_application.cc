@@ -163,6 +163,7 @@ void YoloOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 
 IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_data)
 {
+	std::string calib_table = basic_config_data->calib_table;
 	std::string name_path = yoloOnnxAppConfig.name_path;
 	TensorRTNetwork *jedi_network = new TensorRTNetwork();
 
@@ -204,7 +205,7 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	input_dim.height = tensor_dim.d[3];
 	dataDim_t dim(tensor_dim.d[0],tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 	BatchStream *calibrationStream = new BatchStream(dim, 1, yoloOnnxAppConfig.calib_images_num, yoloOnnxAppConfig.calib_image_path);
-	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, yoloOnnxAppConfig.onnx_file_path + "-calibration.table" , "data");
+	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table , "data");
 	jedi_network->calibrator = calibrator;
 
 	{

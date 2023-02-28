@@ -234,20 +234,25 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int prev_cut_point = 0, curr_cut_point = 0;
 
-	for(int iter1 = 0; iter1 < device_num; iter1++) {
-		std::string onnx_file_name;
+	if (device_num > 1) {
+		for(int iter1 = 0; iter1 < device_num; iter1++) {
+			std::string onnx_file_name;
 
-		getModelFileName(iter1, onnx_file_name, network, ".onnx");
+			getModelFileName(iter1, onnx_file_name, network, ".onnx");
 
-		onnx_file_name_vec.push_back(onnx_file_name);
-		if(iter1 > 0) {
-			prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
+			onnx_file_name_vec.push_back(onnx_file_name);
+			if(iter1 > 0) {
+				prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
+			}
+			curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
+
+			if(fileExist(onnx_file_name) == false && device_num > 1)  {
+				surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
+			}
 		}
-		curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
-
-		if(fileExist(onnx_file_name) == false && device_num > 1)  {
-			surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
-		}
+	}
+	else {
+		onnx_file_name_vec.push_back(model_name);
 	}
 }
 
@@ -290,6 +295,7 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 	}
 }
 
+
 void OnnxModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int data_type = config_data->instances.at(instance_id).data_type;
@@ -312,23 +318,17 @@ void OnnxModel::initializeModel() {
 		total_input_size *= tensor_dim.d[iter1];
 	}
 
-	// TODO: polygraphy might be called here to make separate onnx_file
 	std::vector<std::string> onnx_file_name_vec;	
-	separateOnnxFile(network, tensorrt_network->onnx_file_path, onnx_file_name_vec);
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 		int device = config_data->instances.at(instance_id).devices.at(iter1);
-		// std::string plan_file_name;
 		std::string plan_file_name;
 		getModelFileName(iter1, plan_file_name, network, ".rt");
 
-		// TODO: separate network definition for partial onnx and engine building is needed here
-
-		std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" path_file_name: "<<plan_file_name<<std::endl;
-		// getModelFileName(iter1, plan_file_name, network, ".rt");
 		if(fileExist(plan_file_name) == false)  {
+
 			IBuilder *partial_builder;
 			INetworkDefinition *partial_network;
 			IParser *partial_parser;
@@ -375,7 +375,6 @@ void OnnxModel::initializeModel() {
 
 			char *gieModelStream{nullptr};
 			size_t size{0};
-			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" plan_file_name: "<<plan_file_name<<std::endl;
 			std::ifstream file(plan_file_name, std::ios::binary);
 			if (file.good()) {
 				file.seekg(0, file.end);
@@ -386,24 +385,19 @@ void OnnxModel::initializeModel() {
 				file.close();
 			}
 
-			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
-
 			IRuntime* runtime = createInferRuntime(logger);
 			if(device == DEVICE_DLA) {
 				runtime->setDLACore(core);
 			}
 			ICudaEngine* engine = runtime->deserializeCudaEngine(gieModelStream, size);
-			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
 
 			assert(engine != nullptr);
 			stage->engines.push_back(engine);
-			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
 
 			if (gieModelStream) delete [] gieModelStream;
 
 			runtimes.push_back(runtime);
 		}
-		//setInputOutputLayerId(net, start_index, cut_point);
 		stages.push_back(stage);
 
 		start_index = cut_point + 1;

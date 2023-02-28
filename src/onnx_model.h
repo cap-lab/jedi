@@ -36,7 +36,6 @@ class OnnxModel : public Model {
 		std::vector<nvinfer1::IRuntime *> runtimes;
 		void getModelFileName(int curr, std::string &plan_file_name, nvinfer1::INetworkDefinition *network, std::string postfix);
 		void fillInputs(int device_id, nvinfer1::INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec);
-
 };
 
 #endif
