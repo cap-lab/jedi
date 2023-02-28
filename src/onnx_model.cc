@@ -234,25 +234,20 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int prev_cut_point = 0, curr_cut_point = 0;
 
-	if (device_num > 1) {
-		for(int iter1 = 0; iter1 < device_num; iter1++) {
-			std::string onnx_file_name;
+	for(int iter1 = 0; iter1 < device_num; iter1++) {
+		std::string onnx_file_name;
 
-			getModelFileName(iter1, onnx_file_name, network, ".onnx");
+		getModelFileName(iter1, onnx_file_name, network, ".onnx");
 
-			onnx_file_name_vec.push_back(onnx_file_name);
-			if(iter1 > 0) {
-				prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
-			}
-			curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
-
-			if(fileExist(onnx_file_name) == false)  {
-				surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
-			}
+		onnx_file_name_vec.push_back(onnx_file_name);
+		if(iter1 > 0) {
+			prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
 		}
-	}
-	else {
-		onnx_file_name_vec.push_back(model_name);
+		curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
+
+		if(fileExist(onnx_file_name) == false)  {
+			surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
+		}
 	}
 }
 
@@ -329,7 +324,6 @@ void OnnxModel::initializeModel() {
 		getModelFileName(iter1, plan_file_name, network, ".rt");
 
 		if(fileExist(plan_file_name) == false)  {
-
 			IBuilder *partial_builder;
 			INetworkDefinition *partial_network;
 			IParser *partial_parser;
@@ -367,7 +361,6 @@ void OnnxModel::initializeModel() {
 
 			delete serializedModel;
 		}
-
 		
 		Stage *stage = new Stage(config_data, instance_id, iter1, start_index, cut_point);
 		int duplication_num = dla_core <= 1 ? 1 : std::max(dla_core, DLA_NUM); 
@@ -406,7 +399,6 @@ void OnnxModel::initializeModel() {
 	}
 
 	delete network;
-	//delete config;
 	delete builder;
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
