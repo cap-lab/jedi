@@ -246,7 +246,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 			}
 			curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
 
-			if(fileExist(onnx_file_name) == false && device_num > 1)  {
+			if(fileExist(onnx_file_name) == false)  {
 				surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
 			}
 		}
@@ -319,6 +319,7 @@ void OnnxModel::initializeModel() {
 	}
 
 	std::vector<std::string> onnx_file_name_vec;	
+	separateOnnxFile(network, tensorrt_network->onnx_file_path, onnx_file_name_vec);
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];

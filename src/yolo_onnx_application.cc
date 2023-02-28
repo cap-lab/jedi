@@ -208,6 +208,8 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table , "data");
 	jedi_network->calibrator = calibrator;
 
+	;
+
 	{
 		YoloData yolo;
 
@@ -217,9 +219,9 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 19; // image height / 32
-		yolo.width = 19; // image width / 32
-		yolo.channel = 255;
+		yolo.height = jedi_network->network->getOutput(0)->getDimensions().d[2]; // image height / 32
+		yolo.width = jedi_network->network->getOutput(0)->getDimensions().d[3]; // image width / 32
+		yolo.channel = jedi_network->network->getOutput(0)->getDimensions().d[1];
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
 
@@ -235,9 +237,9 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 38;  // image height / 16
-		yolo.width = 38; // image width / 16
-		yolo.channel = 255;
+		yolo.height = jedi_network->network->getOutput(1)->getDimensions().d[2];  // image height / 16
+		yolo.width = jedi_network->network->getOutput(1)->getDimensions().d[3]; // image width / 16
+		yolo.channel = jedi_network->network->getOutput(1)->getDimensions().d[1];
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
 
@@ -253,9 +255,9 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.new_coords = 0;
 		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
 		yolo.nms_thresh = 0.45;
-		yolo.height = 76;  // image height / 8
-		yolo.width = 76;  // image width / 8
-		yolo.channel = 255;
+		yolo.height = jedi_network->network->getOutput(2)->getDimensions().d[2];  // image height / 8
+		yolo.width = jedi_network->network->getOutput(2)->getDimensions().d[3];  // image width / 8
+		yolo.channel = jedi_network->network->getOutput(2)->getDimensions().d[1];
 		yolo.scale_x_y = 1;
 		yolo.num = 3;
 
