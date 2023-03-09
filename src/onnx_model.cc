@@ -244,6 +244,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 			prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
 		}
 		curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
+		curr_cut_point = std::min(curr_cut_point, network->getNbLayers()-1);
 
 		if(fileExist(onnx_file_name) == false)  {
 			surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
@@ -330,6 +331,7 @@ void OnnxModel::initializeModel() {
 			createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
 
 			IBuilderConfig* config = partial_builder->createBuilderConfig();
+	        config->setAvgTimingIterations(1);
 			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1U << 30);
 			config->setFlag(BuilderFlag::kDEBUG);
 

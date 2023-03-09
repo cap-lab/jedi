@@ -404,6 +404,7 @@ void YoloOnnxApplication::printBox(int sample_index, int batch, Detection *dets,
 		ImageData *data = dataset->getData(image_index);
 		char *path = (char *)(data->path.c_str());
 
+
 		detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
 	}
 }
@@ -424,7 +425,6 @@ void YoloOnnxApplication::initializePostprocessing(std::string network_name, int
 void YoloOnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
 {
 	detectBox(output_buffers, output_num, sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
-
 }
 
 void YoloOnnxApplication::postprocessing2(int thread_id, int sample_index, int batch) {

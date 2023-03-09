@@ -181,6 +181,7 @@ cv::Mat restoreAffinedTransform(int orig_width, int orig_height, cv::Mat dst2)
 	return trans2;
 }
 
+
 void loadImageAffineTransform(char *filename, int w, int h, int c, int *orig_width, int *orig_height, cv::Vec<float, 3> mean, cv::Vec<float, 3> stddev, cv::Mat dst, float *input)
 {
 	try {
@@ -238,3 +239,58 @@ void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *
 		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
 	}
 }
+
+
+static void mat_to_data_v2(cv::Mat mat, float *input)
+{
+	int w = mat.cols;
+	int h = mat.rows;
+	int c = mat.channels();
+	unsigned char *data = (unsigned char *)mat.data;
+	int step = mat.step;
+	for (int y = 0; y < h; ++y) {
+		for (int k = 0; k < c; ++k) {
+			for (int x = 0; x < w; ++x) {
+				input[k*w*h + y*w + x] = data[y*step + x*c + k];
+			}
+		}
+	}
+}
+
+
+void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
+{
+	try {
+		// cv::Mat input_image = load_image_mat(filename, c);
+		cv::Mat input_image = cv::imread(filename);
+		*orig_width = input_image.cols;
+		*orig_height = input_image.rows;
+
+		cv::Mat output_image;    
+		cv::resize(input_image, output_image, cv::Size(800, 800));
+		cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
+		
+		// normalize with mean and std of imagenet
+		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
+		const float std[3] = {0.229, 0.224, 0.225};
+		int height = output_image.rows;
+		int width = output_image.cols;
+		int channels = output_image.channels();
+		for (int ch = 0; ch < channels; ch++) {
+			for (int height_index = 0; height_index < height; height_index++) {
+				for (int width_index = 0; width_index < width; width_index++) {
+					int input_index = ch * width * height + height_index * width + width_index;
+					input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch] - mean[ch]) / std[ch];
+					// output_image.at<cv::Vec3f>(height_index, width_index)[ch] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch] - mean[ch]) / std[ch];
+				}
+			}
+		}
+
+		// mat_to_data_v2(output_image, input);
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
+	}
+}
+

@@ -8,9 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <string>
 #include <map>
-#include <list>
 #include <vector>
 #include <mutex>
 
@@ -33,17 +31,16 @@ static int get_coco_image_id(char *filename) {
 
 static std::map<int,std::list<std::string>> detected_map;
 static std::mutex mu;
-static int detected_num = 0;
 
 void writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
 	std::ofstream result_file;
 	std::vector<std::string> results_vec;
 
-	while(!detected_map.empty() && line_num < detected_num) {
+	while(!detected_map.empty()) {
 		auto it = detected_map.find(idx);	
 		if(it != detected_map.end()) {
-			for(auto it2 = it->second.begin(); it2 != it->second.end() && line_num < detected_num; it2++) {	
+			for(auto it2 = it->second.begin(); it2 != it->second.end(); it2++) {	
 				line_num++;
 				results_vec.push_back(*it2);
 			}
@@ -68,7 +65,9 @@ void writeResultFile(std::string result_file_name) {
 	result_file.close();
 }
 
+
 void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path) {
+	// detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
 	int i, j;
 	int image_id = get_coco_image_id(path);
 	std::list<std::string> detected;
@@ -99,14 +98,23 @@ void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int i
 					std::stringstream result;
 					result<<"{\"image_id\":"<<image_id<<", \"category_id\":"<<coco_ids[j]<<", \"bbox\":["<<bx<<", "<<by<<", "<<bw<<", "<<bh<<"], \"score\":"<<dets[i].prob[j]<<"}";
 					detected.push_back(result.str());
-					detected_num++;
 				}
 			}
 		}
 	}
 
+	// mu.lock();
+	// detected_map.insert(std::pair<int,std::list<std::string>>(idx,detected));
+	// mu.unlock();
+	addToDetectedMap(idx, detected);
+}
+
+
+void addToDetectedMap(int image_index, std::list<std::string> detected){
 	mu.lock();
-	detected_map.insert(std::pair<int,std::list<std::string>>(idx,detected));
+	detected_map.insert(std::pair<int,std::list<std::string>>(image_index,detected));
 	mu.unlock();
 }
+
+
 
