@@ -240,24 +240,6 @@ void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *
 	}
 }
 
-
-static void mat_to_data_v2(cv::Mat mat, float *input)
-{
-	int w = mat.cols;
-	int h = mat.rows;
-	int c = mat.channels();
-	unsigned char *data = (unsigned char *)mat.data;
-	int step = mat.step;
-	for (int y = 0; y < h; ++y) {
-		for (int k = 0; k < c; ++k) {
-			for (int x = 0; x < w; ++x) {
-				input[k*w*h + y*w + x] = data[y*step + x*c + k];
-			}
-		}
-	}
-}
-
-
 void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
 	try {
@@ -282,12 +264,9 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 				for (int width_index = 0; width_index < width; width_index++) {
 					int input_index = ch * width * height + height_index * width + width_index;
 					input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch] - mean[ch]) / std[ch];
-					// output_image.at<cv::Vec3f>(height_index, width_index)[ch] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch] - mean[ch]) / std[ch];
 				}
 			}
 		}
-
-		// mat_to_data_v2(output_image, input);
 	}
 	catch (...) {
 		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
