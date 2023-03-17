@@ -3,6 +3,7 @@
 #include <libconfig.h++>
 #include <cstring>
 #include <sstream>
+#include <algorithm>
 
 #include "config.h"
 #include "variable.h"
@@ -297,7 +298,8 @@ void ConfigData::readDlaCores(Setting &setting, ConfigInstance &config_instance)
 
 void ConfigData::readCalibTable(Setting &setting, ConfigInstance &config_instance) {
 	try{	
-		if(config_instance.data_type == TYPE_INT8)
+		// if(config_instance.data_type == TYPE_INT8)
+		if(std::any_of(config_instance.data_types.begin(), config_instance.data_types.end(), [](int i) {return i==TYPE_INT8;}))
 		{
 			const char *tmp = setting["calib_table"];
 			std::stringstream ss(tmp);
@@ -314,20 +316,30 @@ void ConfigData::readCalibTable(Setting &setting, ConfigInstance &config_instanc
 
 void ConfigData::readDataType(Setting &setting, ConfigInstance &config_instance) {
 	try{	
-		const char *tmp = setting["data_type"];
-		std::stringstream ss(tmp);
-		static std::string data;
-		ss >> data;
+		const char *data = setting["data_type"];
+		std::stringstream ss(data);
+		std::string temp;
+		std::string str_INT8("INT8");
+		std::string str_FP32("FP32");
 
-		config_instance.data_type = TYPE_FP16;
-		if(data == "INT8") {
-			config_instance.data_type = TYPE_INT8;
-		}
-		else if(data == "FP32") {
-			config_instance.data_type = TYPE_FP32;
+		while( getline(ss, temp, ',') ) {
+			int data_type = TYPE_FP16;
+			if(temp.compare(str_INT8) == 0) {
+				data_type = TYPE_INT8;
+			}
+			else if(temp.compare(str_FP32) == 0) {
+				data_type = TYPE_FP32;
+			}
+			config_instance.data_types.push_back(data_type);
 		}
 
-		std::cerr<<"data_type: "<<config_instance.data_type<<std::endl;
+		if(config_instance.device_num > (int)config_instance.data_types.size()) {
+			int size = config_instance.device_num - config_instance.data_types.size();
+			int default_data_type = config_instance.data_types.at(0);
+			for(int iter = 0; iter < size; iter++) {
+				config_instance.data_types.push_back(default_data_type);	
+			}
+		}
 	}
 	catch(const SettingNotFoundException &nfex) {
 		std::cerr << "No 'data_type' setting in configuration file." << std::endl;

@@ -50,7 +50,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	std::string data_type_name;
 	std::string image_size_name;
 	int device = config_data->instances.at(instance_id).devices.at(curr);
-	int data_type = config_data->instances.at(instance_id).data_type;
+	int data_type = config_data->instances.at(instance_id).data_types.at(curr);
 	int prev_cut_point = 0, curr_cut_point = 0;
 	
 	if(curr > 0) {
@@ -143,7 +143,6 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 	for (int iter1 = end_index+1; iter1 < layer_num; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
 
-		std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<std::endl;
 		for (int iter2 = 0; iter2 < layer->getNbInputs(); iter2++) {
 			ITensor *tensor = layer->getInput(iter2);
 			std::cerr<<"tensor name: "<<tensor->getName()<<", target tensor name: "<<tensor_name<<std::endl;
@@ -206,6 +205,7 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 	std::vector<std::string> input_name_vec, output_name_vec;
 	std::vector<int> output_index_vec;
 
+
 	//getIOTensorNamesOfLayer(network, start_index, input_name_vec, true);
 	fillInputs(device_id, network, start_index, end_index, input_name_vec);
 	getOutputIndexOfStage(device_id, network, start_index, end_index, output_index_vec);
@@ -241,7 +241,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 
 		onnx_file_name_vec.push_back(onnx_file_name);
 		if(iter1 > 0) {
-			prev_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1-1) + 1;
+			prev_cut_point = curr_cut_point + 1;
 		}
 		curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
 		curr_cut_point = std::min(curr_cut_point, network->getNbLayers()-1);
@@ -254,7 +254,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 
 void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int data_type = config_data->instances.at(instance_id).data_type;
+	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
 
 	builder = createInferBuilder(logger);
 
@@ -294,7 +294,6 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 
 void OnnxModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int data_type = config_data->instances.at(instance_id).data_type;
 	TensorRTNetwork *tensorrt_network = nullptr;
 	IBuilder *builder = nullptr;
 	INetworkDefinition *network = nullptr;
@@ -321,6 +320,7 @@ void OnnxModel::initializeModel() {
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 		int device = config_data->instances.at(instance_id).devices.at(iter1);
+		int data_type = config_data->instances.at(instance_id).data_types.at(iter1);
 		std::string plan_file_name;
 		getModelFileName(iter1, plan_file_name, network, ".rt");
 
@@ -331,7 +331,7 @@ void OnnxModel::initializeModel() {
 			createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
 
 			IBuilderConfig* config = partial_builder->createBuilderConfig();
-	        config->setAvgTimingIterations(1);
+			config->setAvgTimingIterations(1);
 			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1U << 30);
 			config->setFlag(BuilderFlag::kDEBUG);
 
@@ -341,7 +341,10 @@ void OnnxModel::initializeModel() {
 				config->setDefaultDeviceType(nvinfer1::DeviceType::kDLA);
 				config->setDLACore(dla_core);
 				config->setFlag(BuilderFlag::kGPU_FALLBACK);
-				config->setFlag(BuilderFlag::kSTRICT_TYPES);
+				// config->setFlag(BuilderFlag::kSTRICT_TYPES);
+				config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
+				config->setFlag(BuilderFlag::kDIRECT_IO);
+				config->setFlag(BuilderFlag::kREJECT_EMPTY_ALGORITHMS);
 			}
 
 			if(data_type == TYPE_FP16 && partial_builder->platformHasFastFp16()) {

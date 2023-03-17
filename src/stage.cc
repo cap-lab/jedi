@@ -24,7 +24,7 @@ Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_i
 	this->stream_num = config_data->instances.at(instance_id).stream_numbers[stage_id];
 	this->buffer_num = config_data->instances.at(instance_id).buffer_num;
 	this->device_num = config_data->instances.at(instance_id).device_num;
-	this->data_type = config_data->instances.at(instance_id).data_type;
+	this->data_type = config_data->instances.at(instance_id).data_types[stage_id];
 
 	this->input_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
 	this->output_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();

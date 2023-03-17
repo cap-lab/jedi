@@ -42,18 +42,18 @@ void Model::deallocateStream() {
 	}
 }
 
-void* Model::makeCUDAArray(int size) {
+void* Model::makeCUDAArray(int stage_id, int size) {
 	void *space;
 
-	int data_type = this->config_data->instances.at(instance_id).data_type;
+	int data_type = this->config_data->instances.at(instance_id).data_types.at(stage_id);
 
 	if(data_type == TYPE_FP32) {
-		 space = (void *)cuda_make_array(NULL, size);
+		space = (void *)cuda_make_array(NULL, size);
 	}
 	else {
 		space = (void *)cuda_make_array_16(NULL, size);
 	}
-	
+
 	return space;
 }
 
@@ -97,7 +97,7 @@ void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vecto
 			void *space = nullptr;
 			bool *signal = new bool(false);
 
-			space = makeCUDAArray(size);
+			space = makeCUDAArray(stage_id, size);
 			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space);
 
 			stream_buffers_map.insert(std::make_pair(tensor_name, space));

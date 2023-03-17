@@ -32,7 +32,7 @@ void TkdnnModel::getModelFileName(int curr, std::string &plan_file_name, int inp
 	std::string image_size_name;
 	int device = config_data->instances.at(instance_id).devices.at(curr);
 	int batch = config_data->instances.at(instance_id).batch;
-	int data_type = config_data->instances.at(instance_id).data_type;
+	int data_type = config_data->instances.at(instance_id).data_types.at(curr);
 	int prev_cut_point = 0, curr_cut_point = 0;
 	
 	if(curr > 0) {
@@ -161,7 +161,7 @@ void TkdnnModel::readFromCalibrationTable(std::string basic_calibration_table, i
 
 void TkdnnModel::createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index) {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int data_type = config_data->instances.at(instance_id).data_type;
+	int data_type = config_data->instances.at(instance_id).data_types.at(iter);
 	std::string calib_table = config_data->instances.at(instance_id).calib_table;
 	std::string calib_table_name = plan_file_name.substr(0, plan_file_name.rfind('.')) + "-calibration.table";
 
@@ -172,8 +172,8 @@ void TkdnnModel::createCalibrationTable(std::string plan_file_name, int iter, in
 	}
 }
 
-void TkdnnModel::setDataType() {
-	int data_type = config_data->instances.at(instance_id).data_type;
+void TkdnnModel::setDataType(int device_id) {
+	int data_type = config_data->instances.at(instance_id).data_types.at(device_id);
 
 	if(data_type == TYPE_FP32) {
 		net->fp16 = false;	
@@ -211,13 +211,13 @@ void TkdnnModel::initializeModel() {
 	//
 	total_input_size = net->input_dim.w * net->input_dim.h * net->input_dim.c * batch;
 	setMaxBatchSize();
-	setDataType();
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::string plan_file_name;
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 
+		setDataType(iter1);
 		getModelFileName(iter1, plan_file_name, net->input_dim.w, net->input_dim.h);
 		createCalibrationTable(plan_file_name, iter1, start_index, cut_point);
 

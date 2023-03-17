@@ -29,7 +29,7 @@ class TkdnnModel : public Model {
 	private:
 		std::vector<tk::dnn::NetworkRT *> netRTs;
 		void getModelFileName(int curr, std::string &plan_file_name, int input_width, int input_height);
-		void setDataType();
+		void setDataType(int device_id);
 		void setDevice(int curr);
 		void setMaxBatchSize();
 		void createCalibrationTable(std::string plan_file_name, int iter, int start_index, int end_index);

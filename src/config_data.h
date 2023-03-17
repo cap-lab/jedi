@@ -26,7 +26,7 @@ typedef struct _ConfigInstance {
 	std::vector<int> devices;
 	std::vector<int> dla_cores;
 	std::vector<int> stream_numbers;
-	int data_type;
+	std::vector<int> data_types;
 } ConfigInstance;
 
 
