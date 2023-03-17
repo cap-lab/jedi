@@ -174,13 +174,40 @@ void TensorRTNetwork::printNetwork() {
 
 		for (int i = 0 ; i < layer_num ; i++) {
 			ILayer *layer = network->getLayer(i);
+
 			std::cout.width(4); std::cout<<std::right<<i;
 			std::cout<<" ";
+
 			std::cout.width(16); std::cout<<std::left<< convertLayerTypeToString(layer);
 			std::cout<<" ";
+
 			std::cout.width(16); std::cout<<std::left<< layer->getName();
 			std::cout<<" ";
 			std::cout << std::endl;
+
+//			std::cout<<"\t input num: "<<layer->getNbInputs()<<", output num: "<<layer->getNbOutputs()<<std::endl;
+//
+//			for (int j = 0; j < layer->getNbInputs(); j++) {
+//				ITensor *tensor = layer->getInput(j);	
+//				if(tensor != nullptr) {
+//					std::cout.width(20); std::cout<<std::left<<"\t"<<tensor->getName();
+//					std::cout<<" ";
+//					std::cout << std::endl;
+//				}
+//			}
+//
+//			std::cout.width(20); std::cout<<std::left<<"\t-------";
+//			std::cout<<" ";
+//			std::cout << std::endl;
+//
+//			for (int j = 0; j < layer->getNbOutputs(); j++) {
+//				ITensor *tensor = layer->getOutput(j);	
+//				if(tensor != nullptr) {
+//					std::cout.width(20); std::cout<<std::left<<"\t"<<tensor->getName();
+//					std::cout<<" ";
+//					std::cout << std::endl;
+//				}
+//			}
 		}
 	}
 }

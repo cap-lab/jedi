@@ -145,10 +145,12 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 
 		for (int iter2 = 0; iter2 < layer->getNbInputs(); iter2++) {
 			ITensor *tensor = layer->getInput(iter2);
-			std::cerr<<"tensor name: "<<tensor->getName()<<", target tensor name: "<<tensor_name<<std::endl;
-			std::cerr<<"tensor isNetworkOutput: "<<tensor->isNetworkOutput()<<std::endl;
-			if(tensor_name.compare(tensor->getName()) == 0) {
-				return true;					
+			if(tensor != nullptr) {
+				std::cerr<<"tensor name: "<<tensor->getName()<<", layer_id: "<<iter1<<", target tensor name: "<<tensor_name<<std::endl;
+				std::cerr<<"tensor isNetworkOutput: "<<tensor->isNetworkOutput()<<std::endl;
+				if(tensor_name.compare(tensor->getName()) == 0) {
+					return true;					
+				}
 			}
 		}
 	}
@@ -157,6 +159,7 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 }
 
 void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<int>& output_index_vec) {
+
 	for (int iter1 = start_index ; iter1 <= end_index; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
 		
