@@ -207,8 +207,7 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	BatchStream *calibrationStream = new BatchStream(dim, 1, yoloOnnxAppConfig.calib_images_num, yoloOnnxAppConfig.calib_image_path);
 	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table , "data");
 	jedi_network->calibrator = calibrator;
-
-	;
+	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
 
 	{
 		YoloData yolo;

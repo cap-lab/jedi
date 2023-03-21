@@ -16,7 +16,7 @@ class TensorRTNetwork : public IJediNetwork {
 		nvinfer1::INetworkDefinition* network = nullptr;
 		nvinfer1::IBuilder *builder =nullptr;
 		std::string onnx_file_path;
-		nvinfer1::IInt8EntropyCalibrator2 *calibrator = nullptr;
+		nvinfer1::IInt8Calibrator *calibrator = nullptr;
 		//void createNetwork() override;
 		void printNetwork();
 	private:

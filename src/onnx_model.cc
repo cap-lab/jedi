@@ -43,6 +43,22 @@ class Logger : public ILogger
     }
 } logger;
 
+static void loadFileToBuffer(std::string file_name, char* &buffer, size_t &size) {
+	//char *gieModelStream{nullptr};
+	//size_t size{0};
+	buffer = nullptr;
+	size = 0;
+	std::ifstream file(file_name, std::ios::binary);
+	if (file.good()) {
+		file.seekg(0, file.end);
+		size = file.tellg();
+		file.seekg(0, file.beg);
+		buffer = new char[size];
+		file.read(buffer, size);
+		file.close();
+	}
+}
+
 void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix) {
 	std::string model_dir = config_data->instances.at(instance_id).model_dir;
 	std::string cut_points_name;
@@ -98,12 +114,12 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 bool OnnxModel::serialize(const char *filename, nvinfer1::IHostMemory *ptr){
     std::ofstream p(filename, std::ios::binary);
     if (!p) {
-		std::cerr << "Could not open plan output file" << std::endl;
+		std::cerr << "Could not open file: " << filename  << std::endl;
 		return false;
     }
 
     if(ptr == nullptr)
-		std::cerr << "Can't serialize network" << std::endl;
+		std::cerr << "Can't serialize data file: " << filename  << std::endl;
 
     p.write(reinterpret_cast<const char*>(ptr->data()), ptr->size());
     return true;
@@ -277,6 +293,18 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 		FatalError("Onnx parsing failed");
 	}
 
+	int layer_num = network->getNbLayers();
+
+//	for(int index = 0 ; index < layer_num ; index++) {
+//		ILayer *layer = network->getLayer(index);
+//		if(layer->getType() == nvinfer1::LayerType::kPOOLING && data_type == TYPE_INT8) {
+//			IPoolingLayer *poolLayer = (IPoolingLayer *) layer;
+//			if(poolLayer->getPoolingType() == PoolingType::kMAX){
+//				layer->setPrecision( nvinfer1::DataType::kHALF);
+//			}
+//		}
+//	}
+
 	if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  cur_iter > 0) {
 		int input_num = network->getNbInputs();
 		for (int  index = 0 ; index < input_num ; index++) {
@@ -290,8 +318,32 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 		for (int  index = 0 ; index < output_num ; index++) {
 			ITensor *tensor = network->getOutput(index);
 			tensor->setType(nvinfer1::DataType::kHALF);
+			std::cerr << "output type set to FP16: " << tensor->getName() << std::endl;
 		}
 	}
+}
+
+void OnnxModel::loadTimingCache(IBuilderConfig* config, ITimingCache* &cache) {
+	std::string timing_cache_path = config_data->instances.at(instance_id).timing_cache_path;
+
+	if(fileExist(timing_cache_path) == false)  {
+		cache = config->createTimingCache(nullptr, 0);
+	}
+	else {
+		char *buffer = nullptr;
+		size_t size = 0;
+		loadFileToBuffer(timing_cache_path, buffer, size);
+		cache = config->createTimingCache(buffer, size);
+	}
+}
+
+void OnnxModel::saveTimingCache(ITimingCache *cache) {
+	std::string timing_cache_path = config_data->instances.at(instance_id).timing_cache_path;
+
+	IHostMemory *serializedCache = cache->serialize();
+	serialize(timing_cache_path.c_str(), serializedCache);
+	delete serializedCache;
+
 }
 
 
@@ -337,6 +389,9 @@ void OnnxModel::initializeModel() {
 			config->setAvgTimingIterations(1);
 			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1U << 30);
 			config->setFlag(BuilderFlag::kDEBUG);
+			ITimingCache *cache = nullptr;
+			loadTimingCache(config, cache);
+			config->setTimingCache(*cache, false);
 
 			// DLA options	
 			if (device == DEVICE_DLA) {
@@ -354,13 +409,18 @@ void OnnxModel::initializeModel() {
 				config->setFlag(BuilderFlag::kFP16);
 			}
 			else if(data_type == TYPE_INT8 && partial_builder->platformHasFastInt8()) {  	// int8 option
+				if(partial_builder->platformHasFastFp16()) {
+					config->setFlag(BuilderFlag::kFP16);
+				}
 				config->setFlag(BuilderFlag::kINT8);
 				config->setInt8Calibrator(tensorrt_network->calibrator);
 			}
 
 			IHostMemory *serializedModel = partial_builder->buildSerializedNetwork(*partial_network, *config);
+			assert(serializedModel != nullptr);
 
 			serialize(plan_file_name.c_str(), serializedModel);
+			saveTimingCache(cache);
 
 			delete partial_parser;
 			delete partial_network;
@@ -368,6 +428,7 @@ void OnnxModel::initializeModel() {
 			delete partial_builder;
 
 			delete serializedModel;
+			delete cache;
 		}
 		
 		Stage *stage = new Stage(config_data, instance_id, iter1, start_index, cut_point);

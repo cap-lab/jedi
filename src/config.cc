@@ -68,6 +68,24 @@ void ConfigData::readModelDir(Setting &setting, ConfigInstance &config_instance)
 	}
 }
 
+void ConfigData::readTimingCache(Setting &setting, ConfigInstance &config_instance) {
+	try{
+		const char *tmp = setting["timing_cache_path"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+		config_instance.timing_cache_path = data.c_str();
+
+		std::cerr<<"timing_cache_path: "<<config_instance.timing_cache_path<<std::endl;
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'timing_cache_path' setting in configuration file. Set timing.cache as a default path"  << std::endl;
+		config_instance.timing_cache_path = "timing.cache";
+
+	}
+}
+
+
 void ConfigData::readBinPath(Setting &setting, ConfigInstance &config_instance) {
 	try{	
 		const char *tmp = setting["bin_path"];
@@ -378,6 +396,7 @@ ConfigData::ConfigData(std::string config_file_path, std::vector<IInferenceAppli
 			readDataType(settings[iter], instances.at(iter));
 			readStreams(settings[iter], instances.at(iter));
 			readCalibTable(settings[iter], instances.at(iter));
+			readTimingCache(settings[iter], instances.at(iter));
 		}
 
 		for(int iter = 0; iter < instance_num; iter++) {
