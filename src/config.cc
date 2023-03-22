@@ -308,6 +308,10 @@ void ConfigData::readDlaCores(Setting &setting, ConfigInstance &config_instance)
 		while( getline(ss,temp,',')) {
 			config_instance.dla_cores.push_back(std::stoi(temp));
 		}
+
+		while(config_instance.device_num > config_instance.dla_cores.size()) {
+			config_instance.dla_cores.push_back(0);
+		}
 	}
 	catch(const SettingNotFoundException &nfex) {
 		std::cerr << "No 'dla_cores' setting in configuration file." << std::endl;

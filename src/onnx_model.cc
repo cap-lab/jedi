@@ -162,8 +162,8 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 		for (int iter2 = 0; iter2 < layer->getNbInputs(); iter2++) {
 			ITensor *tensor = layer->getInput(iter2);
 			if(tensor != nullptr) {
-				std::cerr<<"tensor name: "<<tensor->getName()<<", layer_id: "<<iter1<<", target tensor name: "<<tensor_name<<std::endl;
-				std::cerr<<"tensor isNetworkOutput: "<<tensor->isNetworkOutput()<<std::endl;
+				//std::cerr<<"tensor name: "<<tensor->getName()<<", layer_id: "<<iter1<<", target tensor name: "<<tensor_name<<std::endl;
+				//std::cerr<<"tensor isNetworkOutput: "<<tensor->isNetworkOutput()<<std::endl;
 				if(tensor_name.compare(tensor->getName()) == 0) {
 					return true;					
 				}
@@ -295,15 +295,15 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 
 	int layer_num = network->getNbLayers();
 
-//	for(int index = 0 ; index < layer_num ; index++) {
-//		ILayer *layer = network->getLayer(index);
-//		if(layer->getType() == nvinfer1::LayerType::kPOOLING && data_type == TYPE_INT8) {
-//			IPoolingLayer *poolLayer = (IPoolingLayer *) layer;
-//			if(poolLayer->getPoolingType() == PoolingType::kMAX){
-//				layer->setPrecision( nvinfer1::DataType::kHALF);
-//			}
-//		}
-//	}
+	for(int index = 0 ; index < layer_num ; index++) {
+		ILayer *layer = network->getLayer(index);
+		if(layer->getType() == nvinfer1::LayerType::kPOOLING && data_type == TYPE_INT8) {
+			IPoolingLayer *poolLayer = (IPoolingLayer *) layer;
+			if(poolLayer->getPoolingType() == PoolingType::kMAX){
+				layer->setPrecision( nvinfer1::DataType::kHALF);
+			}
+		}
+	}
 
 	if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  cur_iter > 0) {
 		int input_num = network->getNbInputs();
