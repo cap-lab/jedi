@@ -20,6 +20,7 @@
 #include <tkDNN/Int8BatchStream.h>
 #include <tkDNN/Int8Calibrator.h>
 #include <tkDNN/Int8CalibratorMinMax.h>
+#include <tkDNN/Int8CalibratorHistogram.h>
 #include "detr_onnx_application.h"
 
 #define NMS 0.45
@@ -203,6 +204,7 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	BatchStream *calibrationStream = new BatchStream(dim, 1, detrOnnxAppConfig.calib_images_num, detrOnnxAppConfig.calib_image_path);
 	//Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table, "data");
 	Int8EntropyCalibratorMinMax *calibrator = new Int8EntropyCalibratorMinMax(*calibrationStream, 1, calib_table , "data");
+	// Int8HistogramCalibrator *calibrator = new Int8HistogramCalibrator(*calibrationStream, 1, calib_table , "data");
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
 
