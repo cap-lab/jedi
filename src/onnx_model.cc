@@ -312,7 +312,6 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 					break;
 				}
 			}
-
 		}
 	}
 
