@@ -249,7 +249,7 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 		*orig_height = input_image.rows;
 
 		cv::Mat output_image;    
-		cv::resize(input_image, output_image, cv::Size(800, 800));
+		cv::resize(input_image, output_image, cv::Size(w, h));
 		cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
 		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
 		

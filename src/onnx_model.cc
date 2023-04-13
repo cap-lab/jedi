@@ -274,6 +274,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
+	int device = config_data->instances.at(instance_id).devices.at(cur_iter);
 
 	builder = createInferBuilder(logger);
 
@@ -294,7 +295,7 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 	}
 
 	int layer_num = network->getNbLayers();
-	if(data_type == TYPE_INT8) {
+	if(data_type == TYPE_INT8 && device == DEVICE_GPU) {
 		for(int index = 0 ; index < layer_num ; index++) {
 			ILayer *layer = network->getLayer(index);
 			if(layer->getType() == nvinfer1::LayerType::kPOOLING) {
@@ -310,6 +311,25 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 				if(tensor != nullptr && tensor->isNetworkOutput()) {
 					layer->setPrecision(nvinfer1::DataType::kHALF);
 					break;
+				}
+			}
+		}
+	}
+
+
+	if(data_type == TYPE_INT8 && device == DEVICE_DLA) {
+		for(int index = 0 ; index < layer_num ; index++) {
+			ILayer *layer = network->getLayer(index);
+			if(layer->getType() == nvinfer1::LayerType::kCONVOLUTION){
+				IConvolutionLayer *convLayer = (IConvolutionLayer *) layer;
+				Dims pad_dim = convLayer->getPaddingNd();
+				for (int pad_index = 0 ; pad_index < pad_dim.nbDims ; pad_index++) {
+					// Since DLA INT8 with convolution layer with padding (3,3) drops the accuracy of the network,
+					// We forcely changes this convolution layer to FP16 to prevent accuracy drop of this issue.
+					if(pad_dim.d[pad_index] >= 3) {
+						layer->setPrecision(nvinfer1::DataType::kHALF);
+						break;
+					}
 				}
 			}
 		}
@@ -413,6 +433,8 @@ void OnnxModel::initializeModel() {
 				// config->setFlag(BuilderFlag::kSTRICT_TYPES);
 				config->setFlag(BuilderFlag::kDIRECT_IO);
 				config->setFlag(BuilderFlag::kREJECT_EMPTY_ALGORITHMS);
+				config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_MANAGED_SRAM, 1U << 20);
+				//config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
 			}
 
 			if(data_type == TYPE_FP16 && partial_builder->platformHasFastFp16()) {
@@ -463,8 +485,10 @@ void OnnxModel::initializeModel() {
 				runtime->setDLACore(core);
 			}
 			ICudaEngine* engine = runtime->deserializeCudaEngine(gieModelStream, size);
-
 			assert(engine != nullptr);
+			//auto inspector = std::unique_ptr<IEngineInspector>(engine->createEngineInspector());
+			//std::cout << inspector->getLayerInformation(0, LayerInformationFormat::kJSON); // Print the information of the first layer in the engine.
+			//std::cout << inspector->getEngineInformation(LayerInformationFormat::kJSON);
 			stage->engines.push_back(engine);
 
 			if (gieModelStream) delete [] gieModelStream;
