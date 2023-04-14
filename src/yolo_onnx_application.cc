@@ -270,6 +270,7 @@ void YoloOnnxApplication::initializePreprocessing(std::string network_name, int 
 {
 	this->network_name = network_name;
 	dataset = new ImageDataset(yoloOnnxAppConfig.image_path);
+	result_format = new COCOFormat();
 
 	if(yoloOnnxAppConfig.opencv_parallel_num >= 0) {
 		cv::setNumThreads(0);
@@ -404,7 +405,7 @@ void YoloOnnxApplication::printBox(int sample_index, int batch, Detection *dets,
 		char *path = (char *)(data->path.c_str());
 
 
-		detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
+		result_format->detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
 	}
 }
 
@@ -430,6 +431,10 @@ void YoloOnnxApplication::postprocessing2(int thread_id, int sample_index, int b
 	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 }
 
+void YoloOnnxApplication::writeResultFile(std::string result_file_name) {
+	result_format->writeResultFile(result_file_name);
+}
+
 YoloOnnxApplication::~YoloOnnxApplication()
 {
 	int batch = this->detection_num_vec[0].size();
@@ -442,4 +447,5 @@ YoloOnnxApplication::~YoloOnnxApplication()
 	}
 	yolos.clear();
 	delete dataset;
+	delete result_format;
 }

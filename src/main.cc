@@ -8,10 +8,10 @@
 #include "model.h"
 #include "dataset.h"
 #include "thread.h"
-#include "coco.h"
 #include "util.h"
 
 #include "inference_application.h"
+#include "result_format.h"
 
 typedef struct _InstanceThreadData {
 	PreProcessingThread *pre_thread;
@@ -252,7 +252,10 @@ int main(int argc, char *argv[]) {
 	generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
 
 	// write file
-	writeResultFile(result_file_name);
+	for(int iter = 0; iter < instance_num; iter++)
+	{
+		apps[iter]->writeResultFile(result_file_name);
+	}
 
 	// clear data
 	finalizeData(instance_num, models, apps);

@@ -4,6 +4,7 @@
 
 #include "variable.h"
 #include "image_dataset.h"
+#include "coco_format.h"
 
 #include "inference_application.h"
 
@@ -39,6 +40,7 @@ class YoloApplication : public IInferenceApplication {
 		InputDim input_dim;
 		bool letter_box;
 		ImageDataset *dataset;
+		COCOFormat *result_format;
 		std::vector<Detection *> dets_vec;
 		std::vector<std::vector<int>> detection_num_vec;
 		std::string network_name;
@@ -53,6 +55,7 @@ class YoloApplication : public IInferenceApplication {
 		void yoloLayerDetect(int sampleIndex, int batch, float **output_buffers, int output_num, Detection *dets, std::vector<int> &detections_num);
 		void detectBox(float **output_buffers, int output_num, int sampleIndex, int batch, Detection *dets, std::vector<int> &detections_num);
 		void printBox(int sample_index, int batch, Detection *dets, std::vector<int> detections_num);
+		void writeResultFile(std::string result_file_name);
 };
 
 #endif

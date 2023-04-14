@@ -1,4 +1,5 @@
 #include <opencv2/core/version.hpp>
+#include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/opencv_modules.hpp>
@@ -273,3 +274,37 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 	}
 }
 
+void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input)
+{
+	try {
+		cv::Mat input_image = cv::imread(filename);
+
+		cv::Mat output_image;    
+		cv::resize(input_image, output_image, cv::Size(w, h));
+		cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
+
+		int offsetW = (output_image.cols - crop_size) / 2;
+		int offsetH = (output_image.rows - crop_size) / 2;
+		const cv::Rect roi(offsetW, offsetH, crop_size, crop_size);
+		output_image = output_image(roi).clone();
+
+		// normalize with mean and std of imagenet
+		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
+		const float std[3] = {0.229, 0.224, 0.225};
+		int height = output_image.rows;
+		int width = output_image.cols;
+		int channels = output_image.channels();
+		for (int ch = 0; ch < channels; ch++) {
+			for (int height_index = 0; height_index < height; height_index++) {
+				for (int width_index = 0; width_index < width; width_index++) {
+					int input_index = ch * width * height + height_index * width + width_index;
+					input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch] - mean[ch]) / std[ch];
+				}
+			}
+		}
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
+	}
+}

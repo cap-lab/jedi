@@ -1,16 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "variable.h"
-#include "config.h"
-#include "coco.h"
-
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <map>
-#include <vector>
-#include <mutex>
+#include "coco_format.h"
 
 static int coco_ids[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
 						11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 
@@ -21,7 +9,7 @@ static int coco_ids[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 						67, 70, 72, 73, 74, 75, 76, 77, 78, 79,
     					80, 81, 82, 84, 85, 86, 87, 88, 89, 90};
 
-static int get_coco_image_id(char *filename) {
+int COCOFormat::get_coco_image_id(char *filename) {
     char *p = strrchr(filename, '/');
     char *c = strrchr(filename, '_');
     if (c)
@@ -29,10 +17,7 @@ static int get_coco_image_id(char *filename) {
     return atoi(p + 1);
 }
 
-static std::map<int,std::list<std::string>> detected_map;
-static std::mutex mu;
-
-void writeResultFile(std::string result_file_name) {
+void COCOFormat::writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
 	std::ofstream result_file;
 	std::vector<std::string> results_vec;
@@ -66,7 +51,7 @@ void writeResultFile(std::string result_file_name) {
 }
 
 
-void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path) {
+void COCOFormat::detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path) {
 	// detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
 	int i, j;
 	int image_id = get_coco_image_id(path);
@@ -110,11 +95,8 @@ void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int i
 }
 
 
-void addToDetectedMap(int image_index, std::list<std::string> detected){
+void COCOFormat::addToDetectedMap(int image_index, std::list<std::string> detected){
 	mu.lock();
 	detected_map.insert(std::pair<int,std::list<std::string>>(image_index,detected));
 	mu.unlock();
 }
-
-
-

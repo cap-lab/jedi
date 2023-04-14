@@ -35,6 +35,9 @@ class IInferenceApplication {
 		virtual IJediNetwork *createNetwork(ConfigInstance *basic_config_data) = 0;
 
 		virtual void readCustomOptions(libconfig::Setting &setting) {};
+
+		virtual void writeResultFile(std::string result_file_name) = 0;
+
 		//virtual void initializeInference() = 0;
 		//virtual void finalizeInference() {};
 		//void registerModel(std::string model_type) { g_InputModelRegistry.create(model_type); }

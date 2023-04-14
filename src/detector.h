@@ -12,7 +12,6 @@
 #include "image_opencv.h"
 #include "region_wrapper.h"
 #include "yolo_wrapper.h"
-#include "coco.h"
 
 void doPreProcessing(void *d);
 

@@ -1,9 +1,7 @@
 #include "config.h"
 #include "variable.h"
-//#include "model.h"
 #include "dataset.h"
 #include "thread.h"
-#include "coco.h"
 
 long getTime() {
 	struct timespec time;

@@ -7,7 +7,7 @@
 
 #include "config.h"
 #include "variable.h"
-#include "coco.h"
+#include "coco_format.h"
 
 typedef struct _YoloData {
 	float *mask;

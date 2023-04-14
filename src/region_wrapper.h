@@ -4,7 +4,7 @@
 #include"config.h"
 #include "variable.h"
 #include "box.h"
-#include "coco.h"
+#include "coco_format.h"
 
 #define COORDS     4
 #define NUM_ANCHOR 5

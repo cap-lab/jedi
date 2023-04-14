@@ -202,8 +202,8 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	input_dim.height = tensor_dim.d[3];
 	dataDim_t dim(tensor_dim.d[0], tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 	BatchStream *calibrationStream = new BatchStream(dim, 1, detrOnnxAppConfig.calib_images_num, detrOnnxAppConfig.calib_image_path);
-	//Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table, "data");
-	Int8EntropyCalibratorMinMax *calibrator = new Int8EntropyCalibratorMinMax(*calibrationStream, 1, calib_table , "data");
+	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table, "data");
+	//Int8EntropyCalibratorMinMax *calibrator = new Int8EntropyCalibratorMinMax(*calibrationStream, 1, calib_table , "data");
 	// Int8HistogramCalibrator *calibrator = new Int8HistogramCalibrator(*calibrationStream, 1, calib_table , "data");
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
@@ -216,6 +216,7 @@ void DETROnnxApplication::initializePreprocessing(std::string network_name, int 
 {
 	this->network_name = network_name;
 	dataset = new ImageDataset(detrOnnxAppConfig.image_path);
+	result_format = new COCOFormat();
 
 	if(detrOnnxAppConfig.opencv_parallel_num >= 0) {
 		cv::setNumThreads(0);
@@ -301,7 +302,7 @@ void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN fl
 				detected.push_back(result.str());
 			}
 		}
-		addToDetectedMap(image_index, detected);
+		result_format->addToDetectedMap(image_index, detected);
 	}
 }
 
@@ -376,7 +377,9 @@ void DETROnnxApplication::softmax(float *logit){
     }
 }
 
-
+void DETROnnxApplication::writeResultFile(std::string result_file_name) {
+	result_format->writeResultFile(result_file_name);
+}
 
 DETROnnxApplication::~DETROnnxApplication()
 {
@@ -389,4 +392,5 @@ DETROnnxApplication::~DETROnnxApplication()
 		dets_vec.pop_back();
 	}
 	delete dataset;
+	delete result_format;
 }

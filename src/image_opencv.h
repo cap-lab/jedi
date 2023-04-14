@@ -7,6 +7,7 @@ void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *
 void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input);
 
 void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input);
+void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input);
 
 
 #endif

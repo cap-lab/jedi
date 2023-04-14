@@ -379,6 +379,7 @@ void OnnxModel::saveTimingCache(ITimingCache *cache) {
 
 void OnnxModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
+	int batch = config_data->instances.at(instance_id).batch;
 	TensorRTNetwork *tensorrt_network = nullptr;
 	IBuilder *builder = nullptr;
 	INetworkDefinition *network = nullptr;
@@ -423,6 +424,20 @@ void OnnxModel::initializeModel() {
 			loadTimingCache(config, cache);
 			config->setTimingCache(*cache, false);
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
+
+			IOptimizationProfile* profile = partial_builder->createOptimizationProfile();	
+			for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
+				ITensor *tensor = partial_network->getInput(iter2);
+				Dims tensor_dim = tensor->getDimensions();
+				// change batch size of a dynamic onnx model
+				tensor_dim.d[0] = batch;
+
+				profile->setDimensions(tensor->getName(), OptProfileSelector::kMIN, tensor_dim);
+				profile->setDimensions(tensor->getName(), OptProfileSelector::kOPT, tensor_dim);
+				profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);
+			}
+			config->addOptimizationProfile(profile);
+	
 
 			// DLA options	
 			if (device == DEVICE_DLA) {

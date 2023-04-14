@@ -4,7 +4,6 @@
 
 #include "variable.h"
 #include "box.h"
-#include "coco.h"
 
 #include "image_opencv_cnet.h"
 
@@ -946,6 +945,7 @@ void CenternetApplication::initializePreprocessing(std::string network_name, int
 {
 	this->network_name = network_name;
 	dataset = new ImageDataset(centernetAppConfig.image_path);
+	result_format = new COCOFormat();
 
 	dst.at<float>(0,0)= input_dim.width * 0.5;
 	dst.at<float>(0,1)= input_dim.height * 0.5;
@@ -979,7 +979,7 @@ void CenternetApplication::printBox(int sample_index, int batch, Detection *dets
 		ImageData *data = dataset->getData(image_index);
 		char *path = (char *)(data->path.c_str());
 
-		detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
+		result_format->detectCOCO(&dets[iter1 * NBOXES], detections_num[iter1], image_index, data->width, data->height, input_dim.width, input_dim.height, path);
 	}
 }
 
@@ -1149,6 +1149,10 @@ void CenternetApplication::postprocessing2(int thread_id, int sample_index, int 
 	printBox(sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 }
 
+void CenternetApplication::writeResultFile(std::string result_file_name) {
+	result_format->writeResultFile(result_file_name);
+}
+
 CenternetApplication::~CenternetApplication()
 {
 	while(post_streams.size() > 0) {
@@ -1199,6 +1203,7 @@ CenternetApplication::~CenternetApplication()
 	}
 
 	delete dataset;
+	delete result_format;
 }
 
 

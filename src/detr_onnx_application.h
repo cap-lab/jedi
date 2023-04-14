@@ -3,7 +3,7 @@
 #define DETR_ONNX_APPLICATION_H_
 
 #include "variable.h"
-#include "image_dataset.h"
+#include "coco_format.h"
 #include "inference_application.h"
 #include "config.h"
 #include "yolo_wrapper.h"
@@ -55,6 +55,7 @@ class DETROnnxApplication : public IInferenceApplication {
 		InputDim input_dim;
 		bool letter_box;
 		ImageDataset *dataset;
+		COCOFormat *result_format;
 		std::vector<Detection *> dets_vec;
 		std::vector<std::vector<int>> detection_num_vec;
 		std::string network_name;
@@ -71,6 +72,7 @@ class DETROnnxApplication : public IInferenceApplication {
         int get_coco_image_id(char *filename);
         void sumConfidence(float *logit);
 
+		void writeResultFile(std::string result_file_name);
 };
 
 #endif
