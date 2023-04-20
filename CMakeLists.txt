@@ -1,4 +1,6 @@
-cmake_minimum_required (VERSION 2.8)
+project(JEDI)
+
+cmake_minimum_required (VERSION 3.2)
 
 find_package( OpenCV REQUIRED )
 find_package( CUDA REQUIRED )

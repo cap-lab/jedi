@@ -235,10 +235,10 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 	}
 
 	for(auto name :input_name_vec) {
-		inputs.append(name + ":auto:auto ");	
+		inputs.append("\"" + name + ":auto:auto\" ");	
 	}
 	for(auto name :output_name_vec) {
-		outputs.append(name + ":auto ");	
+		outputs.append("\"" + name + ":auto\" ");	
 	}
 
 	cmd = cmd + inputs + outputs;
@@ -460,6 +460,7 @@ void OnnxModel::initializeModel() {
 					config->setFlag(BuilderFlag::kFP16);
 				}
 				config->setFlag(BuilderFlag::kINT8);
+				config->setCalibrationProfile(profile);
 				config->setInt8Calibrator(tensorrt_network->calibrator);
 			}
 
