@@ -108,7 +108,6 @@ cv::Mat letterbox(const cv::Mat& src, uchar pad) {
 
 #define GRAY_COLOR 127
 
-
 void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
 	try {
@@ -280,8 +279,10 @@ void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop
 		cv::Mat input_image = cv::imread(filename);
 
 		cv::Mat output_image;    
-		cv::resize(input_image, output_image, cv::Size(w, h));
-		cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+		cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_LINEAR);
+		//cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_CUBIC);
+		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
+		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
 		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
 
 		int offsetW = (output_image.cols - crop_size) / 2;
@@ -308,3 +309,60 @@ void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop
 		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
 	}
 }
+
+void loadImageResizeCrop(std::string filename, int w, int h, int c, float *input)
+{
+	try {
+		cv::Mat input_image = cv::imread(filename);
+
+		int new_w;
+		int new_h;
+		int img_height = input_image.rows;
+		int img_width = input_image.cols;
+
+		double scale = 87.5;
+		new_h = (int) (100. * h / scale);
+		new_w = (int) (100. * w / scale);
+		if(img_height > img_width) {
+			new_h = (int) (new_h * img_height / img_width);
+		}
+		else {
+			new_w = (int) (new_w * img_width / img_height);
+		}
+
+		cv::Mat output_image(new_h, new_w, CV_8UC3);
+
+		cv::resize(input_image, output_image, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
+		//cv::resize(input_image, output_image, cv::Size(w, h));
+		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
+
+
+		int offsetW = (output_image.cols - w) / 2;
+		int offsetH = (output_image.rows - h) / 2;
+
+		const cv::Rect roi(offsetW, offsetH, w, h);
+		output_image = output_image(roi).clone();
+
+		output_image.convertTo(output_image, CV_32FC3, 1.0f / 128.0f, - 127.0f/128.0f);
+
+		int height = output_image.rows;
+		int width = output_image.cols;
+
+		int channels = output_image.channels();
+		for (int ch = 0; ch < channels; ch++) {
+			for (int height_index = 0; height_index < height; height_index++) {
+				for (int width_index = 0; width_index < width; width_index++) {
+					int input_index = ch * width * height + height_index * width + width_index;
+					input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch]);// - 127.0;
+					input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch]);// / 128.0;
+				}
+			}
+		}
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageResizeCrop() can't load image %s " << filename << std::endl;
+	}
+}
+
+

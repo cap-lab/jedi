@@ -13,7 +13,6 @@
 #include "image_opencv.h"
 #include "region_wrapper.h"
 #include "yolo_wrapper.h"
-#include "coco.h"
 #include "util.h"
 
 #include "inference_application.h"
@@ -263,6 +262,22 @@ void doInference(void *d) {
 			}
 			assigned_buffer_id = assignedSampleId[iter] % buffer_num;
 			model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
+
+			/*int binding_num = model->stages[device_id]->contexts[0]->getEngine().getNbIOTensors();
+			for(int iter1 = 0; iter1 < binding_num; iter1++) {
+				auto const& name = model->stages[device_id]->contexts[0]->getEngine().getIOTensorName(iter1);
+				auto const& mode = model->stages[device_id]->contexts[0]->getEngine().getTensorIOMode(name);
+				bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
+
+				if(!isInput) {
+					TensorAllocator *allocator = (TensorAllocator *)model->stages[device_id]->contexts[0]->getOutputAllocator(name);
+					char *data = (char *) allocator->getBuf();
+				    std::ofstream p("merong.data", std::ios::binary);
+				    p.write(data, allocator->getSize());
+					break;
+				}
+			}*/
+
 			model->stages[device_id]->updateOutputSignals(assigned_buffer_id, true);
 			ready[iter] = 1;
 		}	

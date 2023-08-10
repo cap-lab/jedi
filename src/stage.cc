@@ -196,7 +196,7 @@ void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stre
 			float *host_buf = !is_host_allocated ? nullptr : (is_input ? input_buffers[iter2] : output_buffers[iter2-input_binding_num]);
 
 			// fprintf(stderr, "tensor name: %s, is_host_allocated: %d, host_buf: %p, size: %ld\n", name, is_host_allocated, host_buf, size);
-			TensorAllocator *allocator = new TensorAllocator(is_host_allocated, buf, host_buf, size, dtype);	
+			TensorAllocator *allocator = new TensorAllocator(is_host_allocated, buf, host_buf, size, dtype);
 
 			tensor_allocator.push_back(allocator);
 		}

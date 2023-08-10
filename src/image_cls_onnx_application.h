@@ -9,6 +9,7 @@
 
 #include "config.h"
 
+
 typedef struct _ImageClsOnnxAppConfig {
 	std::string onnx_file_path;
 	std::string calib_image_path;
@@ -16,6 +17,7 @@ typedef struct _ImageClsOnnxAppConfig {
 	std::string label_path;
 	int calib_images_num;
 	int opencv_parallel_num;
+	ImagePreprocessingOption preprocessing_option;
 } ImageClsOnnxAppConfig;
 
 
@@ -47,10 +49,12 @@ class ImageClsOnnxApplication : public IInferenceApplication {
 		void readImagePath(libconfig::Setting &setting);
 		void readLabelPath(libconfig::Setting &setting);
 		void readOpenCVParallelNum(libconfig::Setting &setting);
+		void readImagePreprocessingOption(libconfig::Setting &setting);
 
 		char* nolibStrStr(const char *s1, const char *s2);
 		int generateTruths(std::string path);
 		void writeResultFile(std::string result_file_name);
+		void softmax(float *logit);
 
 };
 

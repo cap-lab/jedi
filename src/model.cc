@@ -47,12 +47,7 @@ void* Model::makeCUDAArray(int stage_id, int size) {
 
 	int data_type = this->config_data->instances.at(instance_id).data_types.at(stage_id);
 
-	if(data_type == TYPE_FP32) {
-		space = (void *)cuda_make_array(NULL, size);
-	}
-	else {
-		space = (void *)cuda_make_array_16(NULL, size);
-	}
+	space = (void *)cuda_make_array(NULL, size);
 
 	return space;
 }

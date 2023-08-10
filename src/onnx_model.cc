@@ -335,22 +335,31 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 		}
 	}
 
-	if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  cur_iter > 0) {
-		int input_num = network->getNbInputs();
-		for (int  index = 0 ; index < input_num ; index++) {
-			ITensor *tensor = network->getInput(index);
-			tensor->setType(nvinfer1::DataType::kHALF);
-		}
-	}
+	/*if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  cur_iter > 0) {
+		int prev_data_type = config_data->instances.at(instance_id).data_types.at(cur_iter - 1);
+		if(prev_data_type == TYPE_FP16 || prev_data_type == TYPE_INT8) {
+			int input_num = network->getNbInputs();
+			for (int  index = 0 ; index < input_num ; index++) {
+				ITensor *tensor = network->getInput(index);
+				//tensor->setType(nvinfer1::DataType::kHALF);
+				tensor->setType(nvinfer1::DataType::kFLOAT);
 
-	if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  device_num > 1 && cur_iter < device_num - 1) {
-		int output_num = network->getNbOutputs();
-		for (int  index = 0 ; index < output_num ; index++) {
-			ITensor *tensor = network->getOutput(index);
-			tensor->setType(nvinfer1::DataType::kHALF);
-			std::cerr << "output type set to FP16: " << tensor->getName() << std::endl;
+			}
 		}
-	}
+	}*/
+
+	/*if ((data_type == TYPE_FP16 || data_type == TYPE_INT8) &&  device_num > 1 && cur_iter < device_num - 1) {
+		int next_data_type = config_data->instances.at(instance_id).data_types.at(cur_iter + 1);
+		if (next_data_type == TYPE_FP16 || data_type == TYPE_INT8) {
+			int output_num = network->getNbOutputs();
+			for (int  index = 0 ; index < output_num ; index++) {
+				ITensor *tensor = network->getOutput(index);
+				//tensor->setType(nvinfer1::DataType::kHALF);
+				tensor->setType(nvinfer1::DataType::kFLOAT);
+				std::cerr << "output type set to FP16: " << tensor->getName() << std::endl;
+			}
+		}
+	}*/
 }
 
 void OnnxModel::loadTimingCache(IBuilderConfig* config, ITimingCache* &cache) {
@@ -424,6 +433,7 @@ void OnnxModel::initializeModel() {
 			loadTimingCache(config, cache);
 			config->setTimingCache(*cache, false);
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
+			//config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
 
 			IOptimizationProfile* profile = partial_builder->createOptimizationProfile();	
 			for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
@@ -443,7 +453,13 @@ void OnnxModel::initializeModel() {
 			if (device == DEVICE_DLA) {
 				config->setFlag(BuilderFlag::kFP16);
 				config->setDefaultDeviceType(nvinfer1::DeviceType::kDLA);
-				config->setDLACore(dla_core);
+				if(dla_core < 2) {
+					config->setDLACore(dla_core);
+				}
+				else {
+					config->setDLACore(0);
+
+				}
 				config->setFlag(BuilderFlag::kGPU_FALLBACK);
 				// config->setFlag(BuilderFlag::kSTRICT_TYPES);
 				config->setFlag(BuilderFlag::kDIRECT_IO);

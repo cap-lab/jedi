@@ -91,6 +91,40 @@ void ImageClsOnnxApplication::readCalibImagesNum(libconfig::Setting &setting){
 }
 
 
+void ImageClsOnnxApplication::readImagePreprocessingOption(libconfig::Setting &setting) {
+	try{	
+		const char *tmp = setting["image_preprocessing"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+
+		if (data == "resize") {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE;
+		}
+		else if (data == "letterbox") {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_LETTERBOX;
+
+		}
+		else if(data == "resize_norm") {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE_NORM;
+		}
+		else if(data == "resize_crop_norm") {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE_CROP_NORM;
+		}
+		else if (data == "resize_crop") {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE_CROP;
+		}
+		else {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE;
+		}
+
+		std::cerr<<"image_preprocessing: "<< data <<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'calib_image_path' setting in configuration file. Set resize as a default." << std::endl;
+		imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE;
+	}
+}
 
 void ImageClsOnnxApplication::readImagePath(libconfig::Setting &setting) {
 	try{	
@@ -146,6 +180,7 @@ void ImageClsOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readOpenCVParallelNum(setting);
 	readCalibImagePath(setting);
 	readCalibImagesNum(setting);
+	readImagePreprocessingOption(setting);
 }
 
 IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_config_data)
@@ -215,14 +250,30 @@ void ImageClsOnnxApplication::preprocessing(int thread_id, int sample_index, int
 	int image_index = (sample_index + batch_index) % dataset->getSize();
 
 	ImageData *image_data = dataset->getData(image_index);
-	int orignal_width = 0;
+	int original_width = 0;
 	int original_height = 0;
 
-	// std::cerr<<"width: "<<input_dim.width<<" height: "<<input_dim.height<<std::endl;
-	// loadImageResize((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &orignal_width, &original_height, input_buffer);
-	loadImageResizeCropNorm((char *)(image_data->path.c_str()), 256, 256, 3, 224, input_buffer);
+	switch(imageClsOnnxAppConfig.preprocessing_option) {
+		case LOAD_IMAGE_RESIZE:
+			loadImageResize((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
+			break;
+		case LOAD_IMAGE_LETTERBOX:
+			loadImageLetterBox((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
+		case LOAD_IMAGE_RESIZE_NORM:
+			loadImageResizeNorm((char *)image_data->path.c_str(), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
+			break;
+		case LOAD_IMAGE_RESIZE_CROP_NORM:
+			loadImageResizeCropNorm((char *)(image_data->path.c_str()), input_dim.width + 32, input_dim.height + 32, input_dim.channel, input_dim.width, input_buffer); // efficient former
+			break;
+		case LOAD_IMAGE_RESIZE_CROP:
+			loadImageResizeCrop((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, input_buffer); // efficient net
+			break;
+		default:
+			loadImageResize((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
+			break;
+	}
 
-	image_data->width = orignal_width;
+	image_data->width = original_width;
 	image_data->height = original_height;
 }
 
@@ -241,7 +292,7 @@ void ImageClsOnnxApplication::initializePostprocessing(std::string network_name,
 }
 
 char* ImageClsOnnxApplication::nolibStrStr(const char *s1, const char *s2) {
-	// fprintf(stderr, "s1: |%s|, s2: |%s|\n", s1, s2);
+	//fprintf(stderr, "s1: |%s|, s2: |%s|\n", s1, s2);
 	int i;
 	if (*s2 == '\0') {
 		return (char *)s1;
@@ -268,6 +319,27 @@ int ImageClsOnnxApplication::generateTruths(std::string path) {
 	return -1;
 }
 
+void ImageClsOnnxApplication::softmax(float *logit){
+	int i = 0;
+    float sum = 0;
+    float largest = -FLT_MAX;
+    for(i = 0; i < class_num; ++i){
+        if(logit[i] > largest) largest = logit[i];
+    }
+
+    for(i = 0; i < class_num; ++i){
+        float e = exp(logit[i] - largest);
+        sum += e;
+        logit[i] = e;
+    }
+
+    for(i = 0; i < class_num; ++i){
+        logit[i] /= sum;
+    }
+}
+
+
+
 void ImageClsOnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
 {
 	float *data_to_check = output_buffers[0];
@@ -279,9 +351,11 @@ void ImageClsOnnxApplication::postprocessing1(int thread_id, int sample_index, I
 		std::string path = data->path;
 
 		int answer = generateTruths(path);	
+		//softmax(&(data_to_check[iter1*class_num]));
 
 		int guess = -1;
-		float max_value = std::numeric_limits<float>::min();
+		float max_value = std::numeric_limits<float>::lowest();
+		//float max_value = std::numeric_limits<float>::min();
 		for (int iter2 = 0; iter2 < class_num; iter2++) {
 			if (max_value < data_to_check[iter1 * class_num + iter2]) {
 				max_value = data_to_check[iter1 * class_num + iter2];

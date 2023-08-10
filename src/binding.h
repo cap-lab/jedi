@@ -22,10 +22,7 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 			else {
 				if(buf != nullptr)
 					cudaFree(buf);
-				if(data_type == nvinfer1::DataType::kFLOAT)
-					buf = (void *)cuda_make_array(nullptr, _size);
-				else
-					buf = (void *)cuda_make_array_16(nullptr, _size);
+				buf = (void *)cuda_make_array(nullptr, _size);
 				host_buf = nullptr;
 			}
 			size = _size;
