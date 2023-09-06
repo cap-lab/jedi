@@ -13,3 +13,4 @@ Makefile
 .*.sw*
 *.o
 *.*.o
+*.log

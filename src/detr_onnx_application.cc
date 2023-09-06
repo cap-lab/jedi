@@ -208,6 +208,12 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
 
+	// object detection has two outputs
+	ITensor *logitsTensor = jedi_network->network->getOutput(0);
+	Dims logit_dim = logitsTensor->getDimensions();
+	num_detections = logit_dim.d[1];
+	num_classes = logit_dim.d[2];
+
 	return jedi_network;
 }
 
@@ -226,7 +232,6 @@ void DETROnnxApplication::initializePreprocessing(std::string network_name, int 
 
 void DETROnnxApplication::initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number)
 {
-	setBiases(network_name);
 	for (int i = 0 ; i < thread_number ; i++ ) {
 		Detection *dets;
 		allocateDetectionBox(maximum_batch_size, &dets);
@@ -245,6 +250,7 @@ void DETROnnxApplication::preprocessing(int thread_id, int sample_index, int bat
 	int original_height = 0;
 
 	loadImageResizeNorm(image_data->path, input_dim.width, input_dim.height, input_dim.channel, &orignal_width, &original_height, input_buffer);
+	//loadImageLetterBoxNorm((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &orignal_width, &original_height, input_buffer);
 
 	image_data->width = orignal_width;
 	image_data->height = original_height;
@@ -257,8 +263,8 @@ void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN fl
 		int image_index = (sample_index * batch + batch_index) % dataset->getSize();
 		std::list<std::string> detected;
 
-		for (int box_index = 0; box_index < DETR_MAX_BOXES_SINGLE_IMAGE; box_index++) {
-			float* logit = output_buffers[0] + batch_index*DETR_MAX_BOXES_SINGLE_IMAGE*DETR_NUM_CLASSES + box_index*DETR_NUM_CLASSES;
+		for (int box_index = 0; box_index < num_detections; box_index++) {
+			float* logit = output_buffers[0] + batch_index*num_detections*num_classes + box_index*num_classes;
 			float confidence = 0.0;
 			int label = 0;
 
@@ -275,18 +281,19 @@ void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN fl
 				ImageData *image_data = dataset->getData(image_index);
 				float orig_width = (float) image_data->width;
 				float orig_height = (float) image_data->height;
+
 				char *path = (char *)(image_data->path.c_str());
 				int image_id = get_coco_image_id(path);
 
-				// float* logit = output_buffers[0] + batch_index + DETR_MAX_BOXES_SINGLE_IMAGE*DETR_NUM_CLASSES + box_index * DETR_NUM_CLASSES;
-				float *pred_box = output_buffers[1] + batch_index*DETR_MAX_BOXES_SINGLE_IMAGE*4 + box_index * 4;
+				// float* logit = output_buffers[0] + batch_index + num_detections*num_classes + box_index * num_classes;
+				float *pred_box = output_buffers[1] + batch_index*num_detections*4 + box_index * 4;
 
 				//rescale box 
 				// float rescale_width = orig_width / this->input_dim.width;
 				// float rescale_height = orig_height / this->input_dim.height;
 
-				float bx = (pred_box[0]-pred_box[2]/2.) * orig_width;
-				float by = (pred_box[1]-pred_box[3]/2.) * orig_height;
+				float bx = (pred_box[0] - pred_box[2]/2.) * orig_width;
+				float by = (pred_box[1] - pred_box[3]/2.) * orig_height;
 				float bw = pred_box[2] * orig_width;
 				float bh = pred_box[3] * orig_height;
 
@@ -306,16 +313,6 @@ void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN fl
 	}
 }
 
-void DETROnnxApplication::sumConfidence(float *logit) {
-	// do nothing
-	float sum =0.0;
-	for(int i =0 ; i<DETR_NUM_CLASSES; i++){
-		sum += logit[i];
-	}
-
-	std::cout << sum << std::endl;
-}
-
 int DETROnnxApplication::get_coco_image_id(char *filename) {
     char *p = strrchr(filename, '/');
     char *c = strrchr(filename, '_');
@@ -329,15 +326,19 @@ void DETROnnxApplication::postprocessing2(int thread_id, int sample_index, int b
 }
 
 
+#define DETR_MAX_CLASSES (91)
+
 void DETROnnxApplication::computeConfidenceAndLabels(float *logit, float &confidence, int &label)
 {
 	// softmax(logit) => prob
 	softmax(logit); 
+
+	int max_classes = std::min(num_classes, DETR_MAX_CLASSES);
 	
 	// get max score and class
 	float max_value = 0.0;
 	int max_index = 0;
-	for(int class_index = 0; class_index < DETR_NUM_CLASSES-1; class_index++) {
+	for(int class_index = 0; class_index < max_classes; class_index++) {
 		if (logit[class_index] > max_value) {
 			max_value = logit[class_index];
 			max_index = class_index;
@@ -351,28 +352,28 @@ void DETROnnxApplication::computeConfidenceAndLabels(float *logit, float &confid
 void DETROnnxApplication::softmax(float *logit){
 	// int iter1 = 0;
 	// float sum = 0;
-	// for (iter1 = 0; iter1 < DETR_NUM_CLASSES; iter1++) {
+	// for (iter1 = 0; iter1 < num_classes; iter1++) {
 	// 	logit[iter1] = expf(logit[iter1]);
 	// 	sum += logit[iter1];
 	// }
 
-	// for (iter1 = 0; iter1 < DETR_NUM_CLASSES; iter1++) {
+	// for (iter1 = 0; iter1 < num_classes; iter1++) {
 	// 	logit[iter1] /= sum;
 	// }
 	int i = 0;
     float sum = 0;
     float largest = -FLT_MAX;
-    for(i = 0; i < DETR_NUM_CLASSES; ++i){
+    for(i = 0; i < num_classes; ++i){
         if(logit[i] > largest) largest = logit[i];
     }
 
-    for(i = 0; i < DETR_NUM_CLASSES; ++i){
+    for(i = 0; i < num_classes; ++i){
         float e = exp(logit[i] - largest);
         sum += e;
         logit[i] = e;
     }
 
-    for(i = 0; i < DETR_NUM_CLASSES; ++i){
+    for(i = 0; i < num_classes; ++i){
         logit[i] /= sum;
     }
 }

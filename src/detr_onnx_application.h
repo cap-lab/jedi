@@ -59,6 +59,8 @@ class DETROnnxApplication : public IInferenceApplication {
 		std::vector<Detection *> dets_vec;
 		std::vector<std::vector<int>> detection_num_vec;
 		std::string network_name;
+		int num_detections =  100;
+		int num_classes = 92;
 
 		void readOnnxFilePath(libconfig::Setting &setting);
 		void readCalibImagePath(libconfig::Setting &setting);
@@ -70,7 +72,6 @@ class DETROnnxApplication : public IInferenceApplication {
         void computeConfidenceAndLabels(float *logit, float &confidence, int &label);
         void softmax(float *logit);
         int get_coco_image_id(char *filename);
-        void sumConfidence(float *logit);
 
 		void writeResultFile(std::string result_file_name);
 };

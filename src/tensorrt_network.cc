@@ -21,7 +21,7 @@ static void printCenteredTitle(const char *title, char fill, int dim) {
 }
 
 
-static std::string convertLayerTypeToString(ILayer *layer) {
+std::string convertLayerTypeToString(ILayer *layer) {
 	std::string type_name;
 	switch(layer->getType()){
 		case LayerType::kCONVOLUTION:

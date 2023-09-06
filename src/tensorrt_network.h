@@ -10,6 +10,8 @@
 
 #include "jedi_network.h"
 
+std::string convertLayerTypeToString(nvinfer1::ILayer *layer);
+
 class TensorRTNetwork : public IJediNetwork {
 	public:
 		TensorRTNetwork() {};

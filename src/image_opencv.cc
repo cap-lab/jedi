@@ -141,6 +141,56 @@ void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, in
 	}
 }
 
+void loadImageLetterBoxNorm(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
+{
+	try {
+		cv::Mat loaded_image = load_image_mat(filename, c);
+
+		*orig_width = loaded_image.cols;
+		*orig_height = loaded_image.rows;
+
+		int new_w = loaded_image.cols;
+		int new_h = loaded_image.rows;
+		if (((float)w / loaded_image.cols) < ((float)h / loaded_image.rows)) {
+				new_w = w;
+				new_h = (loaded_image.rows * w) / loaded_image.cols;
+		}
+		else {
+				new_h = h;
+				new_w = (loaded_image.cols * h) / loaded_image.rows;
+		}
+
+		cv::Mat resized(new_h, new_w, CV_8UC3);
+		cv::resize(loaded_image, resized, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
+		int N = std::max(new_w, new_h);
+		cv::Mat dst = cv::Mat::zeros(w, h, CV_8UC3) + cv::Scalar(GRAY_COLOR, GRAY_COLOR, GRAY_COLOR, 0);
+		int dx = (N - new_w) / 2;
+		int dy = (N - new_h) / 2;
+		resized.copyTo(dst(cv::Rect(dx, dy, new_w, new_h)));
+		mat_to_data(dst, input);
+
+		// normalize with mean and std of imagenet
+		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
+		const float std[3] = {0.229, 0.224, 0.225};
+		int height = resized.rows;
+		int width = resized.cols;
+		int channels = c;
+		for (int ch = 0; ch < channels; ch++) {
+			for (int height_index = 0; height_index < height; height_index++) {
+				for (int width_index = 0; width_index < width; width_index++) {
+					int input_index = ch * width * height + height_index * width + width_index;
+					input[input_index] = (input[input_index] - mean[ch]) / std[ch];
+				}
+			}
+		}
+
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageLetterBox() can't load image %s " << filename << std::endl;
+	}
+}
+
+
 
 static cv::Mat getSrcAffineMatrix(int orig_width, int orig_height) {
 	cv::Mat src = cv::Mat(cv::Size(2,3), CV_32F);
@@ -240,6 +290,63 @@ void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *
 	}
 }
 
+void loadImageResizeCropNormML(std::string filename, int w, int h, int c, float *input)
+{
+	try {
+		cv::Mat input_image = cv::imread(filename);
+
+		int new_w;
+		int new_h;
+		int img_height = input_image.rows;
+		int img_width = input_image.cols;
+
+		double scale = 87.5;
+		new_h = (int) (100. * h / scale);
+		new_w = (int) (100. * w / scale);
+		if(img_height > img_width) {
+			new_h = (int) (new_h * img_height / img_width);
+		}
+		else {
+			new_w = (int) (new_w * img_width / img_height);
+		}
+
+		cv::Mat output_image(new_h, new_w, CV_8UC3);
+
+		cv::resize(input_image, output_image, cv::Size(new_w, new_h), 0, 0, cv::INTER_LINEAR);
+		//cv::resize(input_image, output_image, cv::Size(w, h));
+		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
+
+		const float mean[3] = {123.68, 116.78, 103.94};
+
+		int offsetW = (output_image.cols - w) / 2;
+		int offsetH = (output_image.rows - h) / 2;
+
+		const cv::Rect roi(offsetW, offsetH, w, h);
+		output_image = output_image(roi).clone();
+
+		output_image.convertTo(output_image, CV_32FC3, 1.0f);
+
+		int height = output_image.rows;
+		int width = output_image.cols;
+
+		int channels = output_image.channels();
+		for (int ch = 0; ch < channels; ch++) {
+			for (int height_index = 0; height_index < height; height_index++) {
+				for (int width_index = 0; width_index < width; width_index++) {
+					int input_index = ch * width * height + height_index * width + width_index;
+					input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch]) - mean[ch];
+					//input[input_index] = (output_image.at<cv::Vec3f>(height_index, width_index)[ch]);// / 128.0;
+				}
+			}
+		}
+	}
+	catch (...) {
+		std::cerr << " OpenCV exception: loadImageResizeCrop() can't load image %s " << filename << std::endl;
+	}
+}
+
+
 void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
 {
 	try {
@@ -269,7 +376,7 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 		}
 	}
 	catch (...) {
-		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
+		std::cerr << " OpenCV exception: loadImageResizeNorm() can't load image %s " << filename << std::endl;
 	}
 }
 
@@ -283,16 +390,17 @@ void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop
 		//cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_CUBIC);
 		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
 		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
-		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
+
+		// normalize with mean and std of imagenet
+		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
+		const float std[3] = {0.229, 0.224, 0.225};
 
 		int offsetW = (output_image.cols - crop_size) / 2;
 		int offsetH = (output_image.rows - crop_size) / 2;
 		const cv::Rect roi(offsetW, offsetH, crop_size, crop_size);
 		output_image = output_image(roi).clone();
+		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
 
-		// normalize with mean and std of imagenet
-		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
-		const float std[3] = {0.229, 0.224, 0.225};
 		int height = output_image.rows;
 		int width = output_image.cols;
 		int channels = output_image.channels();
@@ -306,7 +414,7 @@ void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop
 		}
 	}
 	catch (...) {
-		std::cerr << " OpenCV exception: loadImageResize() can't load image %s " << filename << std::endl;
+		std::cerr << " OpenCV exception: loadImageResizeCropNorm() can't load image %s " << filename << std::endl;
 	}
 }
 

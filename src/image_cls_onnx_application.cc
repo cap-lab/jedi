@@ -17,8 +17,8 @@
 #include "image_cls_onnx_application.h"
 
 #include <tkDNN/tkdnn.h>
-#include <tkDNN/Int8BatchStream.h>
-#include <tkDNN/Int8Calibrator.h>
+#include "int8_image_batch_stream.h"
+#include "int8_calibrator.h"
 
 
 using namespace nvinfer1;
@@ -113,6 +113,9 @@ void ImageClsOnnxApplication::readImagePreprocessingOption(libconfig::Setting &s
 		}
 		else if (data == "resize_crop") {
 			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE_CROP;
+		}
+		else if (data == "resize_crop_norm_ml") {
+			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE_CROP_NORM_ML;
 		}
 		else {
 			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE;
@@ -224,11 +227,15 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	input_dim.width = tensor_dim.d[2];
 	input_dim.height = tensor_dim.d[3];
 	// dataDim_t dim(tensor_dim.d[0],tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
-	dataDim_t dim(basic_config_data->batch,tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
-	BatchStream *calibrationStream = new BatchStream(dim, 1, imageClsOnnxAppConfig.calib_images_num, imageClsOnnxAppConfig.calib_image_path);
-	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table , "data");
+	//dataDim_t dim(basic_config_data->batch,tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
+	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, 1, imageClsOnnxAppConfig.calib_images_num, imageClsOnnxAppConfig.calib_image_path, imageClsOnnxAppConfig.preprocessing_option);
+	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
+
+	ITensor *tensor_output = jedi_network->network->getOutput(0);
+	tensor_dim = tensor_output->getDimensions();
+	class_num = tensor_dim.d[1];
 
 	return jedi_network;
 }
@@ -238,7 +245,7 @@ void ImageClsOnnxApplication::initializePreprocessing(std::string network_name, 
 	this->network_name = network_name;
 	dataset = new ImageDataset(imageClsOnnxAppConfig.image_path);
 	result_format = new ImagenetFormat();
-	class_num = result_format->class_num;
+	//class_num = result_format->class_num;
 
 	if(imageClsOnnxAppConfig.opencv_parallel_num >= 0) {
 		cv::setNumThreads(0);
@@ -268,6 +275,9 @@ void ImageClsOnnxApplication::preprocessing(int thread_id, int sample_index, int
 		case LOAD_IMAGE_RESIZE_CROP:
 			loadImageResizeCrop((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, input_buffer); // efficient net
 			break;
+		case LOAD_IMAGE_RESIZE_CROP_NORM_ML:
+			loadImageResizeCropNormML((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, input_buffer); // resnet mlperf
+			break;
 		default:
 			loadImageResize((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
 			break;
@@ -281,7 +291,11 @@ void ImageClsOnnxApplication::initializePostprocessing(std::string network_name,
 {
 	std::string label_path = imageClsOnnxAppConfig.label_path;
 	std::ifstream fp(label_path);
-	std::string line;
+	std::string line = "0000000";
+
+	if(class_num > result_format->class_num) {
+		labels.push_back(line);
+	}
 
 	if(fp.is_open()) {
 		while(std::getline(fp, line)) {
@@ -309,10 +323,10 @@ char* ImageClsOnnxApplication::nolibStrStr(const char *s1, const char *s2) {
 }
 
 int ImageClsOnnxApplication::generateTruths(std::string path) {
-	for (int iter = 0; iter < class_num; iter++) {
+	for (size_t iter = 0; iter < labels.size(); iter++) {
 		std::string label = labels[iter];
 		if (nolibStrStr(path.c_str(), label.c_str())) {
-			return iter;
+			return (int) iter;
 		}
 	}
 	std::cerr<<"an answer of "<<path<<" is not found: "<<std::endl;
@@ -351,6 +365,9 @@ void ImageClsOnnxApplication::postprocessing1(int thread_id, int sample_index, I
 		std::string path = data->path;
 
 		int answer = generateTruths(path);	
+		//if(labels.size() != class_num) { // class_num value is 1001 and labels.size() is 1000, increase the value of answer
+		//	answer = answer + 1;
+		//}
 		//softmax(&(data_to_check[iter1*class_num]));
 
 		int guess = -1;
