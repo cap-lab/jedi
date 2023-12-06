@@ -252,7 +252,7 @@ void ImageClsOnnxApplication::initializePreprocessing(std::string network_name, 
 	}
 }
 
-void ImageClsOnnxApplication::preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer)
+void ImageClsOnnxApplication::preprocessing(int thread_id, int input_tensor_index, const char *input_name, int sample_index, int batch_index, IN OUT float *input_buffer)
 {
 	int image_index = (sample_index + batch_index) % dataset->getSize();
 

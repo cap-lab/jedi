@@ -42,7 +42,7 @@ class DETROnnxApplication : public IInferenceApplication {
 		DETROnnxApplication() {};
 		~DETROnnxApplication();
 		void initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
-		void preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer) override;
+		void preprocessing(int thread_id, int input_tensor_index, const char *input_name, int sample_index, int batch_index, IN OUT float *input_buffer) override;
 		void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
 		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
         void postprocessing2(int thread_id, int sample_index, int batch);

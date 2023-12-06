@@ -955,7 +955,7 @@ void CenternetApplication::initializePreprocessing(std::string network_name, int
 	dst.at<float>(2,1)=dst.at<float>(1,1) + (dst.at<float>(0,0)-dst.at<float>(1,0) );
 }
 
-void CenternetApplication::preprocessing(int thread_id, int sample_index, int batch_index, IN OUT float *input_buffer)
+void CenternetApplication::preprocessing(int thread_id, int input_tensor_index, const char *input_name, int sample_index, int batch_index, IN OUT float *input_buffer)
 {
 	int image_index = (sample_index + batch_index) % dataset->getSize();
 
