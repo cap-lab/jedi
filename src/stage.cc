@@ -62,9 +62,10 @@ void Stage::createExecutionContext() {
 		for(int iter2 = 0; iter2 < binding_num; iter2++) {
 			auto const& name = engines[index]->getIOTensorName(iter2);
 			auto const& mode = engines[index]->getTensorIOMode(name);
-			nvinfer1::Dims dims = engines[index]->getTensorShape(name);
 
 			if(mode == nvinfer1::TensorIOMode::kINPUT) {
+				nvinfer1::Dims dims = engines[index]->getProfileShape(name, 0, nvinfer1::OptProfileSelector::kMAX);
+
 				if(!isImplicit) {
 					// fprintf(stderr, "[%s:%s:%d] tensor name: %s dims: [%dx%dx%dx%d]\n", __FILE__, __func__, __LINE__, name, dims.d[0], dims.d[1], dims.d[2], dims.d[3]);
 					context->setInputShape(name, dims);
@@ -76,6 +77,8 @@ void Stage::createExecutionContext() {
 				}
 			}
 			else {
+				nvinfer1::Dims dims = engines[index]->getTensorShape(name);
+
 				if(iter1 == 0) {
 					std::string _name(name);
 					output_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));

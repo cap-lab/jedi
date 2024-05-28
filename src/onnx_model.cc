@@ -5,6 +5,8 @@
 #include <cctype>
 #include <sstream>
 #include <set>
+#include <algorithm>
+#include <libconfig.h++>
 
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
@@ -59,6 +61,68 @@ static void loadFileToBuffer(std::string file_name, char* &buffer, size_t &size)
 	}
 }
 
+static void setUnnamedLayerAndTensorName(INetworkDefinition* &network, int start_cut_point) {
+	int layer_num = network->getNbLayers();
+
+	for(int index = 0 ; index < layer_num ; index++) {
+		ILayer *layer = network->getLayer(index);
+		std::string layerName = layer->getName();
+
+		if(layerName.size() == 0 || layerName.rfind("(Unnamed Layer* ", 0) == 0) {
+			int global_layer_id = start_cut_point + index;
+			std::string layer_name = "JEDI_" +  std::to_string(global_layer_id) + "_" + convertLayerTypeToString(layer);
+			layer->setName(layer_name.c_str());
+		}
+
+		int output_num = layer->getNbOutputs();
+		for(int out_index = 0; out_index < output_num ; out_index++) {
+			ITensor *tensor = layer->getOutput(out_index);
+			if(tensor != nullptr) {
+				std::string ori_tensor_name = tensor->getName();
+				if((ori_tensor_name.size() == 0 || ori_tensor_name.compare("(Unnamed Layer* ") != 0) && (!tensor->isNetworkOutput()) )  {
+					std::string tensor_name = std::string(layer->getName()) + "_output_" + std::to_string(out_index);
+					tensor->setName(tensor_name.c_str());
+					std::cout << "tensor name: " << tensor_name  << std::endl;
+				}
+			}
+		}
+
+	}
+}
+
+
+static void readOptimizationConfigFile(libconfig::Config *cfg, std::string config_file_path) {
+	try {
+		cfg->readFile(config_file_path.c_str());
+	}
+	catch(const libconfig::FileIOException &fioex) {
+		std::cerr << "I/O error while reading file: " << config_file_path << std::endl;
+		exit(0);
+	}
+	catch(const libconfig::ParseException &pex) {
+		std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()<< " - " << pex.getError() << " of file " << config_file_path  <<  std::endl;
+		exit(-1);
+	}
+}
+
+static void setOptimizationDataFromCfg(IOptimizationProfile *profile, ITensor *tensor, libconfig::Setting &current_setting, std::string opt_string, OptProfileSelector selector) {
+	Dims tensor_dim;
+	const char *data = current_setting[opt_string.c_str()];
+	std::stringstream ss(data);
+	std::string temp;
+	int dim_idx = 0;
+
+	while(std::getline(ss,temp,',')) {
+		tensor_dim.d[dim_idx] = std::stoi(temp);
+		dim_idx++;
+	}
+	tensor_dim.nbDims = dim_idx;
+	profile->setDimensions(tensor->getName(), selector, tensor_dim);
+	std::cout << tensor->getName()  << " " << opt_string << ": " << tensor_dim.d[0] << ", " << tensor_dim.d[1]  << std::endl; 
+}
+
+
+
 void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix) {
 	std::string model_dir = config_data->instances.at(instance_id).model_dir;
 	std::string cut_points_name;
@@ -96,7 +160,6 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	ITensor *tensor = network->getInput(0);
 	Dims tensor_dim = tensor->getDimensions();
 	
-	total_input_size = 1;
 	std::string input_dim_name;
 	for(int iter1 = 0 ; iter1 < tensor_dim.nbDims ; iter1++) {
 		if(iter1 > 0)
@@ -206,10 +269,20 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 		ILayer *layer = network->getLayer(iter1);
 		for(int iter2 = 0 ; iter2 < layer->getNbInputs() ; iter2++) {
 			ITensor *tensor = layer->getInput(iter2);
-			if(output_set.find(tensor) != output_set.end() || iter1 == 0) {
+			if(output_set.find(tensor) != output_set.end()) {
+				std::cout << "add tensor1: " << tensor->getName() << std::endl;
 				input_name_vec.push_back(tensor->getName());
 				output_set.erase(tensor);
 			}
+			else if(tensor != NULL && tensor->isNetworkInput() == true) {
+				auto it = std::find(input_name_vec.begin(), input_name_vec.end(), tensor->getName());
+				if (it == input_name_vec.end()) {
+					std::cout << "add tensor2: " << tensor->getName() << std::endl;
+
+					input_name_vec.push_back(tensor->getName());
+				}
+			}
+			std::cout << "merong: " << iter1 << ", " << iter2 << std::endl;
 		}
 	}
 
@@ -275,6 +348,10 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
 	int device = config_data->instances.at(instance_id).devices.at(cur_iter);
+	int start_cut_point = 0;
+
+	if(cur_iter > 0 )
+		start_cut_point = config_data->instances.at(instance_id).cut_points.at(cur_iter - 1) + 1;
 
 	builder = createInferBuilder(logger);
 
@@ -294,7 +371,32 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 		FatalError("Onnx parsing failed");
 	}
 
+	setUnnamedLayerAndTensorName(network, start_cut_point);
+
 	int layer_num = network->getNbLayers();
+	for(int index = 0 ; index < layer_num ; index++) {
+		ILayer *layer = network->getLayer(index);
+		std::string layerName = layer->getName();
+		if(layer->getType() != LayerType::kCONSTANT) {
+			if(data_type == TYPE_FP16) {
+				//layer->setPrecision( nvinfer1::DataType::kHALF);
+			}
+			else if(data_type == TYPE_INT8) {
+				if(/*layer->getType() == LayerType::kSLICE ||*/ layer->getType() == LayerType::kMATRIX_MULTIPLY/* || layer->getType() == LayerType::kSHUFFLE*/) {
+					layer->setPrecision( nvinfer1::DataType::kFLOAT);
+					layer->setPrecision( nvinfer1::DataType::kHALF);
+				}
+				else if(layer->getType() == LayerType::kACTIVATION && index > 0 && network->getLayer(index-1)->getType() == LayerType::kSLICE) {
+					//layer->setPrecision( nvinfer1::DataType::kHALF);
+				}
+				else {
+					//layer->setPrecision( nvinfer1::DataType::kINT8);
+				}
+			}
+		}
+	}
+
+
 	if(data_type == TYPE_INT8 && device == DEVICE_GPU) {
 		for(int index = 0 ; index < layer_num ; index++) {
 			ILayer *layer = network->getLayer(index);
@@ -398,6 +500,7 @@ void OnnxModel::initializeModel() {
 	tensorrt_network = dynamic_cast<TensorRTNetwork *>(app->createNetwork(&(config_data->instances.at(instance_id))));
 	builder = tensorrt_network->builder;
 	network = tensorrt_network->network;
+	setUnnamedLayerAndTensorName(network, 0);
 	tensorrt_network->printNetwork();
 
 	ITensor *tensor = network->getInput(0);
@@ -410,6 +513,13 @@ void OnnxModel::initializeModel() {
 
 	std::vector<std::string> onnx_file_name_vec;	
 	separateOnnxFile(network, tensorrt_network->onnx_file_path, onnx_file_name_vec);
+
+	libconfig::Config cfg;
+	libconfig::Setting* setting_ptr = nullptr;
+	if(tensorrt_network->optimization_cfg_path.size() > 0) {
+	    readOptimizationConfigFile(&cfg, tensorrt_network->optimization_cfg_path );
+		setting_ptr = &cfg.lookup("configs");
+	}
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		int cut_point = config_data->instances.at(instance_id).cut_points[iter1];
@@ -427,27 +537,51 @@ void OnnxModel::initializeModel() {
 
 			IBuilderConfig* config = partial_builder->createBuilderConfig();
 			config->setAvgTimingIterations(1);
-			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1U << 30);
+			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1UL << 32UL);
 			config->setFlag(BuilderFlag::kDEBUG);
 			ITimingCache *cache = nullptr;
 			loadTimingCache(config, cache);
 			config->setTimingCache(*cache, false);
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
-			//config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
+			config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
+			//config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
 
-			IOptimizationProfile* profile = partial_builder->createOptimizationProfile();	
-			for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
-				ITensor *tensor = partial_network->getInput(iter2);
-				Dims tensor_dim = tensor->getDimensions();
-				// change batch size of a dynamic onnx model
-				tensor_dim.d[0] = batch;
+			IOptimizationProfile* profile = partial_builder->createOptimizationProfile();
+			if(setting_ptr != nullptr) {
+				for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
+					ITensor *tensor = partial_network->getInput(iter2);
+					libconfig::Setting &setting = *setting_ptr;
+					if (setting.exists(tensor->getName())) {
+						libconfig::Setting &current_setting = setting[tensor->getName()];
+						setOptimizationDataFromCfg(profile, tensor, current_setting, "min", OptProfileSelector::kMIN);
+						setOptimizationDataFromCfg(profile, tensor, current_setting, "opt", OptProfileSelector::kOPT);
+						setOptimizationDataFromCfg(profile, tensor, current_setting, "max", OptProfileSelector::kMAX);
+					}
+					else {
+						Dims tensor_dim = tensor->getDimensions();
 
-				profile->setDimensions(tensor->getName(), OptProfileSelector::kMIN, tensor_dim);
-				profile->setDimensions(tensor->getName(), OptProfileSelector::kOPT, tensor_dim);
-				profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);
+						std::cout << tensor->getName()  << " set to default: " << tensor_dim.d[0] << ", " << tensor_dim.d[1]  << std::endl; 
+
+						profile->setDimensions(tensor->getName(), OptProfileSelector::kMIN, tensor_dim);
+						profile->setDimensions(tensor->getName(), OptProfileSelector::kOPT, tensor_dim);
+						profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);
+					}
+				}
 			}
+			else {
+				for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
+					ITensor *tensor = partial_network->getInput(iter2);
+					Dims tensor_dim = tensor->getDimensions();
+					// change batch size of a dynamic onnx model
+					tensor_dim.d[0] = batch;
+
+					profile->setDimensions(tensor->getName(), OptProfileSelector::kMIN, tensor_dim);
+					profile->setDimensions(tensor->getName(), OptProfileSelector::kOPT, tensor_dim);
+					profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);
+				}
+			}
+
 			config->addOptimizationProfile(profile);
-	
 
 			// DLA options	
 			if (device == DEVICE_DLA) {
@@ -465,7 +599,6 @@ void OnnxModel::initializeModel() {
 				config->setFlag(BuilderFlag::kDIRECT_IO);
 				config->setFlag(BuilderFlag::kREJECT_EMPTY_ALGORITHMS);
 				config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_MANAGED_SRAM, 1U << 20);
-				//config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
 			}
 
 			if(data_type == TYPE_FP16 && partial_builder->platformHasFastFp16()) {
@@ -518,9 +651,9 @@ void OnnxModel::initializeModel() {
 			}
 			ICudaEngine* engine = runtime->deserializeCudaEngine(gieModelStream, size);
 			assert(engine != nullptr);
-			//auto inspector = std::unique_ptr<IEngineInspector>(engine->createEngineInspector());
+			auto inspector = std::unique_ptr<IEngineInspector>(engine->createEngineInspector());
 			//std::cout << inspector->getLayerInformation(0, LayerInformationFormat::kJSON); // Print the information of the first layer in the engine.
-			//std::cout << inspector->getEngineInformation(LayerInformationFormat::kJSON);
+			std::cout << inspector->getEngineInformation(LayerInformationFormat::kJSON);
 			stage->engines.push_back(engine);
 
 			if (gieModelStream) delete [] gieModelStream;
