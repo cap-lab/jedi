@@ -5,10 +5,8 @@
 #include <string>
 #include <list>
 
-#include "box.h"
 #include "config.h"
 #include "variable.h"
-#include "image_dataset.h"
 
 class ResultFormat {
 	public:

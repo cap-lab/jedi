@@ -8,8 +8,10 @@
 #include <vector>
 #include <mutex>
 
+#include "box.h"
 #include "variable.h"
 #include "config.h"
+#include "image_dataset.h"
 #include "result_format.h"
 
 class COCOFormat : public ResultFormat {

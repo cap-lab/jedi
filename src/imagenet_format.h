@@ -8,6 +8,7 @@
 
 #include "variable.h"
 #include "config.h"
+#include "image_dataset.h"
 #include "result_format.h"
 
 class ImagenetFormat : public ResultFormat {
