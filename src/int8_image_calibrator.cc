@@ -1,4 +1,4 @@
-#include "int8_calibrator.h"
+#include "int8_image_calibrator.h"
 
 Int8ImageEntropyCalibrator::Int8ImageEntropyCalibrator(ImageBatchStream& stream, int firstBatch, 
                                              const std::string& calibTableFilePath,

@@ -18,7 +18,7 @@
 
 #include <tkDNN/tkdnn.h>
 #include "int8_image_batch_stream.h"
-#include "int8_calibrator.h"
+#include "int8_image_calibrator.h"
 
 
 using namespace nvinfer1;

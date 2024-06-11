@@ -17,7 +17,8 @@ typedef struct _NuscenesDetectionOnnxAppConfig {
 	std::string onnx_file_path;
 	std::string optimization_cfg_path;
 	std::string lidar_list_path;
-	int opencv_parallel_num;
+	std::string calib_lidar_path;
+	int calib_lidar_num;
 } NuscenesDetectionOnnxAppConfig;
 
 
@@ -47,7 +48,6 @@ class NuscenesDetectionOnnxApplication : public IInferenceApplication {
 		std::vector<float *> inputBuffers;
 		std::vector<int> inputBufferSizes;
 
-		std::vector<float *> featureList;
 		std::vector<int *> indicesList;
 
 		std::map<std::string, int> outputIndexMap;
@@ -55,10 +55,10 @@ class NuscenesDetectionOnnxApplication : public IInferenceApplication {
 		void readOnnxFilePath(libconfig::Setting &setting);
 		void readOptimizationProfileFilePath(libconfig::Setting &setting);
 		void readLidarListPath(libconfig::Setting &setting);
-		void makePillars(float* points, float* feature, int* indices, int pointNum, int threadIdx, int pillarsPerThread);
+		void readCalibLidarPath(libconfig::Setting &setting);
+		void readCalibLidarNum(libconfig::Setting &setting);
 
 		void writeResultFile(std::string result_file_name);
-		bool readBinFile(int thread_id, std::string& filename, float*& bufPtr, int& pointNum);
 
 };
 

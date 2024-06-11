@@ -12,6 +12,8 @@
 
 #include "tensorrt_network.h"
 #include "nuscenes_detection_onnx_application.h"
+#include "pillar.h"
+#include "int8_pillar_calibrator.h"
 
 #include <tkDNN/tkdnn.h>
 
@@ -20,24 +22,6 @@ using namespace nvinfer1;
 using namespace nvonnxparser; 
 
 REGISTER_JEDI_APPLICATION(NuscenesDetectionOnnxApplication);
-
-#define X_STEP 0.2f
-#define Y_STEP 0.2f
-#define X_MIN -51.2f
-#define X_MAX 51.2f
-#define Y_MIN -51.2f
-#define Y_MAX 51.2f
-#define Z_MIN -5.0f
-#define Z_MAX 3.0f
-#define PI 3.141592653f
-
-// paramerters for preprocess
-#define BEV_W 512
-#define BEV_H 512
-#define MAX_PILLARS 30000
-#define MAX_POINT_IN_PILLARS 20
-#define FEATURE_NUM 10
-#define THREAD_NUM 1
 
 // paramerters for postprocess
 #define SCORE_THRESHOLD 0.1f
@@ -119,12 +103,41 @@ void NuscenesDetectionOnnxApplication::readLidarListPath(libconfig::Setting &set
 	}
 }
 
+void NuscenesDetectionOnnxApplication::readCalibLidarPath(libconfig::Setting &setting) {
+	try{
+		const char *tmp = setting["calib_lidar_path"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+		nuscenesOnnxAppConfig.calib_lidar_path = data.c_str();
+
+		std::cerr<<"calib_lidar_path: "<<nuscenesOnnxAppConfig.calib_lidar_path<<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'calib_lidar_path' setting in configuration file." << std::endl;
+	}
+}
+
+void NuscenesDetectionOnnxApplication::readCalibLidarNum(libconfig::Setting &setting){
+	try {
+		const char *data = setting["calib_lidar_num"];
+		nuscenesOnnxAppConfig.calib_lidar_num = atoi(data);
+
+		std::cerr<<"calib_lidar_num: "<<nuscenesOnnxAppConfig.calib_lidar_num<<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'calib_lidar_num' setting in configuration file." <<std::endl;
+	}
+}
+
 
 void NuscenesDetectionOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 {
 	readOnnxFilePath(setting);
 	readOptimizationProfileFilePath(setting);
 	readLidarListPath(setting);
+    readCalibLidarPath(setting);
+    readCalibLidarNum(setting);
 }
 
 IJediNetwork *NuscenesDetectionOnnxApplication::createNetwork(ConfigInstance *basic_config_data)
@@ -189,6 +202,11 @@ IJediNetwork *NuscenesDetectionOnnxApplication::createNetwork(ConfigInstance *ba
 	//tensor_dim = tensor_output->getDimensions();
 	//class_num = tensor_dim.d[1];
 
+	Int8PillarEntropyCalibrator *calibrator = new Int8PillarEntropyCalibrator(jedi_network->network, 
+                                                    nuscenesOnnxAppConfig.calib_lidar_path,
+                                                    nuscenesOnnxAppConfig.calib_lidar_num, calib_table);
+	jedi_network->calibrator = calibrator;
+
 	return jedi_network;
 }
 
@@ -200,16 +218,9 @@ void NuscenesDetectionOnnxApplication::initializePreprocessing(std::string netwo
 	//class_num = result_format->class_num;
 
 	for(int i = 0 ; i < thread_number ; i++) {
-		float *feature = nullptr;
 		int *indices = nullptr;
 		inputBuffers.emplace_back(nullptr);
 		inputBufferSizes.emplace_back(0);
-
-		feature = (float *) malloc(MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float));
-		if(feature == nullptr) {
-			std::cerr << "[Error] Malloc Feature Memory Failed! Size: " << MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float) << std::endl;
-			exit(EXIT_FAILURE);
-		}
 
 		indices = (int *) malloc(MAX_PILLARS*2*sizeof(int));
 		if(indices == nullptr) {
@@ -217,56 +228,11 @@ void NuscenesDetectionOnnxApplication::initializePreprocessing(std::string netwo
 			exit(EXIT_FAILURE);
 		}
 
-		featureList.emplace_back(feature);
 		indicesList.emplace_back(indices);
         current_lidar_indexs.emplace_back(-1);
 	}
 }
 
-
-bool NuscenesDetectionOnnxApplication::readBinFile(int thread_id, std::string& filename, float*& bufPtr, int& pointNum)
-{
-    // open the file:
-    std::streampos fileSize;
-    std::ifstream file(filename, std::ios::binary);
-    
-    if (!file) {
-		std::cerr << "[Error] Open file " << filename << " failed" << std::endl;
-        return false;
-    }
-    // get its size:
-    file.seekg(0, std::ios::end);
-    fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-	if (inputBufferSizes[thread_id] < fileSize) {
-		if(inputBuffers[thread_id] != nullptr) {
-			free(inputBuffers[thread_id]);
-		}
-		bufPtr = (float *) malloc(fileSize);
-		if(bufPtr == nullptr){
-			std::cerr << "[Error] Malloc Memory Failed! Size: " << fileSize << std::endl;
-			return false;
-		}
-
-		inputBuffers[thread_id] = bufPtr;
-		inputBufferSizes[thread_id] = fileSize;
-	} else {
-		bufPtr = inputBuffers[thread_id];
-	}
-
-    // read the data:
-    file.read((char*) bufPtr, fileSize);
-    file.close();
-    
-    constexpr int featureNum = 5;
-    pointNum = fileSize /sizeof(float) / featureNum;
-    if( fileSize /sizeof(float) % featureNum != 0){
-		std::cerr << "[Error] File Size Error! " << fileSize << std::endl;
-    }
-	//std::cout << "[INFO] pointNum : " << pointNum << ", filename: " << filename << std::endl;
-    return true;
-}
 
 static void debugWrite(void *data, int sizeToWrite, const char *output_file_path) {
     FILE *f = fopen(output_file_path, "wb");
@@ -280,23 +246,20 @@ void NuscenesDetectionOnnxApplication::preprocessing(int thread_id, int input_te
 	// preprocessing logic for the single sample
 	int lidar_index = (sample_index + batch_index) % dataset->getSize();
 	if (current_lidar_indexs[thread_id] != lidar_index) {
-		float *point_ptr;
 		int point_num = 0;
 		bool readBinOk = false;
 
 		memset(indicesList[thread_id], -1, MAX_PILLARS*2*sizeof(int));
-		memset(featureList[thread_id], 0, MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float));
+		memset(input_buffer, 0, MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float));
 
-		readBinOk = readBinFile(thread_id, dataset->getData(lidar_index)->path, point_ptr, point_num);
+		readBinOk = readBinFile(dataset->getData(lidar_index)->path, inputBuffers[thread_id], point_num, inputBufferSizes[thread_id]);
 		if(readBinOk == false) {
 			exit(EXIT_FAILURE);
 		}
 
-		makePillars(point_ptr, featureList[thread_id], indicesList[thread_id], point_num, 0, MAX_PILLARS/THREAD_NUM);
+		makePillars(inputBuffers[thread_id], input_buffer, indicesList[thread_id], point_num, 0, MAX_PILLARS/THREAD_NUM);
 
 		current_lidar_indexs[thread_id] = lidar_index;
-
-		memcpy(input_buffer, featureList[thread_id], MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float));
 
         //debugWrite((void *) input_buffer, MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float), "feature_backup.binary");
 	} else {
@@ -305,120 +268,20 @@ void NuscenesDetectionOnnxApplication::preprocessing(int thread_id, int input_te
 	}
 }
 
-void NuscenesDetectionOnnxApplication::makePillars(float* points, float* feature, int* indices, int pointNum, int threadIdx, int pillarsPerThread){
-    // 0 ~ MAX_POINT_IN_PILLARS
-    unsigned short pointCount[MAX_PILLARS] = {0};
 
-    // 0 ~ MAX_PILLARS
-    int pillarsIndices[BEV_W*BEV_H] = {0};
-    int pillarCount = threadIdx*pillarsPerThread;
-
-    memset(pillarsIndices, -1, BEV_W*BEV_H*sizeof(int));
-
-    for(int idx = 0; idx < pointNum; idx++){
-        
-        auto x = points[idx*5];
-        auto y = points[idx*5+1];
-        auto z = points[idx*5+2];
-        if(x < X_MIN || x > X_MAX || y < Y_MIN || y > Y_MAX || 
-           z < Z_MIN || z > Z_MAX)
-           continue;
-
-        int xIdx = int((x-X_MIN)/X_STEP);
-        int yIdx = int((y-Y_MIN)/Y_STEP);
-        
-        if(xIdx % THREAD_NUM != threadIdx)
-            continue;
-
-        int pillarIdx = yIdx*BEV_W+xIdx;
-
-        if(pillarIdx >= BEV_W*BEV_H || pillarIdx < 0) {
-            std::cout << "xIdx: " << pillarIdx << ", yIdx: " << yIdx << std::endl;
-            std::cout << "pillarsIndices[" << pillarIdx << "]: " << pillarsIndices[pillarIdx] << std::endl;
-        }
-
-        auto pillarCountIdx = pillarsIndices[pillarIdx];
-
-        if (pillarCountIdx >= MAX_PILLARS || (pillarCountIdx == -1 && pillarCount*2 + 1 >= MAX_PILLARS*2)) {
-            continue;
-        }
-
-        // new pillar index
-        if(pillarCountIdx == -1){
-            pillarCountIdx = pillarCount;
-            pillarsIndices[pillarIdx] = pillarCount;
-            indices[pillarCount*2 + 1] = pillarIdx;
-            ++pillarCount;
-        }
-
-
-        // if(pillarCountIdx < 0 || pillarCountIdx >= MAX_PILLARS)  {
-        //     std::cout << "pointCount[" << pillarCountIdx << "]: " << pointCount[pillarCountIdx] << std::endl;
-        // }
-
-        auto pointNumInPillar = pointCount[pillarCountIdx];
-        if(pointNumInPillar > MAX_POINT_IN_PILLARS - 1)
-            continue;
-
-
-        //std::cout << "pillarsIndices2[" << pillarIdx << "]: " << pillarsIndices[pillarIdx] << std::endl;
-        //std::cout << "pointCount2[" << pillarCountIdx << "]: " << pointCount[pillarCountIdx] << std::endl;
-
-        feature[                                     pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = x;
-        feature[1*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = y;
-        feature[2*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = z; // z
-        feature[3*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = points[idx*5+3]; // instence
-        feature[4*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = points[idx*5+4]; // time_lag
-
-        feature[8*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = x - (xIdx*X_STEP + X_MIN + X_STEP/2);
-        feature[9*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarCountIdx*MAX_POINT_IN_PILLARS + pointNumInPillar] = y - (yIdx*Y_STEP + Y_MIN + Y_STEP/2);
-
-        ++pointNumInPillar;
-        pointCount[pillarCountIdx] = pointNumInPillar;
-        
-    }
-    
-    for(int pillarIdx = threadIdx*pillarsPerThread; pillarIdx < (threadIdx+1)*pillarsPerThread; pillarIdx++)
-    {
-        float xCenter = 0;
-        float yCenter = 0;
-        float zCenter = 0;
-        auto pointNum = pointCount[pillarIdx];
-        for(int pointIdx=0; pointIdx < pointNum; pointIdx++)
-        {
-            auto x = feature[                                     pillarIdx*MAX_POINT_IN_PILLARS + pointIdx];
-            auto y = feature[1*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx];
-            auto z = feature[2*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx];
-            xCenter += x;
-            yCenter += y;
-            zCenter += z;
-        }
-        xCenter = xCenter / pointNum;
-        yCenter = yCenter / pointNum;
-        zCenter = zCenter / pointNum;
-        
-        for(int pointIdx=0; pointIdx < pointNum; pointIdx++)
-        {    
-            auto x = feature[                                     pillarIdx*MAX_POINT_IN_PILLARS + pointIdx];
-            auto y = feature[1*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx];
-            auto z = feature[2*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx];
-       
-            feature[5*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx] = x - xCenter;
-            feature[6*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx] = y - yCenter;
-            feature[7*MAX_PILLARS*MAX_POINT_IN_PILLARS + pillarIdx*MAX_POINT_IN_PILLARS + pointIdx] = z - zCenter;
-
-        }
-    }
-    
-}
 
 void NuscenesDetectionOnnxApplication::initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number)
 {
-    std::vector<std::string> outputName{ "594","598","606","610","618","622","630","634","642","646",
-                                         "654","658","666","670","678","682","690","694","702","706",
-                                         "714","718","726","730","736","737","738","740","741","742",
-                                         "744","745","746","748","749","750","752","753","754","756",
-                                         "757","758"};
+    std::vector<std::string> outputName{ "593","597","605","609","617","621","629","633","641","645",
+                                         "653","657","665","669","677","681","689","693","701","705",
+                                         "713","717","725","729","735","736","737","739","740","741",
+                                         "743","744","745","747","748","749","751","752","753","755",
+                                         "756","757"};
+    // std::vector<std::string> outputName{ "594","598","606","610","618","622","630","634","642","646",
+    //                                      "654","658","666","670","678","682","690","694","702","706",
+    //                                      "714","718","726","730","736","737","738","740","741","742",
+    //                                      "744","745","746","748","749","750","752","753","754","756",
+    //                                      "757","758"};
 
 	for (int i = 0 ; i < outputName.size() ; i++) {
 		outputIndexMap[outputName[i]] = i;
@@ -533,13 +396,13 @@ static void AlignedNMSBev(std::vector<Box>& predBoxs){
 
 void NuscenesDetectionOnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
 {
-    std::vector<std::string> regName{   "594", "618", "642", "666", "690", "714"};
-    std::vector<std::string> heightName{"598", "622", "646", "670", "694", "718"};
-    std::vector<std::string> rotName{   "606", "630", "654", "678", "702", "726"};
-    std::vector<std::string> velName{   "610", "634", "658", "682", "706", "730"};
-    std::vector<std::string> dimName{   "736", "740", "744", "748", "752", "756"};
-    std::vector<std::string> scoreName{ "737", "741", "745", "749", "753", "757"};
-    std::vector<std::string> clsName{   "738", "742", "746", "750", "754", "758"};
+    std::vector<std::string> regName{   "593", "617", "641", "665", "689", "713"};
+    std::vector<std::string> heightName{"597", "621", "645", "669", "693", "717"};
+    std::vector<std::string> rotName{   "605", "629", "653", "677", "701", "725"};
+    std::vector<std::string> velName{   "609", "633", "657", "681", "705", "729"};
+    std::vector<std::string> dimName{   "735", "739", "743", "747", "751", "755"};
+    std::vector<std::string> scoreName{ "736", "740", "744", "748", "752", "756"};
+    std::vector<std::string> clsName{   "737", "741", "745", "749", "753", "757"};
     int clsOffsetPerTask[] = {0, 1, 3, 5, 6, 8};
 	std::vector<Box> predResult;
 	int lidar_index = (sample_index * batch) % dataset->getSize();
