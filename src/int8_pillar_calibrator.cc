@@ -5,8 +5,8 @@
 #include "pillar.h"
 #include "int8_pillar_calibrator.h"
 
-Int8PillarEntropyCalibrator::Int8PillarEntropyCalibrator(nvinfer1::INetworkDefinition *network, const std::string& fileLidarlist, const int calib_lidar_num, 
-                            const std::string calibTableFilePath, bool readCache):  mCalibTableFilePath(calibTableFilePath), mReadCache(readCache), mCalibLidarNum(calib_lidar_num) {
+Int8PillarEntropyCalibrator::Int8PillarEntropyCalibrator(nvinfer1::INetworkDefinition *network, const std::string& fileLidarlist, const int calib_lidar_num, int batch,
+                            const std::string calibTableFilePath, bool readCache):  mCalibTableFilePath(calibTableFilePath), mReadCache(readCache), mCalibLidarNum(calib_lidar_num), mBatch(batch) {
     
     int num_inputs = network->getNbInputs();
 	for (int i = 0 ; i < num_inputs ; i++) {
@@ -30,20 +30,20 @@ Int8PillarEntropyCalibrator::Int8PillarEntropyCalibrator(nvinfer1::INetworkDefin
             input_size *= sizeof(short);
         }
 
-        checkCuda(cudaMalloc(&bufPtr, input_size));
+        checkCuda(cudaMalloc(&bufPtr, input_size * mBatch));
 
         std::cout << "calib tensor print: " << tensor_input->getName() << ", buf_ptr: " << bufPtr << ", size: " << input_size << std::endl;
 
         bindingMap[tensor_input->getName()] = bufPtr;
 
         if(strcmp(tensor_input->getName(),"onnx::MatMul_0") == 0) {
-            featureBuf = (float *) malloc(input_size);
+            featureBuf = (float *) malloc(input_size * mBatch);
             if (featureBuf == nullptr) {
                  exit(EXIT_FAILURE);
             }
             featureSize = input_size;
         } else if(strcmp(tensor_input->getName(),"indices_input") == 0) {
-            indiceBuf = (int *) malloc(input_size);
+            indiceBuf = (int *) malloc(input_size * mBatch);
             if (indiceBuf == nullptr) {
                  exit(EXIT_FAILURE);
             }
@@ -58,35 +58,38 @@ bool Int8PillarEntropyCalibrator::getBatch(void* bindings[], const char* names[]
     int point_num = 0;
     bool readBinOk = false;
 
-    std::cout << "calib index: "<< calibLidarIndex << std::endl;
+    std::cout << "calib index: "<< calibLidarIndex << ", " << nbBindings <<  std::endl;
 
     if (calibLidarIndex >= mCalibLidarNum)
         return false;
 
-    readBinOk = readBinFile(calibLidarSet->getData(calibLidarIndex)->path, fileInputBuf, point_num, fileInputBufSize);
-    if(readBinOk == false) {
-        exit(EXIT_FAILURE);
+    memset(indiceBuf, -1, indiceSize * mBatch);
+    memset(featureBuf, 0, featureSize * mBatch);
+
+    for (int i = 0 ; i < mBatch ; i++) {
+        readBinOk = readBinFile(calibLidarSet->getData(calibLidarIndex)->path, fileInputBuf, point_num, fileInputBufSize);
+        if(readBinOk == false) {
+            exit(EXIT_FAILURE);
+        }
+
+        makePillars(fileInputBuf, featureBuf + (i * featureSize / sizeof(float)), indiceBuf + (i * indiceSize/sizeof(int)), point_num, 0, MAX_PILLARS);
+
+        calibLidarIndex++;
     }
 
-    memset(indiceBuf, -1, indiceSize);
-    memset(featureBuf, 0, featureSize);
-
-    makePillars(fileInputBuf, featureBuf, indiceBuf, point_num, 0, MAX_PILLARS);
 
     for(int i = 0 ; i < nbBindings ; i++) {
         if(strcmp(names[i], "onnx::MatMul_0") == 0) {
-            checkCuda(cudaMemcpy(bindingMap[names[i]], featureBuf, featureSize, cudaMemcpyHostToDevice));
+            checkCuda(cudaMemcpy(bindingMap[names[i]], featureBuf, featureSize * mBatch, cudaMemcpyHostToDevice));
             std::cout << "calib feature print("<< i <<"): " << names[i] << ", binding_ptr: " << bindingMap[names[i]] << ", size: " << featureSize << std::endl;
             bindings[i] = bindingMap[names[i]];
         }
         else if(strcmp(names[i], "indices_input") == 0) {
-            checkCuda(cudaMemcpy(bindingMap[names[i]], indiceBuf, indiceSize, cudaMemcpyHostToDevice));
+            checkCuda(cudaMemcpy(bindingMap[names[i]], indiceBuf, indiceSize * mBatch, cudaMemcpyHostToDevice));
             std::cout << "calib indices print("<< i <<"): " << names[i] << ", binding_ptr: " << bindingMap[names[i]] << ", size: " << indiceSize << std::endl;
             bindings[i] = bindingMap[names[i]];
         }
     }
-    
-    calibLidarIndex++;
 
     return true;
 }

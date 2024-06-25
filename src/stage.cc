@@ -281,6 +281,10 @@ void Stage::finalizeStage() {
 			}
 		}
 	}
+
+	for(unsigned int iter1 = 0; iter1 < engines.size(); iter1++) {
+		delete engines[iter1];
+	}
 }
 
 void Stage::getBindingsDataType() {

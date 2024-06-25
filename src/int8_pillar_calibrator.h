@@ -21,9 +21,10 @@
  * Int8PillarEntropyCalibrator implements the INT8 calibrator to achieve the
  * INT8 quantization.
  */
+//class Int8PillarEntropyCalibrator : public nvinfer1::IInt8MinMaxCalibrator  {
 class Int8PillarEntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator2 {
 public:
-	Int8PillarEntropyCalibrator(nvinfer1::INetworkDefinition *network, const std::string& fileLidarlist, const int calib_lidar_num, 
+	Int8PillarEntropyCalibrator(nvinfer1::INetworkDefinition *network, const std::string& fileLidarlist, const int calib_lidar_num, int batch,
                             const std::string calibTableFilePath, bool readCache = true);
 	virtual ~Int8PillarEntropyCalibrator() { 
 		for (auto iter = bindingMap.begin() ; iter !=  bindingMap.end(); iter++) {
@@ -42,7 +43,7 @@ public:
 			free(indiceBuf);
 		}
 	}
-	int getBatchSize() const NOEXCEPT override { return 1; }
+	int getBatchSize() const NOEXCEPT override { return mBatch; }
 	bool getBatch(void* bindings[], const char* names[], int nbBindings) NOEXCEPT override;
 	const void* readCalibrationCache(size_t& length) NOEXCEPT override;
 	void writeCalibrationCache(const void* cache, size_t length) NOEXCEPT override;
@@ -62,6 +63,7 @@ private:
 	int fileInputBufSize = 0;
 	int mCalibLidarNum = 0;
 	int calibLidarIndex = 0;
+	int mBatch = 1;
 };
 
 #endif //INT8PILLARCALIBRATOR_H

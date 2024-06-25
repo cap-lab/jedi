@@ -1,9 +1,89 @@
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include <string.h>
+#include <zlib.h>
 
 #include "pillar.h"
 
+/*struct PointsArray {
+    float x;
+    float y;
+    float z;
+    float instance;
+    float time_lag;
+};*/
+
+
+bool readGzBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufSize)
+{
+    int fileSize;
+    std::ifstream file(filename, std::ios::binary);
+
+    if (!file) {
+        std::cerr << "[Error] Open file " << filename << " failed" << std::endl;
+        return false;
+    }
+    // get its size:
+    file.seekg(0, std::ios::end);
+    fileSize = file.tellg();
+    file.close();
+
+    // gz 파일 열기
+    gzFile gzfile = gzopen(filename.c_str(), "rb");
+    if (!gzfile) {
+        std::cerr << "[Error] Open file " << filename << " failed" << std::endl;
+        return false;
+    }
+
+    // 파일 크기 추정을 위한 임시 버퍼
+    const int tempBufSize = 1 << 18; // 256KB
+    char buffer[tempBufSize];
+    int bytesRead = 0;
+    int totalBytes = 0;
+    char * bufCharPtr;
+
+    fileSize *= 2;
+
+    if(bufSize < fileSize) {
+        if(bufPtr != nullptr) {
+            free(bufPtr);
+        }
+        bufPtr = (float *) malloc(fileSize);
+        if(bufPtr == nullptr){
+            std::cerr << "[Error] Malloc Memory Failed! Size: " << fileSize << std::endl;
+            return false;
+        }
+        bufSize = fileSize;
+    }
+
+    bufCharPtr = (char *) bufPtr;
+
+    // 파일 내용을 읽어서 임시 버퍼에 저장
+    while ((bytesRead = gzread(gzfile, buffer, tempBufSize)) > 0) {
+        if(bufSize < totalBytes + bytesRead) {
+            bufSize += fileSize;
+            bufPtr = (float *) realloc(bufPtr, bufSize);
+            if(bufPtr == nullptr){
+                std::cerr << "[Error] Realloc Memory Failed! Size: " << bufSize << std::endl;
+                return false;
+            }
+            bufCharPtr = (char *) bufPtr;
+        }
+        memcpy(bufCharPtr + totalBytes, buffer, bytesRead);
+        totalBytes += bytesRead;
+    }
+
+    gzclose(gzfile);
+
+    constexpr int featureNum = 5;
+    pointNum = totalBytes /sizeof(float) / featureNum;
+    if( totalBytes /sizeof(float) % featureNum != 0){
+        std::cerr << "[Error] File Size Error! " << totalBytes << std::endl;
+    }
+    //std::cout << "[INFO] pointNum : " << pointNum << ", filename: " << filename << std::endl;
+    return true;
+}
 
 bool readBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufSize)
 {
@@ -12,7 +92,7 @@ bool readBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufS
     std::ifstream file(filename, std::ios::binary);
     
     if (!file) {
-		std::cerr << "[Error] Open file " << filename << " failed" << std::endl;
+        std::cerr << "[Error] Open file " << filename << " failed" << std::endl;
         return false;
     }
     // get its size:
@@ -20,16 +100,17 @@ bool readBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufS
     fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
-	if(bufSize < fileSize) {
-		if(bufPtr != nullptr) {
-			free(bufPtr);
-		}
-		bufPtr = (float *) malloc(fileSize);
-		if(bufPtr == nullptr){
-			std::cerr << "[Error] Malloc Memory Failed! Size: " << fileSize << std::endl;
-			return false;
-		}
-	}
+    if(bufSize < fileSize) {
+        if(bufPtr != nullptr) {
+            free(bufPtr);
+        }
+        bufPtr = (float *) malloc(fileSize);
+        if(bufPtr == nullptr){
+            std::cerr << "[Error] Malloc Memory Failed! Size: " << fileSize << std::endl;
+            return false;
+        }
+        bufSize = fileSize;
+    }
 
     // read the data:
     file.read((char*) bufPtr, fileSize);
@@ -38,21 +119,32 @@ bool readBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufS
     constexpr int featureNum = 5;
     pointNum = fileSize /sizeof(float) / featureNum;
     if( fileSize /sizeof(float) % featureNum != 0){
-		std::cerr << "[Error] File Size Error! " << fileSize << std::endl;
+        std::cerr << "[Error] File Size Error! " << fileSize << std::endl;
     }
-	//std::cout << "[INFO] pointNum : " << pointNum << ", filename: " << filename << std::endl;
+    //std::cout << "[INFO] pointNum : " << pointNum << ", filename: " << filename << std::endl;
     return true;
 }
+
+/*static bool pointsCompare(struct PointsArray a, struct PointsArray b) {
+    float distance_a = a.x * a.x + a.y * a.y + a.z * a.z;
+    float distance_b = b.x * b.x + b.y * b.y + b.z * b.z;
+
+    return distance_a < distance_b;
+}*/
 
 void makePillars(float* points, float* feature, int* indices, int pointNum, int threadIdx, int pillarsPerThread){
     // 0 ~ MAX_POINT_IN_PILLARS
     unsigned short pointCount[MAX_PILLARS] = {0};
+    //struct PointsArray *pointsArray;
 
     // 0 ~ MAX_PILLARS
     int pillarsIndices[BEV_W*BEV_H] = {0};
     int pillarCount = threadIdx*pillarsPerThread;
 
     memset(pillarsIndices, -1, BEV_W*BEV_H*sizeof(int));
+
+    //pointsArray = (struct PointsArray *) points;
+    //std::sort(pointsArray, pointsArray + pointNum, pointsCompare);
 
     for(int idx = 0; idx < pointNum; idx++){
         
@@ -85,6 +177,9 @@ void makePillars(float* points, float* feature, int* indices, int pointNum, int 
         // new pillar index
         if(pillarCountIdx == -1){
             pillarCountIdx = pillarCount;
+            /*if(pointCount[pillarCountIdx] > MAX_POINT_IN_PILLARS - 1) {
+                continue;
+            }*/
             pillarsIndices[pillarIdx] = pillarCount;
             indices[pillarCount*2 + 1] = pillarIdx;
             ++pillarCount;

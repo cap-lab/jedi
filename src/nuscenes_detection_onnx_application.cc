@@ -37,6 +37,8 @@ REGISTER_JEDI_APPLICATION(NuscenesDetectionOnnxApplication);
 #define OUTPUT_H 128
 #define OUTPUT_W 128
 
+#define CALIBRATION_BATCH_SIZE (16)
+
 #ifndef FatalError
 #define FatalError(s) {                                                \
     std::stringstream _where, _message;                                \
@@ -204,7 +206,7 @@ IJediNetwork *NuscenesDetectionOnnxApplication::createNetwork(ConfigInstance *ba
 
 	Int8PillarEntropyCalibrator *calibrator = new Int8PillarEntropyCalibrator(jedi_network->network, 
                                                     nuscenesOnnxAppConfig.calib_lidar_path,
-                                                    nuscenesOnnxAppConfig.calib_lidar_num, calib_table);
+                                                    nuscenesOnnxAppConfig.calib_lidar_num, CALIBRATION_BATCH_SIZE, calib_table);
 	jedi_network->calibrator = calibrator;
 
 	return jedi_network;
@@ -214,7 +216,7 @@ void NuscenesDetectionOnnxApplication::initializePreprocessing(std::string netwo
 {
 	this->network_name = network_name;
 	dataset = new LidarDataset(nuscenesOnnxAppConfig.lidar_list_path);
-    result_format = new NuscenesFormat();
+	result_format = new NuscenesFormat();
 	//class_num = result_format->class_num;
 
 	for(int i = 0 ; i < thread_number ; i++) {
@@ -252,6 +254,7 @@ void NuscenesDetectionOnnxApplication::preprocessing(int thread_id, int input_te
 		memset(indicesList[thread_id], -1, MAX_PILLARS*2*sizeof(int));
 		memset(input_buffer, 0, MAX_PILLARS*FEATURE_NUM*MAX_POINT_IN_PILLARS*sizeof(float));
 
+		//readBinOk = readGzBinFile(dataset->getData(lidar_index)->path, inputBuffers[thread_id], point_num, inputBufferSizes[thread_id]);
 		readBinOk = readBinFile(dataset->getData(lidar_index)->path, inputBuffers[thread_id], point_num, inputBufferSizes[thread_id]);
 		if(readBinOk == false) {
 			exit(EXIT_FAILURE);

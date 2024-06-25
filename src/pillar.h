@@ -20,6 +20,7 @@
 #define THREAD_NUM 1
 
 bool readBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufSize);
+bool readGzBinFile(std::string& filename, float*& bufPtr, int& pointNum, int &bufSize);
 void makePillars(float* points, float* feature, int* indices, int pointNum, int threadIdx, int pillarsPerThread);
 
 #endif
