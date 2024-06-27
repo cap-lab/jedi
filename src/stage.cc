@@ -113,6 +113,7 @@ void Stage::deallocateStream() {
 
 		cudaEvent_t event = events.back();
 		cudaEventDestroy(event);
+		events.pop_back();
 	}
 	streams.clear();
 	events.clear();
