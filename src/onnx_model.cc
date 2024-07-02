@@ -121,9 +121,51 @@ static void setOptimizationDataFromCfg(IOptimizationProfile *profile, ITensor *t
 	std::cout << tensor->getName()  << " " << opt_string << ": " << tensor_dim.d[0] << ", " << tensor_dim.d[1]  << std::endl; 
 }
 
+static bool valueInRange(std::vector<LayerRange> ranges, int value) {
+	bool valueInRange = false;
+	for(unsigned int iter = 0; iter < ranges.size(); iter++) {
+		if(value >= ranges[iter].start && value <= ranges[iter].end) {
+			valueInRange = true;
+			break;
+		}
+	}
 
+	return valueInRange;
+}
 
-void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix) {
+static std::string makeRangeString(int prev_cut_point, int curr_cut_point, std::vector<LayerRange> ranges) {
+	unsigned int layerNum = curr_cut_point - prev_cut_point + 1;
+	bool continueValue = false;
+	bool first = true;
+	std::string rangeString = "";
+
+	for (unsigned int iter = 0 ; iter < layerNum  ; iter++) {
+		bool valueIsIncluded = valueInRange(ranges, prev_cut_point + iter);
+		if (valueIsIncluded == true) {
+			if( continueValue == false) {
+				if (first == false) {
+					rangeString += ",";
+				}
+				rangeString += std::to_string(prev_cut_point + iter);
+				first = true;
+				continueValue = true;f
+			}
+		} else {
+			if (continueValue == true) {
+				rangeString += "-" + std::to_string(prev_cut_point + iter);
+				continueValue = false;
+			}
+		}
+	}
+
+	if(continueValue == true) {
+		rangeString += "-" + std::to_string(prev_cut_point + layerNum - 1);
+	}
+
+	return rangeString;
+}
+
+void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix, bool for_rt_build) {
 	std::string model_dir = config_data->instances.at(instance_id).model_dir;
 	std::string cut_points_name;
 	std::string device_name;
@@ -131,7 +173,11 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	std::string image_size_name;
 	int device = config_data->instances.at(instance_id).devices.at(curr);
 	int data_type = config_data->instances.at(instance_id).data_types.at(curr);
+	int aux_stream_num = config_data->instances.at(instance_id).aux_stream_numbers.at(curr);
 	int prev_cut_point = 0, curr_cut_point = 0;
+	std::vector<LayerRange> gpu_ranges = config_data->instances.at(instance_id).gpu_ranges;
+	std::vector<LayerRange> fp16_ranges = config_data->instances.at(instance_id).fp16_ranges;
+	std::vector<LayerRange> fp32_ranges = config_data->instances.at(instance_id).fp32_ranges;
 	
 	if(curr > 0) {
 		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr-1) + 1;
@@ -167,11 +213,36 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 		input_dim_name += std::to_string(tensor_dim.d[iter1]);
 	}
 
+	plan_file_name = model_dir + "/model_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name;
+	if(for_rt_build == true) {
+		std::string range_string;
+		plan_file_name = plan_file_name + "_aux" + std::to_string(aux_stream_num);
+		if (device == DEVICE_DLA) {
+			range_string = makeRangeString(prev_cut_point, curr_cut_point, gpu_ranges);
+			if(range_string.size() > 0) {
+				plan_file_name += "_gpu" + range_string;
+			}
+		}
 
-	plan_file_name = model_dir + "/model_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name + postfix;
-	std::cerr<<"plan_file_name: "<<plan_file_name<<std::endl;
+		if (data_type == TYPE_INT8) {
+			range_string = makeRangeString(prev_cut_point, curr_cut_point, fp16_ranges);
+			if(range_string.size() > 0) {
+				plan_file_name += "_half" + range_string;
+			}
+		}
+
+		if (data_type == TYPE_INT8 || data_type == TYPE_FP16) {
+			range_string = makeRangeString(prev_cut_point, curr_cut_point, fp32_ranges);
+			if(range_string.size() > 0) {
+				plan_file_name += "_float" + range_string;
+			}
+		}
+
+	}
+	plan_file_name = plan_file_name + postfix;
+
+	std::cerr<<"plan_file_name: "<< plan_file_name<<std::endl;
 }
-
 
 
 bool OnnxModel::serialize(const char *filename, nvinfer1::IHostMemory *ptr){
@@ -329,7 +400,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::string onnx_file_name;
 
-		getModelFileName(iter1, onnx_file_name, network, ".onnx");
+		getModelFileName(iter1, onnx_file_name, network, ".onnx", false);
 
 		onnx_file_name_vec.push_back(onnx_file_name);
 		if(iter1 > 0) {
@@ -344,10 +415,13 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 	}
 }
 
-void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
-	int device_num = config_data->instances.at(instance_id).device_num;
+IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
 	int device = config_data->instances.at(instance_id).devices.at(cur_iter);
+	std::vector<LayerRange> gpu_ranges = config_data->instances.at(instance_id).gpu_ranges;
+	std::vector<LayerRange> fp16_ranges = config_data->instances.at(instance_id).fp16_ranges;
+	std::vector<LayerRange> fp32_ranges = config_data->instances.at(instance_id).fp32_ranges;
+
 	int start_cut_point = 0;
 
 	if(cur_iter > 0 )
@@ -373,7 +447,27 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 
 	setUnnamedLayerAndTensorName(network, start_cut_point);
 
+	IBuilderConfig* config = builder->createBuilderConfig();
+
 	int layer_num = network->getNbLayers();
+
+	for(int index = 0 ; index < layer_num ; index++) {
+		ILayer *layer = network->getLayer(index);
+		if(valueInRange(gpu_ranges, start_cut_point + index) == true) {
+			config->setDeviceType(layer, nvinfer1::DeviceType::kGPU);
+		}
+		if(data_type == TYPE_INT8 && valueInRange(fp16_ranges, start_cut_point + index) == true) {
+			if(layer->getType() != LayerType::kCONSTANT/* && layer->getType() != LayerType::kSHUFFLE*/) {
+				layer->setPrecision( nvinfer1::DataType::kHALF);
+			}
+		}
+		if((data_type == TYPE_INT8 || data_type == TYPE_FP16) && valueInRange(fp32_ranges, start_cut_point + index) == true) {
+			if(layer->getType() != LayerType::kCONSTANT/* && layer->getType() != LayerType::kSHUFFLE*/) {
+				layer->setPrecision( nvinfer1::DataType::kFLOAT);
+			}
+		}
+	}
+
 	for(int index = 0 ; index < layer_num ; index++) {
 		ILayer *layer = network->getLayer(index);
 		std::string layerName = layer->getName();
@@ -382,8 +476,12 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 				//layer->setPrecision( nvinfer1::DataType::kHALF);
 			}
 			else if(data_type == TYPE_INT8) {
+				if(layer->getType() == nvinfer1::LayerType::kCONVOLUTION){
+					//layer->setPrecision( nvinfer1::DataType::kHALF);
+				}
+
 				if(/*layer->getType() == LayerType::kSLICE ||*/ layer->getType() == LayerType::kMATRIX_MULTIPLY/* || layer->getType() == LayerType::kSHUFFLE*/) {
-					layer->setPrecision( nvinfer1::DataType::kFLOAT);
+					//layer->setPrecision( nvinfer1::DataType::kFLOAT);
 					layer->setPrecision( nvinfer1::DataType::kHALF);
 				}
 				else if(layer->getType() == LayerType::kACTIVATION && index > 0 && network->getLayer(index-1)->getType() == LayerType::kSLICE) {
@@ -398,7 +496,7 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 
 
 	if(data_type == TYPE_INT8 && device == DEVICE_GPU) {
-		for(int index = 0 ; index < layer_num ; index++) {
+		/*for(int index = 0 ; index < layer_num ; index++) {
 			ILayer *layer = network->getLayer(index);
 			if(layer->getType() == nvinfer1::LayerType::kPOOLING) {
 				IPoolingLayer *poolLayer = (IPoolingLayer *) layer;
@@ -411,11 +509,17 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 			for(int out_index = 0; out_index < output_num ; out_index++) {
 				ITensor *tensor = layer->getOutput(out_index);
 				if(tensor != nullptr && tensor->isNetworkOutput()) {
-					layer->setPrecision(nvinfer1::DataType::kHALF);
+					if(layer->getType() != nvinfer1::LayerType::kSHUFFLE) {
+						layer->setPrecision(nvinfer1::DataType::kHALF);
+					}
+					//else {
+					//	layer->setPrecision(nvinfer1::DataType::kINT32);
+					//}
+					std::cout << "precision printing: " << (int) layer->getPrecision() << std::endl;
 					break;
 				}
 			}
-		}
+		}*/
 	}
 
 
@@ -462,6 +566,8 @@ void OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_nam
 			}
 		}
 	}*/
+
+	return config;
 }
 
 void OnnxModel::loadTimingCache(IBuilderConfig* config, ITimingCache* &cache) {
@@ -526,17 +632,18 @@ void OnnxModel::initializeModel() {
 		int dla_core = config_data->instances.at(instance_id).dla_cores[iter1];
 		int device = config_data->instances.at(instance_id).devices.at(iter1);
 		int data_type = config_data->instances.at(instance_id).data_types.at(iter1);
+		int aux_stream_num = config_data->instances.at(instance_id).aux_stream_numbers.at(iter1);
 		std::string plan_file_name;
-		getModelFileName(iter1, plan_file_name, network, ".rt");
+		getModelFileName(iter1, plan_file_name, network, ".rt", true);
 
 		if(fileExist(plan_file_name) == false)  {
 			IBuilder *partial_builder;
 			INetworkDefinition *partial_network;
 			IParser *partial_parser;
-			createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
+			IBuilderConfig* config = createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
 
-			IBuilderConfig* config = partial_builder->createBuilderConfig();
-			config->setAvgTimingIterations(1);
+			config->setAvgTimingIterations(8);
+			config->setMaxAuxStreams(aux_stream_num);
 			config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1UL << 32UL);
 			config->setFlag(BuilderFlag::kDEBUG);
 			ITimingCache *cache = nullptr;

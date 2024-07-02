@@ -38,6 +38,10 @@ class ConfigData {
 		void readApplicationType(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readNetworkModelType(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readTimingCache(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readAuxStreams(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readGPURanges(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readFP16Ranges(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readFP32Ranges(libconfig::Setting &setting, ConfigInstance &config_instance);
 };
 
 #endif

@@ -5,6 +5,10 @@
 #include <iostream>
 #include <vector>
 
+typedef struct _LayerRange {
+	int start;
+	int end;
+} LayerRange;
 
 typedef struct _ConfigInstance {
 	std::string network_name;
@@ -27,7 +31,11 @@ typedef struct _ConfigInstance {
 	std::vector<int> devices;
 	std::vector<int> dla_cores;
 	std::vector<int> stream_numbers;
+	std::vector<int> aux_stream_numbers;
 	std::vector<int> data_types;
+	std::vector<LayerRange> gpu_ranges;
+	std::vector<LayerRange> fp16_ranges;
+	std::vector<LayerRange> fp32_ranges;
 } ConfigInstance;
 
 

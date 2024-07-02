@@ -298,6 +298,99 @@ void ConfigData::readStreams(Setting &setting, ConfigInstance &config_instance){
 	}
 }
 
+#define DEFAULT_AUX_STREAM_NUM (0)
+
+void ConfigData::readAuxStreams(Setting &setting, ConfigInstance &config_instance){
+	try{
+		const char *data = setting["aux_streams"];
+		std::stringstream ss(data);
+		std::string temp;
+
+		while( getline(ss,temp,',')) {
+			config_instance.aux_stream_numbers.push_back(std::stoi(temp));
+		}
+
+		while(config_instance.device_num > (int) config_instance.aux_stream_numbers.size())
+		{
+			std::cerr << "The number of aux streams is less than the number of devices. Set 0 as a default aux stream number for the rest of devices." << std::endl;
+			config_instance.aux_stream_numbers.push_back(DEFAULT_AUX_STREAM_NUM);
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'aux_streams' setting in configuration file. Set 0 as a default aux stream number." << std::endl;
+		for(int iter2 = 0 ; iter2 < config_instance.device_num ; iter2++) {
+			config_instance.aux_stream_numbers.push_back(DEFAULT_AUX_STREAM_NUM);
+		}
+	}
+}
+
+static LayerRange setRangeFromString(std::string str) {
+	LayerRange range;
+	size_t dashPos = str.find('-');
+	std::string startStr = str.substr(0, dashPos);
+	std::stringstream(startStr) >> range.start;
+
+	if(dashPos <= str.size()-1) {
+		std::string endStr = str.substr(dashPos + 1);
+		std::stringstream(endStr) >> range.end;
+	} else {
+		range.end = range.start;
+	}
+
+	return range;
+}
+
+void ConfigData::readGPURanges(Setting &setting, ConfigInstance &config_instance){
+	try{
+		const char *data = setting["gpu_ranges"];
+		std::stringstream ss(data);
+		std::string temp;
+
+		while( getline(ss,temp,',')) {
+			LayerRange range;
+			range = setRangeFromString(temp);
+			config_instance.gpu_ranges.push_back(range);
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'gpu_ranges' setting in configuration file." << std::endl;
+	}
+}
+
+void ConfigData::readFP16Ranges(Setting &setting, ConfigInstance &config_instance){
+	try{
+		const char *data = setting["fp16_ranges"];
+		std::stringstream ss(data);
+		std::string temp;
+
+		while( getline(ss,temp,',')) {
+			LayerRange range;
+			range = setRangeFromString(temp);
+			config_instance.fp16_ranges.push_back(range);
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'fp16_ranges' setting in configuration file." << std::endl;
+	}
+}
+
+void ConfigData::readFP32Ranges(Setting &setting, ConfigInstance &config_instance){
+	try{
+		const char *data = setting["fp32_ranges"];
+		std::stringstream ss(data);
+		std::string temp;
+
+		while( getline(ss,temp,',')) {
+			LayerRange range;
+			range = setRangeFromString(temp);
+			config_instance.fp32_ranges.push_back(range);
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'fp32_ranges' setting in configuration file." << std::endl;
+	}
+}
+
 
 void ConfigData::readDlaCores(Setting &setting, ConfigInstance &config_instance){
 	try{
@@ -333,7 +426,6 @@ void ConfigData::readCalibTable(Setting &setting, ConfigInstance &config_instanc
 	catch(const SettingNotFoundException &nfex) {
 		std::cerr << "Missing 'calib_table' setting in configuration file." << std::endl;
 	}
-
 }
 
 void ConfigData::readDataType(Setting &setting, ConfigInstance &config_instance) {
@@ -401,6 +493,10 @@ ConfigData::ConfigData(std::string config_file_path, std::vector<IInferenceAppli
 			readStreams(settings[iter], instances.at(iter));
 			readCalibTable(settings[iter], instances.at(iter));
 			readTimingCache(settings[iter], instances.at(iter));
+			readAuxStreams(settings[iter], instances.at(iter));
+			readGPURanges(settings[iter], instances.at(iter));
+			readFP16Ranges(settings[iter], instances.at(iter));
+			readFP32Ranges(settings[iter], instances.at(iter));
 		}
 
 		for(int iter = 0; iter < instance_num; iter++) {
