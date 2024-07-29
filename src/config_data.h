@@ -36,6 +36,7 @@ typedef struct _ConfigInstance {
 	std::vector<LayerRange> gpu_ranges;
 	std::vector<LayerRange> fp16_ranges;
 	std::vector<LayerRange> fp32_ranges;
+	std::vector<int> dla_sram_sizes;
 } ConfigInstance;
 
 

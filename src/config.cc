@@ -411,6 +411,31 @@ void ConfigData::readDlaCores(Setting &setting, ConfigInstance &config_instance)
 	}
 }
 
+#define DEFAULT_DLA_SRAM_SIZE (512)
+
+void ConfigData::readDlaSRAMSizes(Setting &setting, ConfigInstance &config_instance){
+	try{
+		const char *data = setting["dla_sram_sizes"];
+		std::stringstream ss(data);
+		std::string temp;
+
+		while( getline(ss,temp,',')) {
+			config_instance.dla_sram_sizes.push_back(std::stoi(temp));
+		}
+
+		while(config_instance.device_num > (int) config_instance.dla_sram_sizes.size()) {
+			config_instance.dla_sram_sizes.push_back(DEFAULT_DLA_SRAM_SIZE);
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'dla_sram_sizes' setting in configuration file. Set 512 as a default to dla_sram_size which represents 2^(10) * 512 " << std::endl;
+		for(int iter2 = 0 ; iter2 < config_instance.device_num ; iter2++) {
+			config_instance.dla_sram_sizes.push_back(DEFAULT_DLA_SRAM_SIZE);
+		}
+
+	}
+}
+
 void ConfigData::readCalibTable(Setting &setting, ConfigInstance &config_instance) {
 	try{	
 		// if(config_instance.data_type == TYPE_INT8)
@@ -497,6 +522,7 @@ ConfigData::ConfigData(std::string config_file_path, std::vector<IInferenceAppli
 			readGPURanges(settings[iter], instances.at(iter));
 			readFP16Ranges(settings[iter], instances.at(iter));
 			readFP32Ranges(settings[iter], instances.at(iter));
+			readDlaSRAMSizes(settings[iter], instances.at(iter));
 		}
 
 		for(int iter = 0; iter < instance_num; iter++) {

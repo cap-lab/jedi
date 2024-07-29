@@ -42,6 +42,7 @@ class ConfigData {
 		void readGPURanges(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readFP16Ranges(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readFP32Ranges(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readDlaSRAMSizes(libconfig::Setting &setting, ConfigInstance &config_instance);
 };
 
 #endif

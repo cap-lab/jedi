@@ -148,12 +148,13 @@ static std::string makeRangeString(int prev_cut_point, int curr_cut_point, std::
 				}
 				rangeString += std::to_string(prev_cut_point + iter);
 				first = true;
-				continueValue = true;f
+				continueValue = true;
 			}
 		} else {
 			if (continueValue == true) {
 				rangeString += "-" + std::to_string(prev_cut_point + iter);
 				continueValue = false;
+				first = false;
 			}
 		}
 	}
@@ -174,6 +175,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	int device = config_data->instances.at(instance_id).devices.at(curr);
 	int data_type = config_data->instances.at(instance_id).data_types.at(curr);
 	int aux_stream_num = config_data->instances.at(instance_id).aux_stream_numbers.at(curr);
+	int dla_sram_size = config_data->instances.at(instance_id).dla_sram_sizes.at(curr);
 	int prev_cut_point = 0, curr_cut_point = 0;
 	std::vector<LayerRange> gpu_ranges = config_data->instances.at(instance_id).gpu_ranges;
 	std::vector<LayerRange> fp16_ranges = config_data->instances.at(instance_id).fp16_ranges;
@@ -218,6 +220,8 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 		std::string range_string;
 		plan_file_name = plan_file_name + "_aux" + std::to_string(aux_stream_num);
 		if (device == DEVICE_DLA) {
+			plan_file_name = plan_file_name + "_sram" + std::to_string(dla_sram_size);
+
 			range_string = makeRangeString(prev_cut_point, curr_cut_point, gpu_ranges);
 			if(range_string.size() > 0) {
 				plan_file_name += "_gpu" + range_string;
@@ -633,6 +637,7 @@ void OnnxModel::initializeModel() {
 		int device = config_data->instances.at(instance_id).devices.at(iter1);
 		int data_type = config_data->instances.at(instance_id).data_types.at(iter1);
 		int aux_stream_num = config_data->instances.at(instance_id).aux_stream_numbers.at(iter1);
+		int dla_sram_size = config_data->instances.at(instance_id).dla_sram_sizes.at(iter1);
 		std::string plan_file_name;
 		getModelFileName(iter1, plan_file_name, network, ".rt", true);
 
@@ -651,6 +656,7 @@ void OnnxModel::initializeModel() {
 			config->setTimingCache(*cache, false);
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
 			config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
+			config->setDefaultDeviceType(nvinfer1::DeviceType::kGPU);
 			//config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
 
 			IOptimizationProfile* profile = partial_builder->createOptimizationProfile();
@@ -687,7 +693,7 @@ void OnnxModel::initializeModel() {
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);
 				}
 			}
-
+			//config->setBuilderOptimizationLevel(3);
 			config->addOptimizationProfile(profile);
 
 			// DLA options	
@@ -705,7 +711,8 @@ void OnnxModel::initializeModel() {
 				// config->setFlag(BuilderFlag::kSTRICT_TYPES);
 				config->setFlag(BuilderFlag::kDIRECT_IO);
 				config->setFlag(BuilderFlag::kREJECT_EMPTY_ALGORITHMS);
-				config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_MANAGED_SRAM, 1U << 20);
+
+				config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_MANAGED_SRAM, (1U << 10) * dla_sram_size);
 			}
 
 			if(data_type == TYPE_FP16 && partial_builder->platformHasFastFp16()) {
