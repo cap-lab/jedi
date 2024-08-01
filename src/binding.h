@@ -27,11 +27,16 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 			}
 			size = _size;
 			is_reallocated = true;
+
+			//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" size(in): "<< _size <<std::endl;
+
 		}
 
 		void* reallocateOutput(char const* tensorName, void* currentMemory, uint64_t size, uint64_t alignment) noexcept override
 		{
 			// std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" size: "<<size<<std::endl;
+			// std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" alignment: "<<alignment<<std::endl;
+
 
 			is_reallocated = false;
 
@@ -51,6 +56,8 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 		float* getHostBuf() { return host_buf; }
 
 		bool getIsReallocated() { return is_reallocated; }
+
+		uint64_t getSize() { return size;  }
 
 		virtual ~TensorAllocator() {}
 

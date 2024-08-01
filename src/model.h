@@ -7,8 +7,6 @@
 #include <cassert>
 #include <boost/function/function3.hpp>
 
-//#include <tkDNN/tkdnn.h>
-
 #include "variable.h"
 #include "config.h"
 #include "stage.h"
@@ -37,6 +35,7 @@ class Model {
 		virtual void finalizeModel() = 0;
 		void initializeBuffers();
 		void finalizeBuffers();
+		void initializeStreams(int device_id);
 		bool checkInferenceDone(int device_id, int stream_id);
 		void infer(int device_id, int stream_id, int buffer_id);
 		void waitUntilInferenceDone(int device_id, int stream_id);

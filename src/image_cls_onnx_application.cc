@@ -16,7 +16,6 @@
 #include "tensorrt_network.h"
 #include "image_cls_onnx_application.h"
 
-#include <tkDNN/tkdnn.h>
 #include "int8_image_batch_stream.h"
 #include "int8_image_calibrator.h"
 

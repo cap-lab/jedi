@@ -66,6 +66,64 @@ static int getNewSampleIndex(std::mutex *mu, int *sample_index_global, int sampl
 	return sample_index;
 }
 
+void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model)
+{
+	int instance_id = 0;
+	int tid = 0;
+	int sample_index = 0;
+	int sample_offset = config_data.instances.at(instance_id).offset;
+	int sample_size = config_data.instances.at(instance_id).sample_size;
+	int batch = config_data.instances.at(instance_id).batch;
+	int index = sample_index * batch;
+	int device_num = config_data.instances.at(instance_id).device_num;
+	float **output_pointers;
+
+	output_pointers = (float **)calloc(model->network_output_number, sizeof(float *));
+
+	while (sample_index < sample_offset + sample_size)
+	{
+		index = sample_index * batch;
+
+		auto input_size_vec = model->stages[0]->input_size_vec;
+		int input_tensor_index = 0;
+		for (auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++)
+		{
+			int input_size = 1;
+			nvinfer1::Dims dims = iter->second;
+
+			for (int iter2 = 0; iter2 < dims.nbDims; iter2++)
+				input_size = input_size * dims.d[iter2];
+
+			// input tensor index is needed
+			readData(tid, input_tensor_index, iter->first.c_str(), model->net_input_buffers[0][input_tensor_index], app, input_size, batch, 1, index);
+			input_tensor_index++;
+		}
+
+		for (int iter = 0; iter < device_num; iter++)
+		{
+			model->infer(iter, 0, 0);
+		}
+
+		for (int iter = 0; iter < model->network_output_number; iter++)
+		{
+			output_pointers[iter] = model->net_output_buffers[0][iter];
+		}
+
+		// no use signals (tmp1) in this version
+		app->postprocessing1(tid, sample_index, output_pointers, model->network_output_number, batch);
+		app->postprocessing2(tid, sample_index, batch);
+
+		if (tid == 0 && instance_id == 0)
+		{
+			std::cerr << "[TEST | " << (sample_index + 1) << " / " << sample_size << "]\r";
+		}
+
+		sample_index += 1;
+	}
+
+	free(output_pointers);
+}
+
 void doPreProcessing(void *d) {
 	PreProcessingThreadData *data = (PreProcessingThreadData *)d;
 	ConfigData *config_data = data->config_data;
@@ -210,6 +268,8 @@ void doInference(void *d) {
 	std::vector<int> stream_balance(stream_num, 0);
 	std::list<int> available_streams;
 
+	model->initializeStreams(device_id);
+
 	for(int iter = 0; iter < stream_num ; iter++) {
 		available_streams.push_back(iter);
 	}
@@ -254,8 +314,13 @@ void doInference(void *d) {
 
 
 			if(sleep_time > MAX_TIMEOUT) {
-				exit_flag = true;
-				printf("timeout is reached. program will be terminated.\n");
+				if(sleep_time > MAX_TIMEOUT * 10) {
+					printf("timeout is reached. program will be terminated.\n");
+					exit_flag = true;
+				}
+				if((sleep_time % MAX_TIMEOUT) == 1) {
+					printf("timeout check.\n");
+				}
 			}
 		}	
 		

@@ -15,9 +15,6 @@
 #include "pillar.h"
 #include "int8_pillar_calibrator.h"
 
-#include <tkDNN/tkdnn.h>
-
-
 using namespace nvinfer1;
 using namespace nvonnxparser; 
 

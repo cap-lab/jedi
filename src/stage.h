@@ -9,8 +9,6 @@
 
 #include <NvInfer.h>
 
-//#include <tkDNN/tkdnn.h>
-
 #include "variable.h"
 #include "config.h"
 

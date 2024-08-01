@@ -45,7 +45,7 @@ void Model::deallocateStream() {
 void* Model::makeCUDAArray(int stage_id, int size) {
 	void *space;
 
-	int data_type = this->config_data->instances.at(instance_id).data_types.at(stage_id);
+	//int data_type = this->config_data->instances.at(instance_id).data_types.at(stage_id);
 
 	space = (void *)cuda_make_array(NULL, size);
 
@@ -67,7 +67,7 @@ void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::
 		cudaHostGetDevicePointer(&(space), buf, 0); 
 		buffers.push_back(buf);
 		stream_buffers_map.insert(std::make_pair(tensor_name, space));
-		// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space, buf);
+		// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p, size: %d\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space, buf, size);
 
 		signals.push_back(signal);
 		signals_map.insert(std::make_pair(tensor_name, signal));
@@ -246,6 +246,14 @@ bool Model::checkInputConsumed(int device_id, int stream_id) {
 	}
 }
 
+void Model::initializeStreams(int device_id) {
+	Stage *stage = stages[device_id];
+
+	for(int iter = 0 ; iter < stage->streams.size() ; iter++) {
+		cudaStreamSynchronize(stage->streams[iter]);
+	}
+}
+
 bool Model::checkInferenceDone(int device_id, int stream_id) {
 	Stage *stage = stages[device_id];
 	cudaError_t error = cudaStreamQuery(stage->streams[stream_id]);	
@@ -276,13 +284,13 @@ void Model::setBindingForContext(Stage *stage, int stream_id, int buffer_id) {
 			result = context->setOutputAllocator(name, allocator);
 			assert(result);
 
-			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, allocator->getBuf(), allocator->getHostBuf());
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p, buffer_id: %d, stream_id: %d, iter1: %d, size: %lu\n", __FILE__, __func__, __LINE__, name, allocator->getBuf(), allocator->getHostBuf(), buffer_id, stream_id, iter1, allocator->getSize());
 		}
 		else {
 			result = context->setTensorAddress(name, allocator->getBuf());	
 			assert(result);
 
-			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p\n", __FILE__, __func__, __LINE__, name, allocator->getBuf(), allocator->getHostBuf());
+			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p, buffer_id: %d, stream_id: %d, iter1: %d, size: %lu\n", __FILE__, __func__, __LINE__, name, allocator->getBuf(), allocator->getHostBuf(), buffer_id, stream_id, iter1, allocator->getSize());
 		}		
 
 		if(allocator->getIsReallocated()) {

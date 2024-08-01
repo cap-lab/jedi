@@ -1,8 +1,6 @@
 #include <iostream>
 #include <vector>
 
-//#include <tkDNN/tkdnn.h>
-
 #include "config.h"
 #include "variable.h"
 #include "model.h"
@@ -95,8 +93,8 @@ static void initializePreAndPostprocessing(int instance_num, ConfigData &config_
 
 static void runInstanceThread(void *d) {
 	InstanceThreadData *data = (InstanceThreadData *)d;
-	PreProcessingThread *pre_thread = data-> pre_thread;	
-	PostProcessingThread *post_thread = data-> post_thread;	
+	PreProcessingThread *pre_thread = data->pre_thread;
+	PostProcessingThread *post_thread = data->post_thread;
 	InferenceThread *infer_thread = data->infer_thread;
 
 	pre_thread->runThreads();
@@ -160,6 +158,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	}
 
 	start_time = getTime();
+
 	for(int iter = 0; iter < instance_num; iter++) {
 		instance_threads.push_back(std::thread(runInstanceThread, &(instance_threads_data[iter])));	
 	}

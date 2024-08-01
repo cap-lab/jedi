@@ -5,8 +5,6 @@
 #include <cctype>
 
 #include <NvInfer.h>
-//#include <tkDNN/tkdnn.h>
-//#include <tkDNN/DarknetParser.h>
 
 #include "cuda.h"
 
@@ -177,7 +175,7 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 		}
 	}
 
-	return size * sizeof(float *);
+	return size * sizeof(float);
 }
 
 void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<float *> input_buffers, std::vector<float *> output_buffers) {
