@@ -195,6 +195,21 @@ void TkdnnModel::setDataType(int device_id) {
 }*/
 
 
+void TkdnnModel::printModel() {
+	int device_num = config_data->instances.at(instance_id).device_num;
+	int start_index = 0;
+	int batch = config_data->instances.at(instance_id).batch;
+
+	// parse a network using tkDNN darknetParser
+	tkdnn_network = dynamic_cast<TkdnnNetwork *>(app->createNetwork(&(config_data->instances.at(instance_id))));
+	net = tkdnn_network->net;
+	net->print();
+
+	net->releaseLayers();
+	delete net;
+	delete tkdnn_network;
+}
+
 void TkdnnModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int start_index = 0;
@@ -259,7 +274,7 @@ void TkdnnModel::finalizeModel() {
 	}
 
 	for(unsigned int iter1 = 0; iter1 < netRTs.size(); iter1++) {
-		delete netRTs[iter1];
+		//delete netRTs[iter1];
 	}
 }
 

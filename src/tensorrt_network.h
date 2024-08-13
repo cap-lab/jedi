@@ -2,8 +2,6 @@
 #ifndef TENSORRT_NETWORK_H_
 #define TENSORRT_NETWORK_H_
 
-//#include <tkDNN/tkdnn.h>
-
 #include <NvInfer.h>
 
 #include "config_data.h"

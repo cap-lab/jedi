@@ -30,6 +30,7 @@ class OnnxModel : public Model {
 		void separateOnnxFile(nvinfer1::INetworkDefinition *network, std::string model_name, std::vector<std::string>& plan_file_name_vec);
 		nvinfer1::IBuilderConfig* createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, nvinfer1::IBuilder* &builder, nvinfer1::INetworkDefinition* &network, nvonnxparser::IParser* &parser);
 		void initializeModel() override;
+		void printModel() override;
 		void finalizeModel() override;
 	private:
 		bool serialize(const char *filename, nvinfer1::IHostMemory *ptr);

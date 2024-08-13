@@ -177,7 +177,7 @@ static float yolo_box_diou(const Box a, const Box b, const float nms_thresh=0.6)
 }
 
 
-void yolo_mergeDetections(Detection *dets, int ndets, double nms_thresh, tk::dnn::Yolo::nmsKind_t nms_kind) {
+void yolo_mergeDetections(Detection *dets, int ndets, double nms_thresh, NMSKind nms_kind) {
 	int total = ndets;
 	int i, j, k;
 	float thresh = 0.45f;
@@ -204,10 +204,10 @@ void yolo_mergeDetections(Detection *dets, int ndets, double nms_thresh, tk::dnn
 			Box a = dets[i].bbox;
 			for(j = i+1; j < total; ++j){
 				Box b = dets[j].bbox;
-				if(nms_kind == tk::dnn::Yolo::GREEDY_NMS && yolo_box_iou(a, b) > thresh) {
+				if(nms_kind == 	NMS_KIND_GREEDY && yolo_box_iou(a, b) > thresh) {
 					dets[j].prob[k] = 0;
 				}
-				else if(nms_kind == tk::dnn::Yolo::DIOU_NMS && yolo_box_diou(a, b, nms_thresh) > thresh) {
+				else if(nms_kind == NMS_KIND_DIOU && yolo_box_diou(a, b, nms_thresh) > thresh) {
 					dets[j].prob[k] = 0;
 				}
 			}

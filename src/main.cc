@@ -21,10 +21,11 @@ bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-P]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg -P (print layers of the network) "<<std::endl;
 }
 
 static void turnOffTegrastats() {
@@ -65,6 +66,15 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 	fp.close();
 }
 
+static void printModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models, std::vector<IInferenceApplication *> &apps) {
+	for(int iter = 0; iter < instance_num; iter++) {
+		Model *model = nullptr;
+		model = g_NetworkModelRegistry.create(config_data.instances.at(iter).model_type, &config_data, iter, apps[iter]);
+		model->printModel();
+
+		models.emplace_back(model);
+	}
+}
 
 static void generateModels(int instance_num, ConfigData &config_data, std::vector<Model *> &models, std::vector<IInferenceApplication *> &apps) {
 	for(int iter = 0; iter < instance_num; iter++) {
@@ -207,6 +217,7 @@ int main(int argc, char *argv[]) {
 	std::string result_file_name = "coco_results.json";
 	std::string power_file_name;
 	std::string time_file_name;
+	bool print_network = false;
 	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	if(argc == 1) {
@@ -214,7 +225,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "c:r:p:t:h")) != -1) {
+	while((option = getopt(argc, argv, "c:r:p:t:h:P")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
@@ -228,6 +239,9 @@ int main(int argc, char *argv[]) {
 			case 't':
 				time_file_name = std::string(optarg);
 				break;
+			case 'P':
+				print_network = true;
+				break;
 			case 'h':
 				printHelpMessage();
 				break;
@@ -240,20 +254,25 @@ int main(int argc, char *argv[]) {
 	ConfigData config_data(config_file_name, apps);
 	instance_num = config_data.instance_num;
 
-	// make models (engines, buffers)
 	std::vector<Model *> models;
-	generateModels(instance_num, config_data, models, apps);
 
-	// initialize dataset, pre/post processing
-	initializePreAndPostprocessing(instance_num, config_data, apps);
+	// make models (engines, buffers)
+	if(print_network == false) {
+		generateModels(instance_num, config_data, models, apps);
 
-	// make threads
-	generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
+		// initialize dataset, pre/post processing
+		initializePreAndPostprocessing(instance_num, config_data, apps);
 
-	// write file
-	for(int iter = 0; iter < instance_num; iter++)
-	{
-		apps[iter]->writeResultFile(result_file_name);
+		// make threads
+		generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
+
+		// write file
+		for(int iter = 0; iter < instance_num; iter++)
+		{
+			apps[iter]->writeResultFile(result_file_name);
+		}
+	} else {
+		printModels(instance_num, config_data, models, apps);
 	}
 
 	// clear data

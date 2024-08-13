@@ -32,7 +32,6 @@ class YoloOnnxApplication : public IInferenceApplication {
 		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
 		void postprocessing2(int thread_id, int sample_index, int batch) override;
 		void readCustomOptions(libconfig::Setting &setting) override;
-		//tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
 		IJediNetwork* createNetwork(ConfigInstance *basic_config_data) override;
 
 	private:

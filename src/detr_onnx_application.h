@@ -27,7 +27,6 @@ typedef struct _DETRData {
 	// float *bias;
 	int new_coords;
 	double nms_thresh;
-	// tk::dnn::Yolo::nmsKind_t nms_kind;
 	int height;
 	int width;
 	int channel;
@@ -47,7 +46,6 @@ class DETROnnxApplication : public IInferenceApplication {
 		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
         void postprocessing2(int thread_id, int sample_index, int batch);
         void readCustomOptions(libconfig::Setting &setting) override;
-        //tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
 		IJediNetwork* createNetwork(ConfigInstance *basic_config_data) override;
 
 	private:

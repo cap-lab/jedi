@@ -476,10 +476,7 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 		ILayer *layer = network->getLayer(index);
 		std::string layerName = layer->getName();
 		if(layer->getType() != LayerType::kCONSTANT) {
-			if(data_type == TYPE_FP16) {
-				//layer->setPrecision( nvinfer1::DataType::kHALF);
-			}
-			else if(data_type == TYPE_INT8) {
+			if(data_type == TYPE_INT8) {
 				if(layer->getType() == nvinfer1::LayerType::kCONVOLUTION){
 					//layer->setPrecision( nvinfer1::DataType::kHALF);
 				}
@@ -500,7 +497,7 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 
 
 	if(data_type == TYPE_INT8 && device == DEVICE_GPU) {
-		/*for(int index = 0 ; index < layer_num ; index++) {
+		for(int index = 0 ; index < layer_num ; index++) {
 			ILayer *layer = network->getLayer(index);
 			if(layer->getType() == nvinfer1::LayerType::kPOOLING) {
 				IPoolingLayer *poolLayer = (IPoolingLayer *) layer;
@@ -509,7 +506,7 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 				}
 			}
 
-			int output_num = layer->getNbOutputs();
+			/*int output_num = layer->getNbOutputs();
 			for(int out_index = 0; out_index < output_num ; out_index++) {
 				ITensor *tensor = layer->getOutput(out_index);
 				if(tensor != nullptr && tensor->isNetworkOutput()) {
@@ -522,8 +519,8 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 					std::cout << "precision printing: " << (int) layer->getPrecision() << std::endl;
 					break;
 				}
-			}
-		}*/
+			}*/
+		}
 	}
 
 
@@ -595,6 +592,22 @@ void OnnxModel::saveTimingCache(ITimingCache *cache) {
 	serialize(timing_cache_path.c_str(), serializedCache);
 	delete serializedCache;
 
+}
+
+void OnnxModel::printModel() {
+	TensorRTNetwork *tensorrt_network = nullptr;
+
+	tensorrt_network = dynamic_cast<TensorRTNetwork *>(app->createNetwork(&(config_data->instances.at(instance_id))));
+	setUnnamedLayerAndTensorName(tensorrt_network->network, 0);
+	tensorrt_network->printNetwork();
+
+	delete tensorrt_network->network;
+	delete tensorrt_network->builder;
+
+	if(tensorrt_network->calibrator != nullptr ) {
+		delete tensorrt_network->calibrator;
+	}
+	delete tensorrt_network;
 }
 
 
@@ -763,6 +776,7 @@ void OnnxModel::initializeModel() {
 			if(device == DEVICE_DLA) {
 				runtime->setDLACore(core);
 			}
+			//runtime->setMaxThreads(4);
 			ICudaEngine* engine = runtime->deserializeCudaEngine(gieModelStream, size);
 			assert(engine != nullptr);
 			auto inspector = std::unique_ptr<IEngineInspector>(engine->createEngineInspector());

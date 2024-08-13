@@ -32,6 +32,7 @@ class Model {
 		Model(ConfigData *config_data, int instance_id, IInferenceApplication *app);
 		~Model();
 		virtual void initializeModel() = 0;
+		virtual void printModel() = 0;
 		virtual void finalizeModel() = 0;
 		void initializeBuffers();
 		void finalizeBuffers();

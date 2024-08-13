@@ -146,7 +146,7 @@ IJediNetwork *YoloApplication::createNetwork(ConfigInstance *basic_config_data)
 			yolo.bias = yoloTKDNN->bias_h;
 			yolo.mask = yoloTKDNN->mask_h;
 			yolo.new_coords = yoloTKDNN->new_coords;
-			yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) yoloTKDNN->nsm_kind;
+			yolo.nms_kind = (NMSKind) yoloTKDNN->nsm_kind;
 			yolo.nms_thresh = yoloTKDNN->nms_thresh;
 			yolo.height = yoloTKDNN->input_dim.h;
 			yolo.width = yoloTKDNN->input_dim.w;

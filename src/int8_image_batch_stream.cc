@@ -4,8 +4,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <tkdnn.h>
-
 #include "int8_image_batch_stream.h"
 
 
@@ -70,9 +68,11 @@ void ImageBatchStream::readInListFile(const std::string& dataFilePath, std::vect
     // dataFilePath contains the list of image paths
     int count = 0;
     FILE* f = fopen(dataFilePath.c_str(), "r");
-    if (!f)
-        FatalError("failed to open " + dataFilePath);
-    
+    if (!f) {
+        std::cerr << "[Error] Failed to open : " << dataFilePath << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
     char str[512];
     while (fgets(str, 512, f) != NULL) {
         for (int i = 0; str[i] != '\0'; ++i) {
@@ -83,7 +83,7 @@ void ImageBatchStream::readInListFile(const std::string& dataFilePath, std::vect
         }
         count ++;
         mListIn.push_back(str);
-        if(count == mMaxBatches)
+        if(count == mMaxBatches * mBatchSize)
             break;
     }
     fclose(f);
@@ -92,19 +92,13 @@ void ImageBatchStream::readInListFile(const std::string& dataFilePath, std::vect
 void ImageBatchStream::readCVimage(std::string inputFileName, float *input, bool fixshape) {
     // unaltered original DsImage
     cv::Mat m_OrigImage;
-    // letterboxed DsImage given to the network as input
-    cv::Mat m_LetterboxImage;
     m_OrigImage = cv::imread(inputFileName, cv::IMREAD_COLOR);
 
-    if (!m_OrigImage.data || m_OrigImage.cols <= 0 || m_OrigImage.rows <= 0)
-        FatalError("Unable to open " + inputFileName);
-
-    int m_Height = m_OrigImage.rows;
-    int m_Width = m_OrigImage.cols;
-    if(fixshape) {
-        m_Height = mHeight;
-        m_Width = mWidth;
+    if (!m_OrigImage.data || m_OrigImage.cols <= 0 || m_OrigImage.rows <= 0) {
+        std::cerr << "[Error] Unable to open : " << inputFileName << std::endl;
+        exit(EXIT_FAILURE);
     }
+
 	int original_width;
 	int original_height;
 

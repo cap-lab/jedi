@@ -20,9 +20,6 @@
 
 #include "yolo_onnx_application.h"
 
-
-#include <tkDNN/tkdnn.h>
-
 #include "int8_image_batch_stream.h"
 #include "int8_image_calibrator.h"
 
@@ -203,7 +200,6 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	input_dim.channel = tensor_dim.d[1];
 	input_dim.width = tensor_dim.d[2];
 	input_dim.height = tensor_dim.d[3];
-	dataDim_t dim(tensor_dim.d[0],tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 
 	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, 1, yoloOnnxAppConfig.calib_images_num, yoloOnnxAppConfig.calib_image_path, LOAD_IMAGE_RESIZE);
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
@@ -218,7 +214,7 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.bias = g_bias;
 		yolo.mask = g_mask[0];
 		yolo.new_coords = 0;
-		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
+		yolo.nms_kind = (NMSKind) 0;
 		yolo.nms_thresh = NMS;
 		yolo.height = jedi_network->network->getOutput(0)->getDimensions().d[2]; // image height / 32
 		yolo.width = jedi_network->network->getOutput(0)->getDimensions().d[3]; // image width / 32
@@ -236,7 +232,7 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.bias = g_bias;
 		yolo.mask = g_mask[1];
 		yolo.new_coords = 0;
-		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
+		yolo.nms_kind = (NMSKind) 0;
 		yolo.nms_thresh = NMS;
 		yolo.height = jedi_network->network->getOutput(1)->getDimensions().d[2];  // image height / 16
 		yolo.width = jedi_network->network->getOutput(1)->getDimensions().d[3]; // image width / 16
@@ -254,7 +250,7 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 		yolo.bias = g_bias;
 		yolo.mask = g_mask[2];
 		yolo.new_coords = 0;
-		yolo.nms_kind = (tk::dnn::Yolo::nmsKind_t) 0;
+		yolo.nms_kind = (NMSKind) 0;
 		yolo.nms_thresh = NMS;
 		yolo.height = jedi_network->network->getOutput(2)->getDimensions().d[2];  // image height / 8
 		yolo.width = jedi_network->network->getOutput(2)->getDimensions().d[3];  // image width / 8

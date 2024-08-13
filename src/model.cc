@@ -138,6 +138,10 @@ void Model::allocateBuffer() {
 void Model::deallocateBuffer() {
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 
+	if (net_input_buffers.size() == 0 && net_output_buffers.size() == 0) {
+		return;
+	}
+
 	for(int buffer_id = 0; buffer_id < buffer_num; buffer_id++) {
 		auto input_buffer = net_input_buffers[buffer_id];
 		auto output_buffer = net_output_buffers[buffer_id];

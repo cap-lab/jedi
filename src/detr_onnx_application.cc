@@ -16,12 +16,12 @@
 
 #include "tensorrt_network.h"
 
-#include <tkDNN/tkdnn.h>
-#include <tkDNN/Int8BatchStream.h>
-#include <tkDNN/Int8Calibrator.h>
-// #include <tkDNN/Int8MinMaxCalibrator.h>
-// #include <tkDNN/Int8HistogramCalibrator.h>
+#include "int8_image_batch_stream.h"
+#include "int8_image_calibrator.h"
+
 #include "detr_onnx_application.h"
+
+#define CALIBRATION_BATCH_SIZE (16)
 
 #define NMS 0.45
 
@@ -200,11 +200,10 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	input_dim.channel = tensor_dim.d[1];
 	input_dim.width = tensor_dim.d[2];
 	input_dim.height = tensor_dim.d[3];
-	dataDim_t dim(tensor_dim.d[0], tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
-	BatchStream *calibrationStream = new BatchStream(dim, 1, detrOnnxAppConfig.calib_images_num, detrOnnxAppConfig.calib_image_path);
-	Int8EntropyCalibrator *calibrator = new Int8EntropyCalibrator(*calibrationStream, 1, calib_table, "data");
-	// Int8MinMaxCalibrator *calibrator = new Int8MinMaxCalibrator(*calibrationStream, 1, calib_table , "data");
-	// Int8HistogramCalibrator *calibrator = new Int8HistogramCalibrator(*calibrationStream, 1, calib_table , "data");
+
+	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, 1, detrOnnxAppConfig.calib_images_num, detrOnnxAppConfig.calib_image_path, LOAD_IMAGE_RESIZE_NORM);
+	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
+
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
 
@@ -384,14 +383,17 @@ void DETROnnxApplication::writeResultFile(std::string result_file_name) {
 
 DETROnnxApplication::~DETROnnxApplication()
 {
-	int batch = this->detection_num_vec[0].size();
+	if(this->detection_num_vec.size() > 0) {
+		int batch = this->detection_num_vec[0].size();
 
-	while(dets_vec.size() > 0)
-	{
-		Detection *det = dets_vec.back();
-		deallocateDetectionBox(batch * NBOXES, det);
-		dets_vec.pop_back();
+		while(dets_vec.size() > 0)
+		{
+			Detection *det = dets_vec.back();
+			deallocateDetectionBox(batch * NBOXES, det);
+			dets_vec.pop_back();
+		}
 	}
+
 	delete dataset;
 	delete result_format;
 }

@@ -31,7 +31,6 @@ class IInferenceApplication {
 		virtual void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) = 0;
 		virtual void postprocessing2(int thread_id, int sample_index, int batch) = 0;
 		//virtual std::string getInputModelName() = 0;
-		//virtual tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) = 0;
 		virtual IJediNetwork *createNetwork(ConfigInstance *basic_config_data) = 0;
 
 		virtual void readCustomOptions(libconfig::Setting &setting) {};

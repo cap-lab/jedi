@@ -185,6 +185,8 @@ void ImageClsOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readImagePreprocessingOption(setting);
 }
 
+#define CALIBRATION_BATCH_SIZE (16)
+
 IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_config_data)
 {
 	std::string calib_table = basic_config_data->calib_table;
@@ -227,7 +229,7 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	input_dim.height = tensor_dim.d[3];
 	// dataDim_t dim(tensor_dim.d[0],tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 	//dataDim_t dim(basic_config_data->batch,tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
-	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, 1, imageClsOnnxAppConfig.calib_images_num, imageClsOnnxAppConfig.calib_image_path, imageClsOnnxAppConfig.preprocessing_option);
+	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_image_path, imageClsOnnxAppConfig.preprocessing_option);
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;

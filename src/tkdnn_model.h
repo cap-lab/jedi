@@ -25,6 +25,7 @@ class TkdnnModel : public Model {
 		TkdnnModel(ConfigData *config_data, int instance_id, IInferenceApplication *app) : Model(config_data, instance_id, app) {};
 		~TkdnnModel() {};
 		void initializeModel() override;
+		void printModel() override;
 		void finalizeModel() override;
 	private:
 		std::vector<tk::dnn::NetworkRT *> netRTs;

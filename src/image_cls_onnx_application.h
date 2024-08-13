@@ -1,6 +1,6 @@
 
-#ifndef YOLO_ONNX_APPLICATION_H_
-#define YOLO_ONNX_APPLICATION_H_
+#ifndef IMAGE_CLS_ONNX_APPLICATION_H_
+#define IMAGE_CLS_ONNX_APPLICATION_H_
 
 #include "variable.h"
 #include "imagenet_format.h"
@@ -31,7 +31,6 @@ class ImageClsOnnxApplication : public IInferenceApplication {
 		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
 		void postprocessing2(int thread_id, int sample_index, int batch) override;
 		void readCustomOptions(libconfig::Setting &setting) override;
-		//tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;
 		IJediNetwork* createNetwork(ConfigInstance *basic_config_data) override;
 
 	private:
