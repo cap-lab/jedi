@@ -26,8 +26,10 @@ std::string convertLayerTypeToString(ILayer *layer) {
 	switch(layer->getType()){
 		case LayerType::kCONVOLUTION:
 			return "Convolution";
-		case LayerType::kFULLY_CONNECTED:
+#if NV_TENSORRT_MAJOR <= 8
+		case LayerType::kFULLY_CONNECTED: // no longer supported in tensorrt 10
 			return "Fully Connected";
+#endif
 		case LayerType::kACTIVATION: {
 			IActivationLayer *actlayer = (IActivationLayer *) layer;
 				switch(actlayer->getActivationType()) {
@@ -55,6 +57,12 @@ std::string convertLayerTypeToString(ILayer *layer) {
 						return "ScaledTanH";
 					case ActivationType::kTHRESHOLDED_RELU:
 						return "ThresholdedReLU";
+#if NV_TENSORRT_MAJOR > 8
+					case ActivationType::kGELU_ERF:
+						return "GeLUErf";
+					case ActivationType::kGELU_TANH:
+						return "GeLUTanH";
+#endif
 				}	
 			}
 			return "UnknownActivation";
@@ -102,8 +110,10 @@ std::string convertLayerTypeToString(ILayer *layer) {
 			return "Ragged Softmax";
 		case LayerType::kCONSTANT:
 			return "Constant";
-		case LayerType::kRNN_V2:
+#if NV_TENSORRT_MAJOR <= 8
+		case LayerType::kRNN_V2: // no longer supported in tensorrt 10
 			return "RNNv2";
+#endif
 		case LayerType::kIDENTITY:
 			return "Identity";
 		case LayerType::kPLUGIN_V2:
@@ -152,6 +162,16 @@ std::string convertLayerTypeToString(ILayer *layer) {
 			return "Grid Sample";
 		case LayerType::kNMS:
 			return "NMS";
+#if NV_TENSORRT_MAJOR > 8
+		case LayerType::kCAST:
+			return "Cast";
+		case LayerType::kREVERSE_SEQUENCE:
+			return "ReverseSequence";
+		case LayerType::kNORMALIZATION:
+			return "Normalization";
+		case LayerType::kPLUGIN_V3:
+			return "PluginV3";
+#endif
 	}
 
 	return "Unknown";

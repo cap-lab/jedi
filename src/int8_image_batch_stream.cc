@@ -43,7 +43,7 @@ bool ImageBatchStream::next() {
         if (mFileBatchPos == mDims.d[0] && !update())
             return false;
 
-        csize = std::min(mBatchSize - batchPos, mDims.d[0] - mFileBatchPos);
+        csize = std::min(mBatchSize - batchPos, (int) mDims.d[0] - mFileBatchPos);
 		memcpy(getBatch() + batchPos * mImageSize, getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize * sizeof(float));
 		//getBatch().insert(getBatch().end(), , &(getFileBatch()[mFileBatchPos * mImageSize + csize * mImageSize]));
         //std::copy_n(getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize, getBatch() + batchPos * mImageSize);

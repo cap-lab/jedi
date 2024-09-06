@@ -433,7 +433,12 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 
 	builder = createInferBuilder(logger);
 
-	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); 
+#if NV_TENSORRT_MAJOR > 8
+	uint32_t flag = 0;
+#else
+	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); deprecated in tensorrt 10
+#endif
+
 	network =  (builder)->createNetworkV2(flag);
 
 	parser = createParser(*network, logger);

@@ -317,6 +317,11 @@ void Model::infer(int device_id, int stream_id, int buffer_id) {
 	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
 
+#if NV_TENSORRT_MAJOR > 8
+	stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
+	setBindingForContext(stage, stream_id, buffer_id);
+	enqueueSuccess = stage->contexts[stream_id]->enqueueV3(stage->streams[stream_id]);
+#else
 	if(!stage->contexts[stream_id]->getEngine().hasImplicitBatchDimension()) {
 		stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
 		setBindingForContext(stage, stream_id, buffer_id);
@@ -329,6 +334,7 @@ void Model::infer(int device_id, int stream_id, int buffer_id) {
 		enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 		// enqueueSuccess = stage->contexts[stream_id]->execute(batch, &(stage->stage_buffers[buffer_id][0]));
 	}
+#endif
 
 	if(enqueueSuccess == false)
 	{
