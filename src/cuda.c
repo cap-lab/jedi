@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "cuda.h"
@@ -23,7 +24,7 @@ void check_error(cudaError_t status) {
         error(buffer);
     }
     if (status2 != cudaSuccess) {
-        const char *s = cudaGetErrorString(status);
+        const char *s = cudaGetErrorString(status2);
         char buffer[256];
         printf("CUDA Error Prev: %s\n", s);
         assert(0);
@@ -56,6 +57,26 @@ float *cuda_make_array_host(size_t n) {
 	cudaError_t status = cudaHostAlloc((void **)&x, size, cudaHostAllocMapped);
     check_error(status);
     return x;
+}
+
+void *cuda_make_generic_array_host(size_t n, size_t type_size) {
+    void *x;
+    size_t size = type_size * n;
+	cudaError_t status = cudaHostAlloc(&x, size, cudaHostAllocMapped);
+    check_error(status);
+    return x;
+}
+
+
+void *cuda_make_generic_array(void *x, size_t n, size_t type_size) {
+    void *x_gpu;
+    size_t size = type_size * n;
+    cudaError_t status = cudaMalloc(&x_gpu, size);
+    check_error(status);
+	check_error(cudaMemset(x_gpu, 0, size));
+    if (!x_gpu)
+        error("Cuda malloc failed\n");
+    return x_gpu;
 }
 
 int *cuda_make_int_array_host(size_t n) {

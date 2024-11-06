@@ -26,6 +26,8 @@ Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_i
 
 	this->input_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
 	this->output_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
+	this->input_type_vec = std::vector<std::pair<std::string, nvinfer1::DataType>>();
+	this->output_type_vec = std::vector<std::pair<std::string, nvinfer1::DataType>>();
 
 	this->batch = this->config_data->instances.at(instance_id).batch;
 
@@ -33,9 +35,9 @@ Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_i
 	this->input_binding_num = 0;
 	this->output_binding_num = 0;
 
-	this->tensor_allocators = std::vector<std::vector<std::vector<TensorAllocator *>>>();
+	this->tensor_allocators = std::vector<std::vector<TensorAllocator *>>();
 	for(int iter = 0; iter < buffer_num; iter++) {
-		std::vector<std::vector<TensorAllocator *>> tensor_allocator;
+		std::vector<TensorAllocator *> tensor_allocator;
 		this->tensor_allocators.push_back(tensor_allocator);
 	}
 }
@@ -71,6 +73,7 @@ void Stage::createExecutionContext() {
 				if(iter1 == 0) {
 					std::string _name(name);
 					input_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
+					input_type_vec.push_back(std::pair<std::string, nvinfer1::DataType>(_name, context->getEngine().getTensorDataType(name)));
 					input_binding_num++;
 				}
 			}
@@ -80,6 +83,7 @@ void Stage::createExecutionContext() {
 				if(iter1 == 0) {
 					std::string _name(name);
 					output_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
+					output_type_vec.push_back(std::pair<std::string, nvinfer1::DataType>(_name, context->getEngine().getTensorDataType(name)));
 					output_binding_num++;
 				}
 			}
@@ -158,6 +162,7 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 				for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 					size = size * dims.d[iter2];
 
+				size = size * getDataTypeSize(input_type_vec[iter1].second);
 				break;
 			}	
 		}
@@ -170,19 +175,19 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 				for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 					size = size * dims.d[iter2];
 
+				size = size * getDataTypeSize(output_type_vec[iter1].second);
 				break;
 			}	
 		}
 	}
 
-	return size * sizeof(float);
+	return size;
 }
 
-void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<float *> input_buffers, std::vector<float *> output_buffers) {
-	for(int iter1 = 0; iter1 < stream_num; iter1++) {
-		auto context = contexts[iter1];
-		std::vector<TensorAllocator *> tensor_allocator;
-		nvinfer1::DataType dtype = (data_type == TYPE_FP32) ? nvinfer1::DataType::kFLOAT : nvinfer1::DataType::kHALF;
+void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<void *> input_buffers, std::vector<void *> output_buffers) {
+		auto context = contexts[0];
+		std::vector<TensorAllocator *> tensor_allocator = tensor_allocators[buffer_id];
+		//nvinfer1::DataType dtype = (data_type == TYPE_FP32) ? nvinfer1::DataType::kFLOAT : nvinfer1::DataType::kHALF;
 
 		for(int iter2 = 0; iter2 < binding_num; iter2++) {
 			auto const& name = context->getEngine().getIOTensorName(iter2);
@@ -195,16 +200,14 @@ void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stre
 				is_host_allocated = true;
 			uint64_t size = getSizeByTensorName(is_input, _name);
 			void *buf = stream_buffers_map[_name];
-			float *host_buf = !is_host_allocated ? nullptr : (is_input ? input_buffers[iter2] : output_buffers[iter2-input_binding_num]);
+			void *host_buf = !is_host_allocated ? nullptr : (is_input ? input_buffers[iter2] : output_buffers[iter2-input_binding_num]);
 
 			// fprintf(stderr, "tensor name: %s, is_host_allocated: %d, host_buf: %p, size: %ld\n", name, is_host_allocated, host_buf, size);
-			TensorAllocator *allocator = new TensorAllocator(is_host_allocated, buf, host_buf, size, dtype);
+			TensorAllocator *allocator = new TensorAllocator(is_host_allocated, buf, host_buf, size, context->getEngine().getTensorDataType(name));
 
 			tensor_allocator.push_back(allocator);
 		}
-
-		tensor_allocators[buffer_id].push_back(tensor_allocator);
-	}
+		this->tensor_allocators[buffer_id] = tensor_allocator;
 }
 
 void Stage::setSignals(int buffer_id, std::map<std::string, bool*> signals_map) {
@@ -274,10 +277,8 @@ void Stage::finalizeStage() {
 
 	for(unsigned int iter1 = 0; iter1 < tensor_allocators.size(); iter1++) {
 		for(unsigned int iter2 = 0; iter2 < tensor_allocators[iter1].size(); iter2++) {
-			for(unsigned int iter3 = 0; iter3 < tensor_allocators[iter1][iter2].size(); iter3++) {
 				// buffers are deallocated in the class model
-				delete tensor_allocators[iter1][iter2][iter3];
-			}
+				delete tensor_allocators[iter1][iter2];
 		}
 	}
 

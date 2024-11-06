@@ -24,7 +24,7 @@ struct Box{
     float theta;
 
     float score;
-    int cls;
+    int64_t cls;
     bool isDrop; // for nms
 };
 

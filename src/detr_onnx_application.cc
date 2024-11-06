@@ -256,14 +256,14 @@ void DETROnnxApplication::preprocessing(int thread_id, int input_tensor_index, c
 }
 
 
-void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
+void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch)
 {
 	for (int batch_index = 0; batch_index < batch; batch_index++) {
 		int image_index = (sample_index * batch + batch_index) % dataset->getSize();
 		std::list<std::string> detected;
 
 		for (int box_index = 0; box_index < num_detections; box_index++) {
-			float* logit = output_buffers[0] + batch_index*num_detections*num_classes + box_index*num_classes;
+			float* logit = (float *) output_buffers[0] + batch_index*num_detections*num_classes + box_index*num_classes;
 			float confidence = 0.0;
 			int label = 0;
 
@@ -285,7 +285,7 @@ void DETROnnxApplication::postprocessing1(int thread_id, int sample_index, IN fl
 				int image_id = get_coco_image_id(path);
 
 				// float* logit = output_buffers[0] + batch_index + num_detections*num_classes + box_index * num_classes;
-				float *pred_box = output_buffers[1] + batch_index*num_detections*4 + box_index * 4;
+				float *pred_box = (float *) output_buffers[1] + batch_index*num_detections*4 + box_index * 4;
 
 				//rescale box 
 				// float rescale_width = orig_width / this->input_dim.width;

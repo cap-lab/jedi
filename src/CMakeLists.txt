@@ -2,12 +2,12 @@ SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 CUDA_ADD_LIBRARY(cuda_kernels cnet_detections.cu)
 
-ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda.c image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc coco_format.cc nuscenes_format.cc util.cc inference_application.cc yolo_application.cc image_dataset.cc lidar_dataset.cc cnet_application.cc tkdnn_model.cc onnx_model.cc yolo_onnx_application.cc tensorrt_network.cc detr_onnx_application.cc imagenet_format.cc image_cls_onnx_application.cc nuscenes_detection_onnx_application.cc int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc)
+ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda.c binding.cc image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc coco_format.cc nuscenes_format.cc util.cc inference_application.cc yolo_application.cc image_dataset.cc lidar_dataset.cc cnet_application.cc tkdnn_model.cc onnx_model.cc yolo_onnx_application.cc tensorrt_network.cc detr_onnx_application.cc imagenet_format.cc image_cls_onnx_application.cc nuscenes_detection_onnx_application.cc int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc)
 TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser tkDNN stdc++ z ${CUDA_LIBRARIES} ${OpenCV_LIBS} cuda_kernels kernels)
 
 
 ## No tkdnn build
-#ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda.c image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc coco_format.cc nuscenes_format.cc util.cc inference_application.cc image_dataset.cc lidar_dataset.cc onnx_model.cc yolo_onnx_application.cc tensorrt_network.cc detr_onnx_application.cc imagenet_format.cc image_cls_onnx_application.cc nuscenes_detection_onnx_application.cc int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc)
+#ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda.c binding.cc image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc coco_format.cc nuscenes_format.cc util.cc inference_application.cc image_dataset.cc lidar_dataset.cc onnx_model.cc yolo_onnx_application.cc tensorrt_network.cc detr_onnx_application.cc imagenet_format.cc image_cls_onnx_application.cc nuscenes_detection_onnx_application.cc int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc)
 #TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser stdc++ z ${CUDA_LIBRARIES} ${OpenCV_LIBS})
 
 

@@ -196,10 +196,6 @@ void TkdnnModel::setDataType(int device_id) {
 
 
 void TkdnnModel::printModel() {
-	int device_num = config_data->instances.at(instance_id).device_num;
-	int start_index = 0;
-	int batch = config_data->instances.at(instance_id).batch;
-
 	// parse a network using tkDNN darknetParser
 	tkdnn_network = dynamic_cast<TkdnnNetwork *>(app->createNetwork(&(config_data->instances.at(instance_id))));
 	net = tkdnn_network->net;

@@ -31,13 +31,13 @@ long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<lon
 	return sum / (long) nSize;
 }
 
-static void readData(int thread_id, int input_tensor_index, const char *input_name, float *input_buffer, IInferenceApplication *app, int input_tensor_size, int batch, int batch_thread_num, int index)
+static void readData(int thread_id, int input_tensor_index, const char *input_name, void *input_buffer, IInferenceApplication *app, int input_tensor_size, int batch, int batch_thread_num, int index)
 {
 	int input_size = input_tensor_size / batch;
 	#pragma omp parallel num_threads(batch_thread_num)
 	#pragma omp for
 	for(int iter = 0; iter < batch; iter++) {
-		app->preprocessing(thread_id, input_tensor_index, input_name, index, iter, input_buffer + iter * input_size);
+		app->preprocessing(thread_id, input_tensor_index, input_name, index, iter, (float *) input_buffer + iter * input_size);
 	}
 }
 
@@ -76,9 +76,9 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 	int batch = config_data.instances.at(instance_id).batch;
 	int index = sample_index * batch;
 	int device_num = config_data.instances.at(instance_id).device_num;
-	float **output_pointers;
+	void **output_pointers;
 
-	output_pointers = (float **)calloc(model->network_output_number, sizeof(float *));
+	output_pointers = (void **)calloc(model->network_output_number, sizeof(void *));
 
 	while (sample_index < sample_offset + sample_size)
 	{
@@ -202,9 +202,9 @@ void doPostProcessing(void *d) {
 	int *sample_index_global = data->sample_index;
 	std::mutex *mu = data->mu;
 	std::vector<int> *cur_running_index_list = data->cur_running_index;
-	float **output_pointers;
+	void **output_pointers;
 
-	output_pointers = (float **) calloc(data->model->network_output_number, sizeof(float *));
+	output_pointers = (void **) calloc(data->model->network_output_number, sizeof(void *));
 
 	sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 
@@ -268,7 +268,7 @@ void doInference(void *d) {
 	std::vector<int> stream_balance(stream_num, 0);
 	std::list<int> available_streams;
 
-	model->initializeStreams(device_id);
+	//model->initializeStreams(device_id);
 
 	for(int iter = 0; iter < stream_num ; iter++) {
 		available_streams.push_back(iter);

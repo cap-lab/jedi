@@ -22,12 +22,14 @@ class Stage {
 		std::vector<cudaStream_t> streams;
 		std::vector<cudaEvent_t> events;
 
-		// std::vector<std::vector<TensorAllocator *>> tensor_allocators;
-		std::vector<std::vector<std::vector<TensorAllocator *>>> tensor_allocators;
+		std::vector<std::vector<TensorAllocator *>> tensor_allocators;
+		//std::vector<std::vector<std::vector<TensorAllocator *>>> tensor_allocators;
 
 		std::vector<std::vector<void *>> stage_buffers;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> input_size_vec;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> output_size_vec;
+		std::vector<std::pair<std::string, nvinfer1::DataType>> input_type_vec;
+		std::vector<std::pair<std::string, nvinfer1::DataType>> output_type_vec;
 
 		int binding_num;
 
@@ -39,7 +41,7 @@ class Stage {
 		void deallocateStream();
 		void setBuffers(int buffer_id, std::map<std::string, void*> stream_buffers_map);
 		uint64_t getSizeByTensorName(bool isInput, std::string name);
-		void setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<float *> input_buffers, std::vector<float *> output_buffers);
+		void setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<void *> input_buffers, std::vector<void *> output_buffers);
 		void setSignals(int buffer_id, std::map<std::string, bool*> signals_map);
 		bool isRunnable(int buffer_id);
 		void updateInputSignals(int buffer_id, bool value);

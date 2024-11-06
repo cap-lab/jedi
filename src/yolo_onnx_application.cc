@@ -422,9 +422,9 @@ void YoloOnnxApplication::initializePostprocessing(std::string network_name, int
 	}
 }
 
-void YoloOnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
+void YoloOnnxApplication::postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch)
 {
-	detectBox(output_buffers, output_num, sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
+	detectBox((float **) output_buffers, output_num, sample_index, batch, dets_vec[thread_id], detection_num_vec[thread_id]);
 }
 
 void YoloOnnxApplication::postprocessing2(int thread_id, int sample_index, int batch) {

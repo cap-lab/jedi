@@ -36,7 +36,7 @@ typedef struct _InputDim {
 #define DLA_NUM 2
 
 #define NUM_CLASSES 80
-#define PRINT_THRESH 0.01
+#define PRINT_THRESH 0.1
 #define CONFIDENCE_THRESH 0.01
 
 extern bool exit_flag;

@@ -394,7 +394,7 @@ static void AlignedNMSBev(std::vector<Box>& predBoxs){
     }
 }
 
-void NuscenesDetectionOnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
+void NuscenesDetectionOnnxApplication::postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch)
 {
     std::vector<std::string> regName{   "593", "617", "641", "665", "689", "713"};
     std::vector<std::string> heightName{"597", "621", "645", "669", "693", "717"};
@@ -403,7 +403,7 @@ void NuscenesDetectionOnnxApplication::postprocessing1(int thread_id, int sample
     std::vector<std::string> dimName{   "735", "739", "743", "747", "751", "755"};
     std::vector<std::string> scoreName{ "736", "740", "744", "748", "752", "756"};
     std::vector<std::string> clsName{   "737", "741", "745", "749", "753", "757"};
-    int clsOffsetPerTask[] = {0, 1, 3, 5, 6, 8};
+    int64_t clsOffsetPerTask[] = {0, 1, 3, 5, 6, 8};
 	std::vector<Box> predResult;
 	int lidar_index = (sample_index * batch) % dataset->getSize();
 	
@@ -416,11 +416,13 @@ void NuscenesDetectionOnnxApplication::postprocessing1(int thread_id, int sample
         float* vel = static_cast<float*>(output_buffers[outputIndexMap[velName[taskIdx]]]);
         float* dim = static_cast<float*>(output_buffers[outputIndexMap[dimName[taskIdx]]]);
         float* score = static_cast<float*>(output_buffers[outputIndexMap[scoreName[taskIdx]]]);
-        int32_t* cls = (int32_t *) output_buffers[outputIndexMap[clsName[taskIdx]]];
+        int64_t* cls = static_cast<int64_t*>(output_buffers[outputIndexMap[clsName[taskIdx]]]);
+        //int32_t* cls = (int32_t *) output_buffers[outputIndexMap[clsName[taskIdx]]];
 
 		for(size_t yIdx=0; yIdx < OUTPUT_H; yIdx++){
             for(size_t xIdx=0; xIdx < OUTPUT_W; xIdx++){
                 auto idx = yIdx* OUTPUT_W + xIdx;
+
                 if(score[idx] < SCORE_THRESHOLD)
                     continue;
                 

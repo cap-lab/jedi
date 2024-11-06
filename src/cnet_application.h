@@ -61,13 +61,13 @@ class CenternetApplication : public IInferenceApplication {
 		    for(int i =0; i<dim_hm.c * dim_hm.h * dim_hm.w; i++){
 		    	ids[i] = i;
 		    }
-		    //cudaHostGetDevicePointer(&ids_d, ids, 0);
+		    //cudaHostGetDevicePointer((void **) &ids_d, ids, 0);
 		};
 		~CenternetApplication();
 		void initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
 		void preprocessing(int thread_id, int input_tensor_index, const char *input_name, int sample_index, int batch_index, IN OUT float *input_buffer) override;
 		void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) override;
-		void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) override;
+		void postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch) override;
 		void postprocessing2(int thread_id, int sample_index, int batch) override;
 		void readCustomOptions(libconfig::Setting &setting) override;
 		//tk::dnn::Network* createNetwork(ConfigInstance *basic_config_data) override;

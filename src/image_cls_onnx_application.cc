@@ -355,9 +355,9 @@ void ImageClsOnnxApplication::softmax(float *logit){
 
 
 
-void ImageClsOnnxApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
+void ImageClsOnnxApplication::postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch)
 {
-	float *data_to_check = output_buffers[0];
+	float *data_to_check = (float *) output_buffers[0];
 
 	for (int iter1 = 0; iter1 < batch; iter1++) {
 		int image_index = (sample_index * batch + iter1) % dataset->getSize();

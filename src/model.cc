@@ -42,20 +42,10 @@ void Model::deallocateStream() {
 	}
 }
 
-void* Model::makeCUDAArray(int stage_id, int size) {
-	void *space;
-
-	//int data_type = this->config_data->instances.at(instance_id).data_types.at(stage_id);
-
-	space = (void *)cuda_make_array(NULL, size);
-
-	return space;
-}
-
-void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, void*>& stream_buffers_map, std::vector<float *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals) {
-	for(auto iter1 = size_vec.begin(); iter1 != size_vec.end(); iter1++) {
-		std::string tensor_name = iter1->first;
-		nvinfer1::Dims dims = iter1->second;
+void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::vector<std::pair<std::string, nvinfer1::DataType>> type_vec, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals) {
+	for(unsigned int iter1 = 0; iter1 < size_vec.size(); iter1++) {
+		std::string tensor_name = size_vec[iter1].first;
+		nvinfer1::Dims dims = size_vec[iter1].second;
 		int size = 1;
 		void *space = nullptr;
 		bool *signal = new bool(false);
@@ -63,8 +53,8 @@ void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::
 		for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 			size = size * dims.d[iter2];
 
-		float *buf = cuda_make_array_host(size);
-		cudaHostGetDevicePointer(&(space), buf, 0); 
+		void *buf = cuda_make_generic_array_host(size, getDataTypeSize(type_vec[iter1].second));
+		cudaHostGetDevicePointer((void **) &(space), buf, 0); 
 		buffers.push_back(buf);
 		stream_buffers_map.insert(std::make_pair(tensor_name, space));
 		// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p, size: %d\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space, buf, size);
@@ -74,9 +64,9 @@ void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::
 	}   
 }
 
-void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map) {
-	for(auto iter1 = size_vec.begin(); iter1 != size_vec.end(); iter1++) {
-		std::string tensor_name = iter1->first;
+void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::vector<std::pair<std::string, nvinfer1::DataType>> type_vec, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map) {
+	for(unsigned int iter1 = 0; iter1 < size_vec.size(); iter1++) {
+		std::string tensor_name = size_vec[iter1].first;
 
 		if(stream_buffers_map.find(tensor_name) == stream_buffers_map.end()) {
 			// skip the first stage's input and the last stage's output
@@ -85,14 +75,14 @@ void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vecto
 			if(stage_id == int(stages.size()-1) && !is_input_size_map)
 				continue;
 
-			nvinfer1::Dims dims = iter1->second;
+			nvinfer1::Dims dims = size_vec[iter1].second;
 			int size = 1;
 			for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 				size = size * dims.d[iter2];
 			void *space = nullptr;
 			bool *signal = new bool(false);
 
-			space = makeCUDAArray(stage_id, size);
+			space = cuda_make_generic_array(nullptr, size, getDataTypeSize(type_vec[iter1].second));
 			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space);
 
 			stream_buffers_map.insert(std::make_pair(tensor_name, space));
@@ -107,21 +97,21 @@ void Model::allocateBuffer() {
 	for(int buffer_id = 0; buffer_id < buffer_num; buffer_id++) {
 		std::map<std::string, void*> stream_buffers_map;
 		std::map<std::string, bool*> signals_map;
-		std::vector<float*> input_buffer;
-		std::vector<float*> output_buffer;
+		std::vector<void*> input_buffer;
+		std::vector<void*> output_buffer;
 		std::vector<bool*> input_signal;
 		std::vector<bool*> output_signal;
 
-		allocateIOStreamBuffer(stages[0]->input_size_vec, stream_buffers_map, input_buffer, signals_map, input_signal);
+		allocateIOStreamBuffer(stages[0]->input_size_vec, stages[0]->input_type_vec, stream_buffers_map, input_buffer, signals_map, input_signal);
 
 		for(unsigned int stage_id = 0; stage_id < stages.size(); stage_id++) {
 			Stage *stage = stages[stage_id];
 
-			allocateStreamBuffer(stage_id, true, stage->input_size_vec, stream_buffers_map, signals_map);
-			allocateStreamBuffer(stage_id, false, stage->output_size_vec, stream_buffers_map, signals_map);
+			allocateStreamBuffer(stage_id, true, stage->input_size_vec, stage->input_type_vec, stream_buffers_map, signals_map);
+			allocateStreamBuffer(stage_id, false, stage->output_size_vec, stage->input_type_vec, stream_buffers_map, signals_map);
 		}
 
-		allocateIOStreamBuffer(stages[stages.size()-1]->output_size_vec, stream_buffers_map, output_buffer, signals_map, output_signal);
+		allocateIOStreamBuffer(stages[stages.size()-1]->output_size_vec, stages[stages.size()-1]->output_type_vec, stream_buffers_map, output_buffer, signals_map, output_signal);
 
 		net_input_buffers.push_back(input_buffer);
 		net_output_buffers.push_back(output_buffer);
@@ -282,7 +272,7 @@ void Model::setBindingForContext(Stage *stage, int stream_id, int buffer_id) {
 		bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
 		bool result = false;
 		std::string _name(name);
-		TensorAllocator *allocator = stage->tensor_allocators[buffer_id][stream_id][iter1];
+		TensorAllocator *allocator = stage->tensor_allocators[buffer_id][iter1];
 
 		if(!isInput) {
 			result = context->setOutputAllocator(name, allocator);
@@ -314,7 +304,6 @@ void Model::setStreamBuffers(Stage *stage, int stream_id, int buffer_id) {
 
 void Model::infer(int device_id, int stream_id, int buffer_id) {
 	Stage *stage = stages[device_id];
-	int batch = config_data->instances.at(instance_id).batch;
 	bool enqueueSuccess = false;
 
 #if NV_TENSORRT_MAJOR > 8
@@ -331,6 +320,7 @@ void Model::infer(int device_id, int stream_id, int buffer_id) {
 		//enqueueSuccess = stage->contexts[stream_id]->enqueueV2(&(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 	}
 	else {
+		int batch = config_data->instances.at(instance_id).batch;
 		enqueueSuccess = stage->contexts[stream_id]->enqueue(batch, &(stage->stage_buffers[buffer_id][0]), stage->streams[stream_id], &(stage->events[stream_id]));
 		// enqueueSuccess = stage->contexts[stream_id]->execute(batch, &(stage->stage_buffers[buffer_id][0]));
 	}

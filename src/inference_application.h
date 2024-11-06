@@ -28,7 +28,7 @@ class IInferenceApplication {
 		virtual void initializePreprocessing(std::string network_name, int maximum_batch_size, int thread_number) {};
 		virtual void preprocessing(int thread_id, int input_tensor_index, const char *input_name, int sample_index, int batch_index, IN OUT float *input_buffer)  = 0;
 		virtual void initializePostprocessing(std::string network_name, int maximum_batch_size, int thread_number) {};
-		virtual void postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch) = 0;
+		virtual void postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch) = 0;
 		virtual void postprocessing2(int thread_id, int sample_index, int batch) = 0;
 		//virtual std::string getInputModelName() = 0;
 		virtual IJediNetwork *createNetwork(ConfigInstance *basic_config_data) = 0;

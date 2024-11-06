@@ -1011,10 +1011,10 @@ void CenternetApplication::initializePostprocessing(std::string network_name, in
 		CenterPostProcessingGPUData *gpuData = (CenterPostProcessingGPUData *) malloc(sizeof(CenterPostProcessingGPUData));
 
 		cpuData->scores = cuda_make_array_host(K_VALUE);
-		checkCuda( cudaHostGetDevicePointer(&(gpuData->shared.scores), cpuData->scores, 0));
+		checkCuda( cudaHostGetDevicePointer((void **) &(gpuData->shared.scores), cpuData->scores, 0));
 
 		cpuData->clses = cuda_make_int_array_host(K_VALUE);
-		checkCuda( cudaHostGetDevicePointer(&(gpuData->shared.clses), cpuData->clses, 0));
+		checkCuda( cudaHostGetDevicePointer((void **) &(gpuData->shared.clses), cpuData->clses, 0));
 
 		gpuData->topk_inds = cuda_make_int_array(NULL, K_VALUE);
 		gpuData->topk_ys = cuda_make_array(NULL, K_VALUE);
@@ -1025,13 +1025,13 @@ void CenternetApplication::initializePostprocessing(std::string network_name, in
 		gpuData->ids_out = cuda_make_int_array(NULL, K_VALUE);
 
 		cpuData->bbx0 = cuda_make_array_host(K_VALUE);
-		checkCuda( cudaHostGetDevicePointer(&(gpuData->shared.bbx0), cpuData->bbx0, 0));
+		checkCuda( cudaHostGetDevicePointer((void **) &(gpuData->shared.bbx0), cpuData->bbx0, 0));
 		cpuData->bby0 = cuda_make_array_host(K_VALUE);
-		checkCuda( cudaHostGetDevicePointer(&(gpuData->shared.bby0), cpuData->bby0, 0));
+		checkCuda( cudaHostGetDevicePointer((void **) &(gpuData->shared.bby0), cpuData->bby0, 0));
 		cpuData->bbx1 = cuda_make_array_host(K_VALUE);
-		checkCuda( cudaHostGetDevicePointer(&(gpuData->shared.bbx1), cpuData->bbx1, 0));
+		checkCuda( cudaHostGetDevicePointer((void **) &(gpuData->shared.bbx1), cpuData->bbx1, 0));
 		cpuData->bby1 = cuda_make_array_host(K_VALUE);
-		checkCuda( cudaHostGetDevicePointer(&(gpuData->shared.bby1), cpuData->bby1, 0));
+		checkCuda( cudaHostGetDevicePointer((void **) &(gpuData->shared.bby1), cpuData->bby1, 0));
 
 		cpuDataList.push_back(cpuData);
 		gpuDataList.push_back(gpuData);
@@ -1042,7 +1042,7 @@ void CenternetApplication::initializePostprocessing(std::string network_name, in
 	}
 }
 
-void CenternetApplication::postprocessing1(int thread_id, int sample_index, IN float **output_buffers, int output_num, int batch)
+void CenternetApplication::postprocessing1(int thread_id, int sample_index, IN void **output_buffers, int output_num, int batch)
 {
 	float **rt_batch_out = (float **) malloc(sizeof(float *) * output_num);
 	//float **rt_out = (float **) malloc(sizeof(float *) * output_num);
@@ -1051,7 +1051,7 @@ void CenternetApplication::postprocessing1(int thread_id, int sample_index, IN f
 	CenterPostProcessingGPUData *gpuData = gpuDataList[thread_id];
 
 	for(int i = 0 ; i < output_num; i++) {
-		cudaHostGetDevicePointer(&(rt_batch_out[i]), output_buffers[i], 0);
+		cudaHostGetDevicePointer((void **) &(rt_batch_out[i]), output_buffers[i], 0);
 	}
 
 	for (int iter = 0 ; iter < batch ; iter++) {

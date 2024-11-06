@@ -1,7 +1,7 @@
 #ifndef CUDA_H_
 #define CUDA_H_
 
-#include <cublas_v2.h>
+#include <stdint.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
@@ -31,6 +31,9 @@ int *cuda_make_int_array(int *x, size_t n);
 // float cuda_compare(float *x_gpu, float *x, size_t n, char *s);
 // dim3 cuda_gridsize(size_t n);
 void cuda_free(float *x_gpu);
+
+void *cuda_make_generic_array_host(size_t n, size_t type_size);
+void *cuda_make_generic_array(void *x, size_t n, size_t type_size);
 
 __half_raw *cuda_make_array_16(float *not_used, size_t n);
 // void cuda_pull_array_16(__half_raw *x_gpu, float *x, size_t n);
