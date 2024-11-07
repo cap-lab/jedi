@@ -1,5 +1,5 @@
-#ifndef CUDA_H_
-#define CUDA_H_
+#ifndef CUDA_JEDI_H_
+#define CUDA_JEDI_H_
 
 #include <stdint.h>
 #include <cuda.h>

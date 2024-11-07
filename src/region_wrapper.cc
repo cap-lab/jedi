@@ -5,7 +5,7 @@
 #include <iostream>
 #include <algorithm>
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 #include "box.h"
 #include "region_wrapper.h"
 

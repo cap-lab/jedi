@@ -8,7 +8,7 @@
 
 #include <cuda_runtime_api.h>
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 
 int getDataTypeSize(nvinfer1::DataType data_type);
 

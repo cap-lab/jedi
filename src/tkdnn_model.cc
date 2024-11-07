@@ -7,7 +7,7 @@
 #include <tkDNN/tkdnn.h>
 #include <tkDNN/DarknetParser.h>
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 #include "variable.h"
 
 #include "util.h"

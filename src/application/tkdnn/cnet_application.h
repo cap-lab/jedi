@@ -14,7 +14,7 @@
 
 
 #include "config.h"
-#include "cuda.h"
+#include "cuda_jedi.h"
 
 #include "tkdnn_network.h"
 

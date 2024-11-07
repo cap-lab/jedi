@@ -11,7 +11,7 @@
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 #include "variable.h"
 #include "util.h"
 

@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 #include "common.h"
 
 void error(const char *s) {

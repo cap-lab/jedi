@@ -5,7 +5,7 @@
 
 #include <NvInfer.h>
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 
 #include "model.h"
 #include "variable.h"

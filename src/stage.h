@@ -12,7 +12,7 @@
 #include "variable.h"
 #include "config.h"
 
-#include "cuda.h"
+#include "cuda_jedi.h"
 #include "binding.h"
 
 class Stage {
