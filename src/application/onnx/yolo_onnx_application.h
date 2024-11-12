@@ -39,8 +39,8 @@ class YoloOnnxApplication : public IInferenceApplication {
 		std::vector<YoloData> yolos;
 		InputDim input_dim;
 		bool letter_box;
-		ImageDataset *dataset;
-		COCOFormat *result_format;
+		ImageDataset *dataset = nullptr;
+		COCOFormat *result_format = nullptr;
 		std::vector<Detection *> dets_vec;
 		std::vector<std::vector<int>> detection_num_vec;
 		std::string network_name;

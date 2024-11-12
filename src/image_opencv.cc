@@ -23,9 +23,12 @@
 
 #include "variable.h"
 #include "image.h"
+#include "image_opencv.h"
 
 typedef void* mat_cv;
 
+float imagenet_mean[IMAGE_COLOR_NUM] = {0.485, 0.456, 0.406};
+float imagenet_std[IMAGE_COLOR_NUM] = {0.229, 0.224, 0.225};
 
 static mat_cv *load_image_mat_cv(const char *filename, int flag)
 {
@@ -141,7 +144,7 @@ void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, in
 	}
 }
 
-void loadImageLetterBoxNorm(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
+void loadImageLetterBoxNorm(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input, float mean[IMAGE_COLOR_NUM], float std[IMAGE_COLOR_NUM])
 {
 	try {
 		cv::Mat loaded_image = load_image_mat(filename, c);
@@ -169,9 +172,6 @@ void loadImageLetterBoxNorm(char *filename, int w, int h, int c, int *orig_width
 		resized.copyTo(dst(cv::Rect(dx, dy, new_w, new_h)));
 		mat_to_data(dst, input);
 
-		// normalize with mean and std of imagenet
-		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
-		const float std[3] = {0.229, 0.224, 0.225};
 		int height = resized.rows;
 		int width = resized.cols;
 		int channels = c;
@@ -232,7 +232,7 @@ cv::Mat restoreAffinedTransform(int orig_width, int orig_height, cv::Mat dst2)
 }
 
 
-void loadImageAffineTransform(char *filename, int w, int h, int c, int *orig_width, int *orig_height, cv::Vec<float, 3> mean, cv::Vec<float, 3> stddev, cv::Mat dst, float *input)
+void loadImageAffineTransform(char *filename, int w, int h, int c, int *orig_width, int *orig_height, cv::Vec<float, IMAGE_COLOR_NUM> mean, cv::Vec<float, IMAGE_COLOR_NUM> stddev, cv::Mat dst, float *input)
 {
 	try {
 		//cv::Mat src = cv::Mat(cv::Size(2,3), CV_32F);
@@ -253,9 +253,9 @@ void loadImageAffineTransform(char *filename, int w, int h, int c, int *orig_wid
 	    resized.convertTo(resized, CV_32FC3, 1/255.0);
 
 	    //split channels
-	    cv::Mat bgr[3];
+	    cv::Mat bgr[IMAGE_COLOR_NUM];
 	    cv::split(resized,bgr);//split source
-	    for(int i=0; i<3; i++){
+	    for(int i=0; i<IMAGE_COLOR_NUM; i++){
 			bgr[i] = bgr[i] - mean[i];
 			bgr[i] = bgr[i] / stddev[i];
 	    }
@@ -317,7 +317,7 @@ void loadImageResizeCropNormML(std::string filename, int w, int h, int c, float 
 		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
 		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
 
-		const float mean[3] = {123.68, 116.78, 103.94};
+		const float mean[IMAGE_COLOR_NUM] = {123.68, 116.78, 103.94};
 
 		int offsetW = (output_image.cols - w) / 2;
 		int offsetH = (output_image.rows - h) / 2;
@@ -347,7 +347,7 @@ void loadImageResizeCropNormML(std::string filename, int w, int h, int c, float 
 }
 
 
-void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input)
+void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input, float mean[IMAGE_COLOR_NUM], float std[IMAGE_COLOR_NUM])
 {
 	try {
 		// cv::Mat input_image = load_image_mat(filename, c);
@@ -360,9 +360,6 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 		cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
 		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
 		
-		// normalize with mean and std of imagenet
-		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
-		const float std[3] = {0.229, 0.224, 0.225};
 		int height = output_image.rows;
 		int width = output_image.cols;
 		int channels = output_image.channels();
@@ -380,7 +377,7 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 	}
 }
 
-void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input)
+void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input, float mean[IMAGE_COLOR_NUM], float std[IMAGE_COLOR_NUM])
 {
 	try {
 		cv::Mat input_image = cv::imread(filename);
@@ -390,10 +387,6 @@ void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop
 		//cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_CUBIC);
 		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
 		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
-
-		// normalize with mean and std of imagenet
-		const float mean[3] = {0.485, 0.456, 0.406};  //RGB
-		const float std[3] = {0.229, 0.224, 0.225};
 
 		int offsetW = (output_image.cols - crop_size) / 2;
 		int offsetH = (output_image.rows - crop_size) / 2;

@@ -18,6 +18,8 @@ typedef struct _ImageClsOnnxAppConfig {
 	int calib_images_num;
 	int opencv_parallel_num;
 	ImagePreprocessingOption preprocessing_option;
+	float mean[IMAGE_COLOR_NUM];
+	float std[IMAGE_COLOR_NUM];
 } ImageClsOnnxAppConfig;
 
 
@@ -36,8 +38,8 @@ class ImageClsOnnxApplication : public IInferenceApplication {
 	private:
 		ImageClsOnnxAppConfig imageClsOnnxAppConfig;
 		InputDim input_dim;
-		ImageDataset *dataset;
-		ImagenetFormat *result_format;
+		ImageDataset *dataset = nullptr;
+		ImagenetFormat *result_format = nullptr;
 		std::string network_name;
 		int class_num;
 		std::vector<std::string> labels;
@@ -49,6 +51,8 @@ class ImageClsOnnxApplication : public IInferenceApplication {
 		void readLabelPath(libconfig::Setting &setting);
 		void readOpenCVParallelNum(libconfig::Setting &setting);
 		void readImagePreprocessingOption(libconfig::Setting &setting);
+		void readImageNormalizeMeanOption(libconfig::Setting &setting);
+		void readImageNormalizeStdOption(libconfig::Setting &setting);
 
 		char* nolibStrStr(const char *s1, const char *s2);
 		int generateTruths(std::string path);

@@ -3,15 +3,20 @@
 
 #include "image.h"
 
+#define IMAGE_COLOR_NUM (3)
+
+extern float imagenet_mean[IMAGE_COLOR_NUM];
+extern float imagenet_std[IMAGE_COLOR_NUM];
+
 void loadImageResize(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input);
 void loadImageLetterBox(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input);
 
-void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input);
-void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input);
+void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_width, int *orig_height, float *input, float mean[IMAGE_COLOR_NUM]=imagenet_mean, float std[IMAGE_COLOR_NUM]=imagenet_std);
+void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input, float mean[IMAGE_COLOR_NUM]=imagenet_mean, float std[IMAGE_COLOR_NUM]=imagenet_std);
 
 void loadImageResizeCrop(std::string filename, int w, int h, int c, float *input);
 
-void loadImageLetterBoxNorm(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input);
+void loadImageLetterBoxNorm(char *filename, int w, int h, int c, int *orig_width, int *orig_height, float *input, float mean[IMAGE_COLOR_NUM]=imagenet_mean, float std[IMAGE_COLOR_NUM]=imagenet_std);
 
 void loadImageResizeCropNormML(std::string filename, int w, int h, int c, float *input);
 

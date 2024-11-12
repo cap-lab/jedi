@@ -123,10 +123,64 @@ void ImageClsOnnxApplication::readImagePreprocessingOption(libconfig::Setting &s
 		std::cerr<<"image_preprocessing: "<< data <<std::endl;
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
-		std::cerr << "No 'calib_image_path' setting in configuration file. Set resize as a default." << std::endl;
+		std::cerr << "No 'image_preprocessing' setting in configuration file. Set resize as a default." << std::endl;
 		imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE;
 	}
 }
+
+void ImageClsOnnxApplication::readImageNormalizeMeanOption(libconfig::Setting &setting) {
+	try{
+		const char *tmp = setting["image_norm_mean"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		int i = 0;
+
+		while( getline(ss,data,',') && i < IMAGE_COLOR_NUM) {
+			imageClsOnnxAppConfig.mean[i] = std::stof(data);
+			i++;
+		}
+
+		while (i < IMAGE_COLOR_NUM) {
+			imageClsOnnxAppConfig.mean[i] = imagenet_mean[i];
+			i++;
+		}
+
+		std::cerr<<"image_norm_mean: "<< data <<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'image_norm_mean' setting in configuration file. Set "
+		<< imagenet_mean[0] << "," << imagenet_mean[1] << "," << imagenet_mean[2] << "as a default." << std::endl;
+		memcpy(imageClsOnnxAppConfig.mean, imagenet_mean, IMAGE_COLOR_NUM * sizeof(float));
+	}
+}
+
+
+void ImageClsOnnxApplication::readImageNormalizeStdOption(libconfig::Setting &setting) {
+	try{
+		const char *tmp = setting["image_norm_std"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		int i = 0;
+
+		while( getline(ss,data,',') && i < IMAGE_COLOR_NUM) {
+			imageClsOnnxAppConfig.std[i] = std::stof(data);
+			i++;
+		}
+
+		while (i < IMAGE_COLOR_NUM) {
+			imageClsOnnxAppConfig.std[i] = imagenet_std[i];
+			i++;
+		}
+
+		std::cerr<<"image_norm_std: "<< data <<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'image_norm_std' setting in configuration file. Set "
+		<< imagenet_std[0] << "," << imagenet_std[1] << "," << imagenet_std[2] << "as a default." << std::endl;
+		memcpy(imageClsOnnxAppConfig.std, imagenet_std, IMAGE_COLOR_NUM * sizeof(float));
+	}
+}
+
 
 void ImageClsOnnxApplication::readImagePath(libconfig::Setting &setting) {
 	try{	
@@ -183,6 +237,8 @@ void ImageClsOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readCalibImagePath(setting);
 	readCalibImagesNum(setting);
 	readImagePreprocessingOption(setting);
+	readImageNormalizeMeanOption(setting);
+	readImageNormalizeStdOption(setting);
 }
 
 #define CALIBRATION_BATCH_SIZE (16)
@@ -229,7 +285,9 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	input_dim.height = tensor_dim.d[3];
 	// dataDim_t dim(tensor_dim.d[0],tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 	//dataDim_t dim(basic_config_data->batch,tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
-	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_image_path, imageClsOnnxAppConfig.preprocessing_option);
+	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE,
+											imageClsOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_image_path,
+											imageClsOnnxAppConfig.preprocessing_option, imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
@@ -267,6 +325,7 @@ void ImageClsOnnxApplication::preprocessing(int thread_id, int input_tensor_inde
 			break;
 		case LOAD_IMAGE_LETTERBOX:
 			loadImageLetterBox((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
+			break;
 		case LOAD_IMAGE_RESIZE_NORM:
 			loadImageResizeNorm((char *)image_data->path.c_str(), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
 			break;
@@ -396,6 +455,11 @@ void ImageClsOnnxApplication::writeResultFile(std::string result_file_name) {
 ImageClsOnnxApplication::~ImageClsOnnxApplication()
 {
 	labels.clear();
-	delete dataset;
-	delete result_format;
+	if (dataset != nullptr) {
+		delete dataset;
+	}
+
+	if (result_format != nullptr) {
+		delete result_format;
+	}
 }

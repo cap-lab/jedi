@@ -21,15 +21,11 @@
 #include "NvInfer.h"
 #include "image_opencv.h"
 
-/*
- * ImageBatchStream implements the stream for the INT8 calibrator. 
- * It reads the two files .txt with the list of image file names 
- * and the list of label file names. 
- * It then iterates on images and labels.
- */
+
 class ImageBatchStream {
 public:
 	ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist, ImagePreprocessingOption preprocessing_option);
+	ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist, ImagePreprocessingOption preprocessingOption, float *image_norm_mean, float *image_norm_std);
 	virtual ~ImageBatchStream() { free(mInputBuffer); }
 	void reset(int firstBatch);
 	bool next();
@@ -55,6 +51,8 @@ private:
 	std::vector<float> mBatch;
 	std::vector<float> mFileBatch;
 	float *mInputBuffer{nullptr};
+	float *mImageNormMean{imagenet_mean};
+	float *mImageNormStd{imagenet_std};
 
 	int mHeight;
 	int mWidth;

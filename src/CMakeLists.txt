@@ -27,7 +27,7 @@ target_include_directories(cuda_kernels INTERFACE ${KERNELS_DIR})
 ## tkdnn-dependent build (both tkdnn and onnx model are supported)
 ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda_jedi.c binding.cc image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc util.cc inference_application.cc tkdnn_model.cc onnx_model.cc tensorrt_network.cc ${RESULT_FORMAT_FILES} ${DATASET_FILES} int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc ${TKDNN_FILES} ${ONNX_FILES})
 target_include_directories(proc PRIVATE ${TKDNN_APPLICATION_DIR} ${ONNX_APPLICATION_DIR} ${DATASET_DIR} ${RESULT_FORMAT_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser tkDNN stdc++ z ${CUDA_LIBRARIES} ${OpenCV_LIBS} cuda_kernels kernels)
+TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser nvinfer_plugin tkDNN stdc++ z ${CUDA_LIBRARIES} ${OpenCV_LIBS} cuda_kernels kernels)
 
 ## tkdnn-independent build (only onnx model is supported)
 #ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda_jedi.c binding.cc image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc util.cc inference_application.cc ${RESULT_FORMAT_FILES} ${DATASET_FILES} onnx_model.cc tensorrt_network.cc int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc ${ONNX_FILES})

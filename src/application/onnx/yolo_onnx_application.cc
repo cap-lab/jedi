@@ -437,7 +437,10 @@ void YoloOnnxApplication::writeResultFile(std::string result_file_name) {
 
 YoloOnnxApplication::~YoloOnnxApplication()
 {
-	int batch = this->detection_num_vec[0].size();
+	int batch;
+	if(this->detection_num_vec.size() > 0) {
+		batch = this->detection_num_vec[0].size();
+	}
 
 	while(dets_vec.size() > 0)
 	{
@@ -446,6 +449,11 @@ YoloOnnxApplication::~YoloOnnxApplication()
 		dets_vec.pop_back();
 	}
 	yolos.clear();
-	delete dataset;
-	delete result_format;
+	if (dataset != nullptr) {
+		delete dataset;
+	}
+
+	if (result_format != nullptr) {
+		delete result_format;
+	}
 }

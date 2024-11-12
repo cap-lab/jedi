@@ -8,14 +8,19 @@
 
 
 ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist, ImagePreprocessingOption preprocessingOption) {
-    mBatchSize = batchSize;
+    if(batchSize > 0) {
+        mBatchSize = batchSize;
+    } else {
+        mBatchSize = 1;
+    }
+
     mMaxBatches = maxBatches;
     mDims = nvinfer1::Dims4{ dim.d[0], dim.d[1], dim.d[2], dim.d[3] };
     mHeight = dim.d[2];
     mWidth = dim.d[3];
     mImageSize = mDims.d[1]*mDims.d[2]*mDims.d[3];
     mBatch.resize(mBatchSize*mImageSize, 0);
-    mFileBatch.resize(mDims.d[0]*mImageSize, 0);
+    //mFileBatch.resize(mBatchSize*mImageSize, 0);
     mFileImgList = fileimglist;
     readInListFile(fileimglist, mListImg);
 	mPreprocessingOption = preprocessingOption;
@@ -23,6 +28,14 @@ ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBat
 
     reset(0);
 }
+
+ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist,
+                                ImagePreprocessingOption preprocessingOption, float *image_norm_mean, float *image_norm_std) :
+                                ImageBatchStream(dim, batchSize, maxBatches, fileimglist, preprocessingOption) {
+    mImageNormMean = image_norm_mean;
+    mImageNormStd = image_norm_std;
+}
+
 
 void ImageBatchStream::reset(int firstBatch) {
     mBatchCount = 0;
@@ -110,10 +123,10 @@ void ImageBatchStream::readCVimage(std::string inputFileName, float *input, bool
 			loadImageLetterBox((char *)(inputFileName.c_str()), mWidth, mHeight, mDims.d[1], &original_width, &original_height, input);
 			break;
 		case LOAD_IMAGE_RESIZE_NORM:
-			loadImageResizeNorm((char *)inputFileName.c_str(), mWidth, mHeight, mDims.d[1], &original_width, &original_height, input);
+			loadImageResizeNorm((char *)inputFileName.c_str(), mWidth, mHeight, mDims.d[1], &original_width, &original_height, input, mImageNormMean, mImageNormStd);
 			break;
 		case LOAD_IMAGE_RESIZE_CROP_NORM:
-			loadImageResizeCropNorm((char *)(inputFileName.c_str()), mWidth + 32, mHeight + 32, mDims.d[1], mWidth, input); // efficient former
+			loadImageResizeCropNorm((char *)(inputFileName.c_str()), mWidth + 32, mHeight + 32, mDims.d[1], mWidth, input, mImageNormMean, mImageNormStd); // efficient former
 			break;
 		case LOAD_IMAGE_RESIZE_CROP:
 			loadImageResizeCrop((char *) (inputFileName.c_str()), mWidth, mHeight, mDims.d[1], input); // efficient net
@@ -131,7 +144,7 @@ bool ImageBatchStream::update() {
     mFileCount++;
 
     //read image
-    mFileBatch.clear();
+    //FileBatch.clear();
     readCVimage(imgFileName, mInputBuffer);
     
     mFileBatchPos = 0;

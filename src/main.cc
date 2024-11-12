@@ -1,6 +1,9 @@
 #include <iostream>
 #include <vector>
 
+#include <NvInfer.h>
+#include <NvInferPlugin.h>
+
 #include "config.h"
 #include "variable.h"
 #include "model.h"
@@ -21,7 +24,7 @@ bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-P]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-P] [-n]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
@@ -38,6 +41,14 @@ static void turnOffTegrastats() {
 		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
 	}
 }
+
+class Logger : public nvinfer1::ILogger
+{
+    void log(Severity severity, const char* msg) noexcept override
+    {
+		std::cout <<"TENSORRT PLUGIN LOG: "<< msg << std::endl;
+    }
+} default_logger;
 
 static void turnOnTegrastats(std::string power_file_name) {
 	int result = -1;
@@ -218,6 +229,7 @@ int main(int argc, char *argv[]) {
 	std::string power_file_name;
 	std::string time_file_name;
 	bool print_network = false;
+	bool load_default_plugins = true;
 	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	if(argc == 1) {
@@ -242,6 +254,9 @@ int main(int argc, char *argv[]) {
 			case 'P':
 				print_network = true;
 				break;
+			case 'n':
+				load_default_plugins = false;
+				break;
 			case 'h':
 				printHelpMessage();
 				break;
@@ -255,6 +270,10 @@ int main(int argc, char *argv[]) {
 	instance_num = config_data.instance_num;
 
 	std::vector<Model *> models;
+
+	if (load_default_plugins == true) {
+		initLibNvInferPlugins((void *) &default_logger, "");
+	}
 
 	// make models (engines, buffers)
 	if(print_network == false) {
