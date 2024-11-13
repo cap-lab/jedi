@@ -327,10 +327,12 @@ void ImageClsOnnxApplication::preprocessing(int thread_id, int input_tensor_inde
 			loadImageLetterBox((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
 			break;
 		case LOAD_IMAGE_RESIZE_NORM:
-			loadImageResizeNorm((char *)image_data->path.c_str(), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer);
+			loadImageResizeNorm((char *)image_data->path.c_str(), input_dim.width, input_dim.height, input_dim.channel, &original_width, &original_height, input_buffer,
+									imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 			break;
 		case LOAD_IMAGE_RESIZE_CROP_NORM:
-			loadImageResizeCropNorm((char *)(image_data->path.c_str()), input_dim.width + 32, input_dim.height + 32, input_dim.channel, input_dim.width, input_buffer); // efficient former
+			loadImageResizeCropNorm((char *)(image_data->path.c_str()), input_dim.width + 32, input_dim.height + 32, input_dim.channel, input_dim.width, input_buffer,
+									imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std); // efficient former
 			break;
 		case LOAD_IMAGE_RESIZE_CROP:
 			loadImageResizeCrop((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, input_buffer); // efficient net
