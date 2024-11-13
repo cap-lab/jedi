@@ -168,7 +168,11 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 
 	jedi_network->builder = createInferBuilder(onnx_logger2);
 
-	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); 
+#if NV_TENSORRT_MAJOR > 8
+	uint32_t flag = 0;
+#else
+	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); // deprecated in tensorrt 10
+#endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = detrOnnxAppConfig.onnx_file_path;
 

@@ -35,7 +35,7 @@ REGISTER_JEDI_NETWORK_MODEL(OnnxModel);
 }
 #endif 
 
-class Logger : public ILogger           
+class Logger : public ILogger
 {
     void log(Severity severity, const char* msg) noexcept override
     {
@@ -436,7 +436,7 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 #if NV_TENSORRT_MAJOR > 8
 	uint32_t flag = 0;
 #else
-	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); deprecated in tensorrt 10
+	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); // deprecated in tensorrt 10
 #endif
 
 	network =  (builder)->createNetworkV2(flag);

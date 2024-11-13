@@ -250,7 +250,11 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 
 	jedi_network->builder = createInferBuilder(onnx_logger3);
 
-	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); 
+#if NV_TENSORRT_MAJOR > 8
+	uint32_t flag = 0;
+#else
+	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); // deprecated in tensorrt 10
+#endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = imageClsOnnxAppConfig.onnx_file_path;
 
