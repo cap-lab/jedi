@@ -44,17 +44,6 @@ REGISTER_JEDI_APPLICATION(DETROnnxApplication);
 #endif 
 
 
-class OnnxParserLogger2 : public ILogger           
-{
-    void log(Severity severity, const char* msg) noexcept override
-    {
-        // suppress info-level messages
-        if (severity <= Severity::kWARNING)
-			std::cout <<"TENSORRT ONNX LOG: "<< msg << std::endl;
-    }
-} onnx_logger2;
-
-
 // static inline float logisticActivate(float x){return 1.f/(1.f + expf(-x));}
 
 
@@ -166,7 +155,7 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	std::string calib_table = basic_config_data->calib_table;
 	TensorRTNetwork *jedi_network = new TensorRTNetwork();
 
-	jedi_network->builder = createInferBuilder(onnx_logger2);
+	jedi_network->builder = createInferBuilder(onnx_logger);
 
 #if NV_TENSORRT_MAJOR > 8
 	uint32_t flag = 0;
@@ -176,7 +165,7 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = detrOnnxAppConfig.onnx_file_path;
 
-	IParser* parser = createParser(*(jedi_network->network), onnx_logger2);
+	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
 	// TODO: onnx file path
 	parser->parseFromFile(detrOnnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));

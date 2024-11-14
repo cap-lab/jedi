@@ -23,5 +23,16 @@ class TensorRTNetwork : public IJediNetwork {
 	private:
 };
 
+class OnnxParserLogger : public nvinfer1::ILogger
+{
+    void log(Severity severity, const char* msg) noexcept override
+    {
+        // suppress info-level messages
+        if (severity <= Severity::kWARNING)
+			std::cout <<"TENSORRT ONNX LOG: "<< msg << std::endl;
+    }
+};
+
+extern OnnxParserLogger onnx_logger;
 
 #endif

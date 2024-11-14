@@ -45,6 +45,8 @@ class Logger : public ILogger
     }
 } logger;
 
+OnnxParserLogger onnx_logger;
+
 static void loadFileToBuffer(std::string file_name, char* &buffer, size_t &size) {
 	//char *gieModelStream{nullptr};
 	//size_t size{0};

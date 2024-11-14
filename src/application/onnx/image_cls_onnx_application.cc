@@ -37,16 +37,6 @@ REGISTER_JEDI_APPLICATION(ImageClsOnnxApplication);
 }
 #endif 
 
-class OnnxParserLogger3 : public ILogger           
-{
-    void log(Severity severity, const char* msg) noexcept override
-    {
-        // suppress info-level messages
-        //if (severity <= Severity::kWARNING)
-		std::cout <<"TENSORRT ONNX LOG: "<< msg << std::endl;
-    }
-} onnx_logger3;
-
 void ImageClsOnnxApplication::readOnnxFilePath(libconfig::Setting &setting) {
 	try{	
 		const char *tmp = setting["onnx_file_path"];
@@ -248,7 +238,7 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	std::string calib_table = basic_config_data->calib_table;
 	TensorRTNetwork *jedi_network = new TensorRTNetwork();
 
-	jedi_network->builder = createInferBuilder(onnx_logger3);
+	jedi_network->builder = createInferBuilder(onnx_logger);
 
 #if NV_TENSORRT_MAJOR > 8
 	uint32_t flag = 0;
@@ -258,7 +248,7 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = imageClsOnnxAppConfig.onnx_file_path;
 
-	IParser* parser = createParser(*(jedi_network->network), onnx_logger3);
+	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
 	// TODO: onnx file path
 	parser->parseFromFile(imageClsOnnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));

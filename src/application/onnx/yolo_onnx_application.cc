@@ -44,16 +44,6 @@ REGISTER_JEDI_APPLICATION(YoloOnnxApplication);
 #endif 
 
 
-class OnnxParserLogger : public ILogger           
-{
-    void log(Severity severity, const char* msg) noexcept override
-    {
-        // suppress info-level messages
-        //if (severity <= Severity::kWARNING)
-		std::cout <<"TENSORRT ONNX LOG: "<< msg << std::endl;
-    }
-} onnx_logger;
-
 static float g_bias[18] = {10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119, 116, 90, 156, 198, 373, 326 };
 static float g_mask[3][3] = { { 6, 7, 8}, {3, 4, 5}, {0, 1, 2} };
 
