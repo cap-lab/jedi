@@ -4,9 +4,11 @@ int getDataTypeSize(nvinfer1::DataType data_type) {
     int data_type_size = 0;
 
     switch(data_type) {
+#if NV_TENSORRT_MAJOR > 8
         case nvinfer1::DataType::kINT64:
             data_type_size = sizeof(int64_t);
             break;
+#endif
         case nvinfer1::DataType::kFLOAT:
             data_type_size = sizeof(float);
             break;
