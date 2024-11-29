@@ -21,6 +21,7 @@ class COCOFormat : public ResultFormat {
 		void writeResultFile(std::string result_file_name) override;
 		void detectCOCO(Detection *dets, int nDets, int idx, int w, int h, int iw, int ih, char *path);
 		void addToDetectedMap(int image_index, std::list<std::string> detected);
+		int getCOCOIdFromIndex(int index);
 
 	private:
 		int get_coco_image_id(char *filename);

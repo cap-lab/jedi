@@ -66,25 +66,47 @@ static void loadFileToBuffer(std::string file_name, char* &buffer, size_t &size)
 static void setUnnamedLayerAndTensorName(INetworkDefinition* &network, int start_cut_point) {
 	int layer_num = network->getNbLayers();
 
+	// change layer name first
 	for(int index = 0 ; index < layer_num ; index++) {
 		ILayer *layer = network->getLayer(index);
 		std::string layerName = layer->getName();
 
-		if(layerName.size() == 0 || layerName.rfind("(Unnamed Layer* ", 0) == 0) {
+		if(layerName.size() == 0 || layerName.rfind("(Unnamed Layer* ", 0) == 0 || layerName.rfind("ONNXTRT_", 0) == 0) {
 			int global_layer_id = start_cut_point + index;
 			std::string layer_name = "JEDI_" +  std::to_string(global_layer_id) + "_" + convertLayerTypeToString(layer);
 			layer->setName(layer_name.c_str());
+
+			int output_num = layer->getNbOutputs();
+			for(int out_index = 0; out_index < output_num ; out_index++) {
+				ITensor *tensor = layer->getOutput(out_index);
+				if(tensor != nullptr) {
+					std::string ori_tensor_name = tensor->getName();
+					if((ori_tensor_name.size() == 0 || ori_tensor_name.compare("(Unnamed Layer* ") != 0) && (!tensor->isNetworkOutput()) )  {
+						std::string tensor_name = std::string(layer->getName()) + "_output_" + std::to_string(out_index);
+						tensor->setName(tensor_name.c_str());
+						//std::cout << "tensor name: " <<  ori_tensor_name << " => " << tensor_name  << std::endl;
+					}
+				}
+			}
+			//std::cout << "layer name (" << index << ") : " << layerName << " => " << layer_name << std::endl;
 		}
+	}
+
+	for(int index = 0 ; index < layer_num ; index++) {
+		ILayer *layer = network->getLayer(index);
 
 		int output_num = layer->getNbOutputs();
 		for(int out_index = 0; out_index < output_num ; out_index++) {
 			ITensor *tensor = layer->getOutput(out_index);
+			std::string output_str = "_output_";
 			if(tensor != nullptr) {
 				std::string ori_tensor_name = tensor->getName();
-				if((ori_tensor_name.size() == 0 || ori_tensor_name.compare("(Unnamed Layer* ") != 0) && (!tensor->isNetworkOutput()) )  {
+				if((ori_tensor_name.size() == 0 || ori_tensor_name.rfind(output_str) == std::string::npos) && (!tensor->isNetworkOutput()) )  {
 					std::string tensor_name = std::string(layer->getName()) + "_output_" + std::to_string(out_index);
 					tensor->setName(tensor_name.c_str());
-					std::cout << "tensor name: " << tensor_name  << std::endl;
+					//std::cout << "tensor name (layer: " << layer->getName() << "): " <<  ori_tensor_name << " => " << tensor_name  << std::endl;
+				} else {
+					//std::cout << "unchanged tensor name (layer: " << layer->getName() << "): " << tensor->getName()  << std::endl;
 				}
 			}
 		}
@@ -178,6 +200,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	int data_type = config_data->instances.at(instance_id).data_types.at(curr);
 	int aux_stream_num = config_data->instances.at(instance_id).aux_stream_numbers.at(curr);
 	int dla_sram_size = config_data->instances.at(instance_id).dla_sram_sizes.at(curr);
+	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int prev_cut_point = 0, curr_cut_point = 0;
 	std::vector<LayerRange> gpu_ranges = config_data->instances.at(instance_id).gpu_ranges;
 	std::vector<LayerRange> fp16_ranges = config_data->instances.at(instance_id).fp16_ranges;
@@ -217,7 +240,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 		input_dim_name += std::to_string(tensor_dim.d[iter1]);
 	}
 
-	plan_file_name = model_dir + "/model_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name;
+	plan_file_name = model_dir + "/model_" + network_name + "_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name;
 	if(for_rt_build == true) {
 		std::string range_string;
 		plan_file_name = plan_file_name + "_aux" + std::to_string(aux_stream_num);
@@ -359,7 +382,7 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 					input_name_vec.push_back(tensor->getName());
 				}
 			}
-			std::cout << "merong: " << iter1 << ", " << iter2 << std::endl;
+			//std::cout << "merong: " << iter1 << ", " << iter2 << std::endl;
 		}
 	}
 

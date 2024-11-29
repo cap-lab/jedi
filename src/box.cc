@@ -1,8 +1,8 @@
 #include "box.h"
 
-void allocateDetectionBox(int batch, Detection **dets) {
-	*dets = (Detection *)calloc(batch * NBOXES, sizeof(Detection));
-	for(int iter = 0; iter < batch * NBOXES; iter++) {
+void allocateDetectionBox(int batch, int max_box_num, Detection **dets) {
+	*dets = (Detection *)calloc(batch * max_box_num, sizeof(Detection));
+	for(int iter = 0; iter < batch * max_box_num; iter++) {
 		(*dets)[iter].prob = (float *)calloc(NUM_CLASSES + 1, sizeof(float));	
 	}
 }

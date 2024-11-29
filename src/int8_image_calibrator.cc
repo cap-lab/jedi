@@ -9,9 +9,8 @@ Int8ImageEntropyCalibrator::Int8ImageEntropyCalibrator(ImageBatchStream& stream,
     mInputBlobName(inputBlobName.c_str()),
     mReadCache(readCache) {
     nvinfer1::Dims4 dims = mStream.getDims();
-    mInputCount = mStream.getBatchSize() + dims.d[1]*dims.d[2]*dims.d[3];
+    mInputCount = mStream.getBatchSize()*dims.d[1]*dims.d[2]*dims.d[3];
     checkCuda(cudaMalloc(&mDeviceInput, mInputCount * sizeof(float)));
-    mStream.reset(firstBatch);
 }
 
 bool Int8ImageEntropyCalibrator::getBatch(void* bindings[], const char* names[], int nbBindings) NOEXCEPT {

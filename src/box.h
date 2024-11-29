@@ -21,7 +21,7 @@ typedef struct Detection {
 #define MAX_DETECTION_BOXES (8192*2)
 #define NBOXES MAX_DETECTION_BOXES
 
-void allocateDetectionBox(int batch, Detection **dets);
+void allocateDetectionBox(int batch, int max_box_num, Detection **dets);
 void deallocateDetectionBox(int n, Detection *dets);
 void do_nms_sort(Detection *dets, int total, float thresh);
 

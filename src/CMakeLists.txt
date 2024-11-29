@@ -39,7 +39,7 @@ TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser nvinfer_plugin tkDNN 
 ## tkdnn-independent build (only onnx model is supported)
 #ADD_EXECUTABLE(proc main.cc config.cc model.cc stage.cc cuda_jedi.c binding.cc image_opencv.cc image.cc thread.cc box.cc detector.cc region_wrapper.cc yolo_wrapper.cc pillar.cc util.cc inference_application.cc ${RESULT_FORMAT_FILES} ${DATASET_FILES} ${ONNX_MODEL_FILES} tensorrt_network.cc int8_image_batch_stream.cc int8_image_calibrator.cc int8_pillar_calibrator.cc ${ONNX_FILES})
 #target_include_directories(proc PRIVATE ${ONNX_MODEL_DIR} ${ONNX_APPLICATION_DIR} ${DATASET_DIR} ${RESULT_FORMAT_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-#TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser stdc++ z ${CUDA_LIBRARIES} ${OpenCV_LIBS})
+#TARGET_LINK_LIBRARIES(proc m config++ nvinfer nvonnxparser nvinfer_plugin stdc++ z ${CUDA_LIBRARIES} ${OpenCV_LIBS})
 
 ADD_EXECUTABLE(network_analyzer analyzer.cc config.cc inference_application.cc ${TKDNN_FILES} ${DATASET_FILES} region_wrapper.cc yolo_wrapper.cc ${RESULT_FORMAT_FILES} util.cc image_opencv.cc box.cc cuda_jedi.c)
 target_include_directories(network_analyzer PRIVATE ${TKDNN_MODEL_DIR} ${TKDNN_APPLICATION_DIR} ${DATASET_DIR} ${RESULT_FORMAT_DIR} ${CMAKE_CURRENT_SOURCE_DIR})

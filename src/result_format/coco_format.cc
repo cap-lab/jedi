@@ -17,6 +17,10 @@ int COCOFormat::get_coco_image_id(char *filename) {
     return atoi(p + 1);
 }
 
+int COCOFormat::getCOCOIdFromIndex(int index) {
+	return coco_ids[index];
+}
+
 void COCOFormat::writeResultFile(std::string result_file_name) {
 	int idx = 0, line_num = 0;
 	std::ofstream result_file;

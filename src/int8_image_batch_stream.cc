@@ -19,14 +19,12 @@ ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBat
     mHeight = dim.d[2];
     mWidth = dim.d[3];
     mImageSize = mDims.d[1]*mDims.d[2]*mDims.d[3];
-    mBatch.resize(mBatchSize*mImageSize, 0);
-    //mFileBatch.resize(mBatchSize*mImageSize, 0);
+    mBatch = reinterpret_cast<float*>(calloc(mImageSize*mBatchSize, sizeof(float)));
     mFileImgList = fileimglist;
     readInListFile(fileimglist, mListImg);
 	mPreprocessingOption = preprocessingOption;
-	mInputBuffer = (float *) calloc(mImageSize * batchSize, sizeof(float));
-
-    reset(0);
+    mBatchCount = 0;
+    mFileCount = 0;
 }
 
 ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist,
@@ -37,44 +35,18 @@ ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBat
 }
 
 
-void ImageBatchStream::reset(int firstBatch) {
-    mBatchCount = 0;
-    mFileCount = 0;
-    mFileBatchPos = mDims.d[0];
-    skip(firstBatch);
-}
-
 // https://stackoverflow.com/questions/259297/how-do-you-copy-the-contents-of-an-array-to-a-stdvector-in-c-without-looping
 // dataVec.insert(dataVec.end(), &dataArray[0], &dataArray[dataArraySize]);
 bool ImageBatchStream::next() {
     std::cout<<"Next batch: "<<mBatchCount<<" of "<<mMaxBatches<<"\n";
-    if (mBatchCount == mMaxBatches-1)
+    if (mBatchCount == mMaxBatches)
         return false;
 
-    for (int csize = 1, batchPos = 0; batchPos < mBatchSize; batchPos += csize, mFileBatchPos += csize) {
-        assert(mFileBatchPos > 0 && mFileBatchPos <= mDims.d[0]);
-        if (mFileBatchPos == mDims.d[0] && !update())
-            return false;
-
-        csize = std::min(mBatchSize - batchPos, (int) mDims.d[0] - mFileBatchPos);
-		memcpy(getBatch() + batchPos * mImageSize, getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize * sizeof(float));
-		//getBatch().insert(getBatch().end(), , &(getFileBatch()[mFileBatchPos * mImageSize + csize * mImageSize]));
-        //std::copy_n(getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize, getBatch() + batchPos * mImageSize);
+    for (int batchPos = 0; batchPos < mBatchSize; batchPos += 1) {
+        update(getBatch() + batchPos * mImageSize);
     }
     mBatchCount++;
     return true;
-}
-
-void ImageBatchStream::skip(int skipCount) {
-    if (mBatchSize >= mDims.d[0] && mBatchSize%mDims.d[0] == 0 && mFileBatchPos == mDims.d[0]) {
-        mFileCount += skipCount * mBatchSize / mDims.d[0];
-        return;
-    }
-
-    int x = mBatchCount;
-    for (int i = 0; i < skipCount; i++)
-        next();
-    mBatchCount = x;
 }
 
 void ImageBatchStream::readInListFile(const std::string& dataFilePath, std::vector<std::string>& mListIn) {
@@ -139,14 +111,16 @@ void ImageBatchStream::readCVimage(std::string inputFileName, float *input, bool
 	}
 }
 
-bool ImageBatchStream::update() {
+bool ImageBatchStream::update(float *inputBuffer) {
     std::string imgFileName = mListImg[mFileCount];
     mFileCount++;
 
     //read image
     //FileBatch.clear();
-    readCVimage(imgFileName, mInputBuffer);
-    
-    mFileBatchPos = 0;
+    readCVimage(imgFileName, inputBuffer);
+
+    if(mListImg.size() <= mFileCount) {
+        mFileCount = 0;
+    }
     return true;
 }

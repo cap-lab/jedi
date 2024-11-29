@@ -46,7 +46,7 @@ class Logger : public nvinfer1::ILogger
 {
     void log(Severity severity, const char* msg) noexcept override
     {
-		std::cout <<"TENSORRT PLUGIN LOG: "<< msg << std::endl;
+		std::cout <<"TENSORRT LOG: "<< msg << std::endl;
     }
 } default_logger;
 

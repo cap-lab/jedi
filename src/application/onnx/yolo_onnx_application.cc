@@ -409,7 +409,7 @@ void YoloOnnxApplication::initializePostprocessing(std::string network_name, int
 	setBiases(network_name);
 	for (int i = 0 ; i < thread_number ; i++ ) {
 		Detection *dets;
-		allocateDetectionBox(maximum_batch_size, &dets);
+		allocateDetectionBox(maximum_batch_size, NBOXES, &dets);
 		dets_vec.push_back(dets);
 
 		this->detection_num_vec.push_back(std::vector<int>(maximum_batch_size, 0));
