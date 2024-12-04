@@ -391,6 +391,17 @@ void ConfigData::readFP32Ranges(Setting &setting, ConfigInstance &config_instanc
 	}
 }
 
+void ConfigData::readSaveLayerInfo(Setting &setting, ConfigInstance &config_instance) {
+	try{
+		bool save_layer_info = setting["save_layer_info"];
+		config_instance.save_layer_info = save_layer_info;
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'save_layer_info' setting in configuration file. Set false as a default." << std::endl;
+		config_instance.save_layer_info = false;
+	}
+}
+
 
 void ConfigData::readDlaCores(Setting &setting, ConfigInstance &config_instance){
 	try{
@@ -523,6 +534,7 @@ ConfigData::ConfigData(std::string config_file_path, std::vector<IInferenceAppli
 			readFP16Ranges(settings[iter], instances.at(iter));
 			readFP32Ranges(settings[iter], instances.at(iter));
 			readDlaSRAMSizes(settings[iter], instances.at(iter));
+			readSaveLayerInfo(settings[iter], instances.at(iter));
 		}
 
 		for(int iter = 0; iter < instance_num; iter++) {

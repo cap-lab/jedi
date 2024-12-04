@@ -274,6 +274,20 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 }
 
 
+bool OnnxModel::saveLayerInfoFile(std::string filename, const char *layerInfo){
+    std::ofstream p(filename);
+    if (!p) {
+		std::cerr << "Could not open file: " << filename  << std::endl;
+		return false;
+    }
+
+    if(layerInfo == nullptr)
+		std::cerr << "Can't write layer info to file: " << filename  << std::endl;
+
+    p.write(layerInfo, strlen(layerInfo));
+    return true;
+}
+
 bool OnnxModel::serialize(const char *filename, nvinfer1::IHostMemory *ptr){
     std::ofstream p(filename, std::ios::binary);
     if (!p) {
@@ -681,6 +695,8 @@ void OnnxModel::initializeModel() {
 		int data_type = config_data->instances.at(instance_id).data_types.at(iter1);
 		int aux_stream_num = config_data->instances.at(instance_id).aux_stream_numbers.at(iter1);
 		int dla_sram_size = config_data->instances.at(instance_id).dla_sram_sizes.at(iter1);
+		bool save_layer_info = config_data->instances.at(instance_id).save_layer_info;
+		bool engineBuilt = false;
 		std::string plan_file_name;
 		getModelFileName(iter1, plan_file_name, network, ".rt", true);
 
@@ -689,6 +705,7 @@ void OnnxModel::initializeModel() {
 			INetworkDefinition *partial_network;
 			IParser *partial_parser;
 			IBuilderConfig* config = createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
+			engineBuilt = true;
 
 			config->setAvgTimingIterations(8);
 			config->setMaxAuxStreams(aux_stream_num);
@@ -700,7 +717,10 @@ void OnnxModel::initializeModel() {
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
 			config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
 			config->setDefaultDeviceType(nvinfer1::DeviceType::kGPU);
-			//config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
+
+			if(save_layer_info == true) {
+				config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
+			}
 
 			IOptimizationProfile* profile = partial_builder->createOptimizationProfile();
 			if(setting_ptr != nullptr) {
@@ -809,9 +829,13 @@ void OnnxModel::initializeModel() {
 			//runtime->setMaxThreads(4);
 			ICudaEngine* engine = runtime->deserializeCudaEngine(gieModelStream, size);
 			assert(engine != nullptr);
-			auto inspector = std::unique_ptr<IEngineInspector>(engine->createEngineInspector());
-			//std::cout << inspector->getLayerInformation(0, LayerInformationFormat::kJSON); // Print the information of the first layer in the engine.
-			std::cout << inspector->getEngineInformation(LayerInformationFormat::kJSON);
+			std::string layer_info_file_name = plan_file_name + ".trt.json";
+			if(save_layer_info == true && engineBuilt == true) {
+				auto inspector = std::unique_ptr<IEngineInspector>(engine->createEngineInspector());
+				//std::cout << inspector->getLayerInformation(0, LayerInformationFormat::kJSON); // Print the information of the first layer in the engine.
+				saveLayerInfoFile(layer_info_file_name, inspector->getEngineInformation(LayerInformationFormat::kJSON));
+			}
+
 			stage->engines.push_back(engine);
 
 			if (gieModelStream) delete [] gieModelStream;

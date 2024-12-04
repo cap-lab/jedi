@@ -18,6 +18,7 @@ typedef struct _ConfigInstance {
 	std::string bin_path;
 	std::string calib_table;
 	std::string timing_cache_path;
+	bool save_layer_info;
 	int batch;
 	int batch_thread_num;
 	int offset;
