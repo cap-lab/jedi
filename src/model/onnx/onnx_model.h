@@ -39,6 +39,7 @@ class OnnxModel : public Model {
 		void fillInputs(int device_id, nvinfer1::INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec);
 		void loadTimingCache(nvinfer1::IBuilderConfig* config, nvinfer1::ITimingCache* &cache);
 		void saveTimingCache(nvinfer1::ITimingCache *cache);
+		bool saveLayerInfoFile(std::string filename, const char *layerInfo);
 };
 
 #endif
