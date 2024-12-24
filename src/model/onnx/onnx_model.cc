@@ -355,13 +355,16 @@ void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network
 
 	for (int iter1 = start_index ; iter1 <= end_index; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
-		
-		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
-			ITensor *tensor = layer->getOutput(iter2);
-			auto tensor_name = tensor->getName();
+		bool inserted = false;
+		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && layer->getType() != nvinfer1::LayerType::kDEQUANTIZE) {
+			for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+				ITensor *tensor = layer->getOutput(iter2);
+				auto tensor_name = tensor->getName();
 
-			if(checkTensorIsUsedInNextStages(device_id, network, end_index, iter1, tensor_name)) {
-				output_index_vec.push_back(iter1);	
+				if (inserted == false && checkTensorIsUsedInNextStages(device_id, network, end_index, iter1, tensor_name)) {
+					output_index_vec.push_back(iter1);
+					inserted = true;
+				}
 			}
 		}
 	}
@@ -371,10 +374,12 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 	std::set<ITensor *> output_set;
 	for(int iter1 = 0 ; iter1 < start_index ; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
-		for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
-			ITensor *tensor = layer->getOutput(iter2);
-			if(output_set.find(tensor) == output_set.end()) {
-				output_set.insert(tensor);
+		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && layer->getType() != nvinfer1::LayerType::kDEQUANTIZE) {
+			for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
+				ITensor *tensor = layer->getOutput(iter2);
+				if (output_set.find(tensor) == output_set.end()) {
+					output_set.insert(tensor);
+				}
 			}
 		}
 	}
@@ -458,6 +463,20 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 	}
 }
 
+static void updateLayerAndOutputType(ILayer *layer, nvinfer1::DataType updatedType) {
+	int old_precision = (int) layer->getPrecision();
+	layer->setPrecision(updatedType);
+	std::cout << "Precision changed " << layer->getName() << ": " << old_precision << " => " << (int) layer->getPrecision() << std::endl;
+	int output_num = layer->getNbOutputs();
+	for(int output_index = 0 ; output_index < output_num  ; output_index++) {
+		nvinfer1::DataType output_type = layer->getOutputType(output_index);
+		if (output_type != nvinfer1::DataType::kINT64) {
+			layer->setOutputType(output_index, updatedType);
+			//layer->getOutput(output_index)->setType(updatedType);
+		}
+	}
+}
+
 IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
 	int device = config_data->instances.at(instance_id).devices.at(cur_iter);
@@ -505,13 +524,15 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 			config->setDeviceType(layer, nvinfer1::DeviceType::kGPU);
 		}
 		if(data_type == TYPE_INT8 && valueInRange(fp16_ranges, start_cut_point + index) == true) {
-			if(layer->getType() != LayerType::kCONSTANT/* && layer->getType() != LayerType::kSHUFFLE*/) {
-				layer->setPrecision( nvinfer1::DataType::kHALF);
+			if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
+			layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3 /* && layer->getType() != LayerType::kSHUFFLE*/) {
+				updateLayerAndOutputType(layer, nvinfer1::DataType::kHALF);
 			}
 		}
 		if((data_type == TYPE_INT8 || data_type == TYPE_FP16) && valueInRange(fp32_ranges, start_cut_point + index) == true) {
-			if(layer->getType() != LayerType::kCONSTANT/* && layer->getType() != LayerType::kSHUFFLE*/) {
-				layer->setPrecision( nvinfer1::DataType::kFLOAT);
+			if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
+			layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3/* && layer->getType() != LayerType::kSHUFFLE*/) {
+				updateLayerAndOutputType(layer, nvinfer1::DataType::kFLOAT);
 			}
 		}
 	}
@@ -705,7 +726,6 @@ void OnnxModel::initializeModel() {
 			INetworkDefinition *partial_network;
 			IParser *partial_parser;
 			IBuilderConfig* config = createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
-			engineBuilt = true;
 
 			config->setAvgTimingIterations(8);
 			config->setMaxAuxStreams(aux_stream_num);
@@ -717,6 +737,7 @@ void OnnxModel::initializeModel() {
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
 			config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
 			config->setDefaultDeviceType(nvinfer1::DeviceType::kGPU);
+			//config->setFlag(BuilderFlag::kSTRICT_NANS);
 
 			if(save_layer_info == true) {
 				config->setProfilingVerbosity( nvinfer1::ProfilingVerbosity::kDETAILED);
@@ -794,6 +815,7 @@ void OnnxModel::initializeModel() {
 			assert(serializedModel != nullptr);
 
 			serialize(plan_file_name.c_str(), serializedModel);
+			engineBuilt = true;
 			saveTimingCache(cache);
 
 			delete partial_parser;

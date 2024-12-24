@@ -88,8 +88,39 @@ std::string convertLayerTypeToString(ILayer *layer) {
 			return "Deconvolution";
 		case LayerType::kCONCATENATION:
 			return "Concatenation";
-		case LayerType::kELEMENTWISE:
-			return "Elementwise";
+		case LayerType::kELEMENTWISE: {
+				IElementWiseLayer *elementwiseLayer = (IElementWiseLayer *) layer;
+				switch(elementwiseLayer->getOperation()) {
+					case ElementWiseOperation::kSUM:
+						return "ElementWise_SUM";
+					case ElementWiseOperation::kPROD:
+						return "ElementWise_PROD";
+					case ElementWiseOperation::kMAX:
+						return "ElementWise_MAX";
+					case ElementWiseOperation::kMIN:
+						return "ElementWise_MIN";
+					case ElementWiseOperation::kSUB:
+						return "ElementWise_SUB";
+					case ElementWiseOperation::kDIV:
+						return "ElementWise_DIV";
+					case ElementWiseOperation::kPOW:
+						return "ElementWise_POW";
+					case ElementWiseOperation::kFLOOR_DIV:
+						return "ElementWise_FLOOR_DIV";
+					case ElementWiseOperation::kAND:
+						return "ElementWise_AND";
+					case ElementWiseOperation::kOR:
+						return "ElementWise_OR";
+					case ElementWiseOperation::kXOR:
+						return "ElementWise_XOR";
+					case ElementWiseOperation::kEQUAL:
+						return "ElementWise_EQUAL";
+					case ElementWiseOperation::kGREATER:
+						return "ElementWise_GREATER";
+					case ElementWiseOperation::kLESS:
+						return "ElementWise_LESS";
+				}
+			}
 		case LayerType::kPLUGIN:
 			return "Plugin";
 		case LayerType::kUNARY:
@@ -171,6 +202,10 @@ std::string convertLayerTypeToString(ILayer *layer) {
 			return "Normalization";
 		case LayerType::kPLUGIN_V3:
 			return "PluginV3";
+		case LayerType::kSQUEEZE:
+			return "Squeeze";
+		case LayerType::kUNSQUEEZE:
+			return "Unsqueeze";
 #endif
 	}
 
@@ -180,11 +215,11 @@ std::string convertLayerTypeToString(ILayer *layer) {
 void TensorRTNetwork::printNetwork() {
 	if(network != nullptr) {
 		int layer_num = network->getNbLayers();
-		std::cout.width(4); std::cout << std::left << "N.";
+		std::cout.width(5); std::cout << std::left << "N.";
 		std::cout<<" ";
-		std::cout.width(17); std::cout<<std::left<<"Layer type";
+		std::cout.width(25); std::cout<<std::left<<"Layer type";
 		std::cout<<" ";
-		std::cout.width(17); std::cout<<std::left<<"Layer name";
+		std::cout.width(25); std::cout<<std::left<<"Layer name";
 		std::cout<<" ";
 		//std::cout.width(22); std::cout<<std::left<<"input (H*W,CH)";
 		//std::cout.width(16); std::cout<<std::left<<"output (H*W,CH)";
@@ -198,11 +233,16 @@ void TensorRTNetwork::printNetwork() {
 			std::cout.width(4); std::cout<<std::right<<i;
 			std::cout<<" ";
 
-			std::cout.width(16); std::cout<<std::left<< convertLayerTypeToString(layer);
+			std::cout.width(24); std::cout<<std::left<< convertLayerTypeToString(layer);
 			std::cout<<" ";
 
-			std::cout.width(16); std::cout<<std::left<< layer->getName();
+			std::cout.width(24); std::cout<<std::left<< layer->getName();
 			std::cout<<" ";
+
+
+			std::cout.width(24); std::cout<<std::left<< (int) layer->getOutputType(0);
+			std::cout<<" ";
+
 			std::cout << std::endl;
 
 //			std::cout<<"\t input num: "<<layer->getNbInputs()<<", output num: "<<layer->getNbOutputs()<<std::endl;

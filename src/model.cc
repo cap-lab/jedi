@@ -53,6 +53,10 @@ void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::
 		for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 			size = size * dims.d[iter2];
 
+		if(size % ALIGNMENT != 0) {
+			size = (size / ALIGNMENT + 1) * ALIGNMENT;
+		}
+
 		void *buf = cuda_make_generic_array_host(size, getDataTypeSize(type_vec[iter1].second));
 		cudaHostGetDevicePointer((void **) &(space), buf, 0); 
 		buffers.push_back(buf);
@@ -63,6 +67,7 @@ void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::
 		signals_map.insert(std::make_pair(tensor_name, signal));
 	}   
 }
+
 
 void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::vector<std::pair<std::string, nvinfer1::DataType>> type_vec, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map) {
 	for(unsigned int iter1 = 0; iter1 < size_vec.size(); iter1++) {
@@ -81,6 +86,10 @@ void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vecto
 				size = size * dims.d[iter2];
 			void *space = nullptr;
 			bool *signal = new bool(false);
+
+			if(size % ALIGNMENT != 0) {
+				size = (size / ALIGNMENT + 1) * ALIGNMENT;
+			}
 
 			space = cuda_make_generic_array(nullptr, size, getDataTypeSize(type_vec[iter1].second));
 			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space);

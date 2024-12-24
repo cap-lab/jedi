@@ -10,6 +10,8 @@
 
 #include "cuda_jedi.h"
 
+#define ALIGNMENT (512)
+
 int getDataTypeSize(nvinfer1::DataType data_type);
 
 class TensorAllocator : public nvinfer1::IOutputAllocator {
@@ -41,7 +43,7 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 			this->size = _size;
 			is_reallocated = true;
 
-			//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<< "ptr: "<< this  << ", size(in): "<< this->size <<std::endl;
+			std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<< "ptr: "<< this  << ", size(in): "<< this->size <<std::endl;
 		}
 
 		void* reallocateOutputAsync(char const* tensorName, void* currentMemory, uint64_t size, uint64_t alignment, cudaStream_t stream) noexcept override
@@ -51,19 +53,20 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 			//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" tensorName: "<<tensorName<<std::endl;
 			//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" size: "<<size<<std::endl;
 			//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" alignment: "<<alignment<<std::endl;
+			//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" data_type: " << (int) data_type <<std::endl;
 
 			is_reallocated = false;
 			size = std::max(size, static_cast<uint64_t>(1));
 			if ((size % alignment) != 0) {
-				allocatedSizeInBytes = (size / alignment) * (alignment + 1);
+				allocatedSizeInBytes = (size / alignment + 1) * alignment;
 			}
 			else {
 				allocatedSizeInBytes = size;
 			}
 
 			if (allocatedSizeInBytes > this->size) {
-				std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" tensorName: "<<tensorName<<", ptr: "<<this<<std::endl;
-				std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" size: "<<allocatedSizeInBytes<<", size2:"<< this->size <<std::endl;
+				//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" tensorName: "<<tensorName<<", ptr: "<<this<<std::endl;
+				//std::cerr<<"["<<__FILE__<<":"<<__func__<<":"<<__LINE__<<"]"<<" size: "<<allocatedSizeInBytes<<", size2:"<< this->size <<std::endl;
 				assert(allocatedSizeInBytes % data_type_size == 0);
 				allocateWithStream(allocatedSizeInBytes, stream);
 			}
@@ -106,7 +109,7 @@ class TensorAllocator : public nvinfer1::IOutputAllocator {
 			is_reallocated = false;
 			size = std::max(size, static_cast<uint64_t>(1));
 			if ((size % alignment) != 0) {
-				allocatedSizeInBytes = (size / alignment) * (alignment + 1);
+				allocatedSizeInBytes = (size / alignment + 1) * alignment;
 			}
 			else {
 				allocatedSizeInBytes = size;
