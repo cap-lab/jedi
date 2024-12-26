@@ -477,6 +477,7 @@ static void updateLayerAndOutputType(ILayer *layer, nvinfer1::DataType updatedTy
 	}
 }
 
+
 IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
 	int device = config_data->instances.at(instance_id).devices.at(cur_iter);
@@ -604,6 +605,45 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 					}
 				}
 			}
+		}
+	}
+
+	if (data_type == TYPE_INT8 && device == DEVICE_GPU) {
+		int net_output_num = network->getNbOutputs();
+
+		for (int index = 0 ; index < net_output_num ; index++) {
+			printf("output(%d): %s\n", index, network->getOutput(index)->getName());
+		}
+
+		for(int index = 0 ; index < layer_num ; index++) {
+			ILayer *layer = network->getLayer(index);
+			if(layer->getType() == nvinfer1::LayerType::kELEMENTWISE && index > 0){
+				ILayer *prevlayer = network->getLayer(index-1);
+				if(prevlayer->getType() == nvinfer1::LayerType::kACTIVATION) {
+					int output_num = layer->getNbOutputs();
+					for(int output_index = 0 ; output_index < output_num  ; output_index++) {
+						if(layer->getOutput(output_index)->isNetworkOutput()) {
+							ITensor *tensor = layer->getOutput(output_index);
+							IActivationLayer *iMulLayer = network->addActivation(*tensor, nvinfer1::ActivationType::kLEAKY_RELU);
+							iMulLayer->setAlpha(1.0f);
+
+							std::string old_output = tensor->getName();
+							std::string new_output = tensor->getName();
+							new_output += "_old";
+							tensor->setName(new_output.c_str());
+							//iMulLayer->setPrecision(nvinfer1::DataType::kHALF);
+							iMulLayer->getOutput(0)->setName(old_output.c_str());
+							network->markOutput(*(iMulLayer->getOutput(0)));
+							network->unmarkOutput(*(layer->getOutput(output_index)));
+							std::cout << "mark output old: " << new_output << std::endl;
+						}
+					}
+				}
+			}
+		}
+
+		for (int index = 0 ; index < net_output_num ; index++) {
+			printf("output(%d): %s\n", index, network->getOutput(index)->getName());
 		}
 	}
 
