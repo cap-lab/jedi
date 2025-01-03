@@ -39,23 +39,6 @@ REGISTER_JEDI_APPLICATION(YoloEnd2EndOnnxApplication);
 
 // static inline float logisticActivate(float x){return 1.f/(1.f + expf(-x));}
 
-
-void YoloEnd2EndOnnxApplication::readOnnxFilePath(libconfig::Setting &setting) {
-	try{	
-		const char *tmp = setting["onnx_file_path"];
-		std::stringstream ss(tmp);
-		static std::string data;
-		ss >> data;
-		yoloOnnxAppConfig.onnx_file_path = data.c_str();
-
-		std::cerr<<"onnx_file_path: "<<yoloOnnxAppConfig.onnx_file_path<<std::endl;
-	}
-	catch(const libconfig::SettingNotFoundException &nfex) {
-		std::cerr << "No 'onnx_file_path' setting in configuration file." << std::endl;
-	}
-}
-
-
 void YoloEnd2EndOnnxApplication::readCalibImagePath(libconfig::Setting &setting) {
 	try{	
 		const char *tmp = setting["calib_image_path"];
@@ -131,31 +114,14 @@ void YoloEnd2EndOnnxApplication::readOpenCVParallelNum(libconfig::Setting &setti
 	}
 }
 
-void YoloEnd2EndOnnxApplication::readOptimizationProfileFilePath(libconfig::Setting &setting) {
-	try{	
-		const char *tmp = setting["optimization_cfg_path"];
-		std::stringstream ss(tmp);
-		static std::string data;
-		ss >> data;
-		yoloOnnxAppConfig.optimization_cfg_path = data.c_str();
-		std::cerr<<"optimization_cfg_path: "<<yoloOnnxAppConfig.optimization_cfg_path<<std::endl;
-	}
-	catch(const libconfig::SettingNotFoundException &nfex) {
-		std::cerr << "No 'optimization_cfg_path' setting in configuration file." << std::endl;
-		//exit(EXIT_FAILURE);
-	}
-}
 
 void YoloEnd2EndOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 {
-	readOnnxFilePath(setting);
+	BasicOnnxApplication::readCustomOptions(setting);
 	readImagePath(setting);
 	readNamePath(setting);
-	readOpenCVParallelNum(setting);
 	readCalibImagePath(setting);
 	readCalibImagesNum(setting);
-	readOptimizationProfileFilePath(setting);
-
 }
 
 
@@ -172,12 +138,12 @@ IJediNetwork *YoloEnd2EndOnnxApplication::createNetwork(ConfigInstance *basic_co
 	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); // deprecated in tensorrt 10
 #endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
-	jedi_network->onnx_file_path = yoloOnnxAppConfig.onnx_file_path;
+	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
 	// TODO: onnx file path
-	parser->parseFromFile(yoloOnnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
+	parser->parseFromFile(onnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
 	for (int32_t i = 0; i < parser->getNbErrors(); ++i)
 	{
 		std::cout << "TENSORRT ONNX ERROR: "  << parser->getError(i)->desc() << std::endl;
@@ -187,7 +153,7 @@ IJediNetwork *YoloEnd2EndOnnxApplication::createNetwork(ConfigInstance *basic_co
 		FatalError("Onnx parsing failed");
 	}
 
-	jedi_network->optimization_cfg_path = yoloOnnxAppConfig.optimization_cfg_path;
+	jedi_network->optimization_cfg_path = onnxAppConfig.optimization_cfg_path;
 
 	// Printing network inputs with dimensions
 	/*int nNumOfInput = jedi_network->network->getNbInputs();

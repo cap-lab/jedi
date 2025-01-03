@@ -9,9 +9,10 @@
 
 #include "config.h"
 
+#include "basic_onnx_application.h"
+
 
 typedef struct _ImageClsOnnxAppConfig {
-	std::string onnx_file_path;
 	std::string calib_image_path;
 	std::string image_path;
 	std::string label_path;
@@ -23,7 +24,7 @@ typedef struct _ImageClsOnnxAppConfig {
 } ImageClsOnnxAppConfig;
 
 
-class ImageClsOnnxApplication : public IInferenceApplication {
+class ImageClsOnnxApplication : public BasicOnnxApplication {
 	public:
 		ImageClsOnnxApplication() {};
 		~ImageClsOnnxApplication();
@@ -44,7 +45,6 @@ class ImageClsOnnxApplication : public IInferenceApplication {
 		int class_num;
 		std::vector<std::string> labels;
 
-		void readOnnxFilePath(libconfig::Setting &setting);
 		void readCalibImagePath(libconfig::Setting &setting);
 		void readCalibImagesNum(libconfig::Setting &setting);
 		void readImagePath(libconfig::Setting &setting);

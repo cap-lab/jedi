@@ -7,12 +7,12 @@
 #include "inference_application.h"
 #include "config.h"
 #include "yolo_wrapper.h"
+#include "basic_onnx_application.h"
 
 #define DETR_MAX_BOXES_SINGLE_IMAGE 100
 #define DETR_NUM_CLASSES 92
 
 typedef struct _DETROnnxAppConfig {
-	std::string onnx_file_path;
 	std::string calib_image_path;
 	std::string image_path;
 	std::string name_path;
@@ -36,7 +36,7 @@ typedef struct _DETRData {
 
 
 
-class DETROnnxApplication : public IInferenceApplication {
+class DETROnnxApplication : public BasicOnnxApplication {
 	public:
 		DETROnnxApplication() {};
 		~DETROnnxApplication();
@@ -60,7 +60,6 @@ class DETROnnxApplication : public IInferenceApplication {
 		int num_detections =  100;
 		int num_classes = 92;
 
-		void readOnnxFilePath(libconfig::Setting &setting);
 		void readCalibImagePath(libconfig::Setting &setting);
 		void readCalibImagesNum(libconfig::Setting &setting);
 		void readImagePath(libconfig::Setting &setting);

@@ -12,9 +12,10 @@
 
 #include "config.h"
 
+#include "basic_onnx_application.h"
+
 
 typedef struct _NuscenesDetectionOnnxAppConfig {
-	std::string onnx_file_path;
 	std::string optimization_cfg_path;
 	std::string lidar_list_path;
 	std::string calib_lidar_path;
@@ -22,7 +23,7 @@ typedef struct _NuscenesDetectionOnnxAppConfig {
 } NuscenesDetectionOnnxAppConfig;
 
 
-class NuscenesDetectionOnnxApplication : public IInferenceApplication {
+class NuscenesDetectionOnnxApplication : public BasicOnnxApplication {
 	public:
 		NuscenesDetectionOnnxApplication() {};
 		~NuscenesDetectionOnnxApplication();
@@ -50,7 +51,6 @@ class NuscenesDetectionOnnxApplication : public IInferenceApplication {
 
 		std::map<std::string, int> outputIndexMap;
 
-		void readOnnxFilePath(libconfig::Setting &setting);
 		void readOptimizationProfileFilePath(libconfig::Setting &setting);
 		void readLidarListPath(libconfig::Setting &setting);
 		void readCalibLidarPath(libconfig::Setting &setting);

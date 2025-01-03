@@ -47,22 +47,6 @@ REGISTER_JEDI_APPLICATION(NuscenesDetectionOnnxApplication);
 }
 #endif 
 
-void NuscenesDetectionOnnxApplication::readOnnxFilePath(libconfig::Setting &setting) {
-	try{	
-		const char *tmp = setting["onnx_file_path"];
-		std::stringstream ss(tmp);
-		static std::string data;
-		ss >> data;
-		nuscenesOnnxAppConfig.onnx_file_path = data.c_str();
-
-		std::cerr<<"onnx_file_path: "<<nuscenesOnnxAppConfig.onnx_file_path<<std::endl;
-	}
-	catch(const libconfig::SettingNotFoundException &nfex) {
-		std::cerr << "No 'onnx_file_path' setting in configuration file." << std::endl;
-		exit(EXIT_FAILURE);
-	}
-}
-
 void NuscenesDetectionOnnxApplication::readOptimizationProfileFilePath(libconfig::Setting &setting) {
 	try{	
 		const char *tmp = setting["optimization_cfg_path"];
@@ -123,7 +107,7 @@ void NuscenesDetectionOnnxApplication::readCalibLidarNum(libconfig::Setting &set
 
 void NuscenesDetectionOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 {
-	readOnnxFilePath(setting);
+	BasicOnnxApplication::readCustomOptions(setting);
 	readOptimizationProfileFilePath(setting);
 	readLidarListPath(setting);
     readCalibLidarPath(setting);
@@ -143,12 +127,12 @@ IJediNetwork *NuscenesDetectionOnnxApplication::createNetwork(ConfigInstance *ba
 	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); // deprecated in tensorrt 10
 #endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
-	jedi_network->onnx_file_path = nuscenesOnnxAppConfig.onnx_file_path;
+	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
 	// TODO: onnx file path
-	parser->parseFromFile(nuscenesOnnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
+	parser->parseFromFile(onnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
 	for (int32_t i = 0; i < parser->getNbErrors(); ++i)
 	{
 		std::cout << "TENSORRT ONNX ERROR: "  << parser->getError(i)->desc() << std::endl;

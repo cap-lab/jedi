@@ -7,18 +7,17 @@
 #include "inference_application.h"
 #include "config.h"
 #include "yolo_wrapper.h"
+#include "basic_onnx_application.h"
 
 #define DETR_MAX_BOXES_SINGLE_IMAGE 100
 #define DETR_NUM_CLASSES 92
 
 typedef struct _YoloEnd2EndOnnxAppConfig {
-	std::string onnx_file_path;
 	std::string calib_image_path;
 	std::string image_path;
 	std::string name_path;
 	int calib_images_num;
 	int opencv_parallel_num;
-	std::string optimization_cfg_path;
 } YoloEnd2EndOnnxAppConfig;
 
 
@@ -37,7 +36,7 @@ typedef struct _DETRData {
 
 
 
-class YoloEnd2EndOnnxApplication : public IInferenceApplication {
+class YoloEnd2EndOnnxApplication : public BasicOnnxApplication {
 	public:
 		YoloEnd2EndOnnxApplication() {};
 		~YoloEnd2EndOnnxApplication();
@@ -61,7 +60,6 @@ class YoloEnd2EndOnnxApplication : public IInferenceApplication {
 		int num_max_detections =  100;
 		int num_classes = 92;
 
-		void readOnnxFilePath(libconfig::Setting &setting);
 		void readCalibImagePath(libconfig::Setting &setting);
 		void readCalibImagesNum(libconfig::Setting &setting);
 		void readImagePath(libconfig::Setting &setting);

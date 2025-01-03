@@ -10,10 +10,11 @@
 
 #include "config.h"
 
+#include "basic_onnx_application.h"
+
 #include "yolo_wrapper.h"
 
 typedef struct _YoloOnnxAppConfig {
-	std::string onnx_file_path;
 	std::string calib_image_path;
 	std::string image_path;
 	std::string name_path;
@@ -22,7 +23,7 @@ typedef struct _YoloOnnxAppConfig {
 } YoloOnnxAppConfig;
 
 
-class YoloOnnxApplication : public IInferenceApplication {
+class YoloOnnxApplication : public BasicOnnxApplication {
 	public:
 		YoloOnnxApplication() {};
 		~YoloOnnxApplication();
@@ -45,7 +46,6 @@ class YoloOnnxApplication : public IInferenceApplication {
 		std::vector<std::vector<int>> detection_num_vec;
 		std::string network_name;
 
-		void readOnnxFilePath(libconfig::Setting &setting);
 		void readCalibImagePath(libconfig::Setting &setting);
 		void readCalibImagesNum(libconfig::Setting &setting);
 		void readImagePath(libconfig::Setting &setting);
@@ -57,7 +57,6 @@ class YoloOnnxApplication : public IInferenceApplication {
 		void printBox(int sample_index, int batch, Detection *dets, std::vector<int> detections_num);
 		void writeResultFile(std::string result_file_name);
 
-		int entryIndex(int width, int height, int batch_index, int location, int entry);
 		void activateArrayLogistic(float *x, int n);
 		void scalAddCPU(int N, float ALPHA, float BETA, float *X, int INCX);
 		void forwardYoloLayer(float **output_buffers, int batch);

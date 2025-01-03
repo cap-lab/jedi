@@ -49,21 +49,6 @@ static float g_mask[3][3] = { { 6, 7, 8}, {3, 4, 5}, {0, 1, 2} };
 
 // static inline float logisticActivate(float x){return 1.f/(1.f + expf(-x));}
 
-void YoloOnnxApplication::readOnnxFilePath(libconfig::Setting &setting) {
-	try{	
-		const char *tmp = setting["onnx_file_path"];
-		std::stringstream ss(tmp);
-		static std::string data;
-		ss >> data;
-		yoloOnnxAppConfig.onnx_file_path = data.c_str();
-
-		std::cerr<<"onnx_file_path: "<<yoloOnnxAppConfig.onnx_file_path<<std::endl;
-	}
-	catch(const libconfig::SettingNotFoundException &nfex) {
-		std::cerr << "No 'onnx_file_path' setting in configuration file." << std::endl;
-	}
-}
-
 void YoloOnnxApplication::readCalibImagePath(libconfig::Setting &setting) {
 	try{	
 		const char *tmp = setting["calib_image_path"];
@@ -141,7 +126,7 @@ void YoloOnnxApplication::readOpenCVParallelNum(libconfig::Setting &setting) {
 
 void YoloOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 {
-	readOnnxFilePath(setting);
+	BasicOnnxApplication::readCustomOptions(setting);
 	readImagePath(setting);
 	readNamePath(setting);
 	readOpenCVParallelNum(setting);
@@ -163,12 +148,12 @@ IJediNetwork *YoloOnnxApplication::createNetwork(ConfigInstance *basic_config_da
 	uint32_t flag = 1U <<static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH); // deprecated in tensorrt 10
 #endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
-	jedi_network->onnx_file_path = yoloOnnxAppConfig.onnx_file_path;
+	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
 	// TODO: onnx file path
-	parser->parseFromFile(yoloOnnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
+	parser->parseFromFile(onnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
 	for (int32_t i = 0; i < parser->getNbErrors(); ++i)
 	{
 		std::cout << "TENSORRT ONNX ERROR: "  << parser->getError(i)->desc() << std::endl;
