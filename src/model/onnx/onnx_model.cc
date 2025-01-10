@@ -190,7 +190,15 @@ static std::string makeRangeString(int prev_cut_point, int curr_cut_point, std::
 	return rangeString;
 }
 
-void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix, bool for_rt_build) {
+static bool isQuantizedModel(int device, int data_type, bool hasQuantizedModel) {
+	if (device == DEVICE_GPU && data_type == TYPE_INT8 && hasQuantizedModel == true) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix, bool for_rt_build, bool is_quantized_model) {
 	std::string model_dir = config_data->instances.at(instance_id).model_dir;
 	std::string cut_points_name;
 	std::string device_name;
@@ -228,6 +236,9 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	}
 	else if(data_type == TYPE_INT8) {
 		data_type_name = "INT8";
+		if (is_quantized_model == true) {
+			data_type_name += "_QUANT";
+		}
 	}
 
 	ITensor *tensor = network->getInput(0);
@@ -253,20 +264,21 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 			}
 		}
 
-		if (data_type == TYPE_INT8) {
-			range_string = makeRangeString(prev_cut_point, curr_cut_point, fp16_ranges);
-			if(range_string.size() > 0) {
-				plan_file_name += "_half" + range_string;
+		if (is_quantized_model == false) {
+			if (data_type == TYPE_INT8) {
+				range_string = makeRangeString(prev_cut_point, curr_cut_point, fp16_ranges);
+				if(range_string.size() > 0) {
+					plan_file_name += "_half" + range_string;
+				}
+			}
+
+			if (data_type == TYPE_INT8 || data_type == TYPE_FP16) {
+				range_string = makeRangeString(prev_cut_point, curr_cut_point, fp32_ranges);
+				if(range_string.size() > 0) {
+					plan_file_name += "_float" + range_string;
+				}
 			}
 		}
-
-		if (data_type == TYPE_INT8 || data_type == TYPE_FP16) {
-			range_string = makeRangeString(prev_cut_point, curr_cut_point, fp32_ranges);
-			if(range_string.size() > 0) {
-				plan_file_name += "_float" + range_string;
-			}
-		}
-
 	}
 	plan_file_name = plan_file_name + postfix;
 
@@ -351,15 +363,14 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 	return false;
 }
 
-void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<int>& output_index_vec) {
-
+void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<int>& output_index_vec, int dequantize_skip_index) {
 	for (int iter1 = start_index ; iter1 <= end_index; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
 		bool inserted = false;
-		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && layer->getType() != nvinfer1::LayerType::kDEQUANTIZE) {
+		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && (layer->getType() != nvinfer1::LayerType::kDEQUANTIZE || iter1 >= dequantize_skip_index)) {
 			for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
 				ITensor *tensor = layer->getOutput(iter2);
-				auto tensor_name = tensor->getName();
+				std::string tensor_name = tensor->getName();
 
 				if (inserted == false && checkTensorIsUsedInNextStages(device_id, network, end_index, iter1, tensor_name)) {
 					output_index_vec.push_back(iter1);
@@ -370,11 +381,11 @@ void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network
 	}
 }
 
-void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec) {
+void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec, int dequantize_skip_index) {
 	std::set<ITensor *> output_set;
 	for(int iter1 = 0 ; iter1 < start_index ; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
-		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && layer->getType() != nvinfer1::LayerType::kDEQUANTIZE) {
+		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && (layer->getType() != nvinfer1::LayerType::kDEQUANTIZE || iter1 >= dequantize_skip_index)) {
 			for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
 				ITensor *tensor = layer->getOutput(iter2);
 				if (output_set.find(tensor) == output_set.end()) {
@@ -407,7 +418,7 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 
 }
 
-void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *network, std::string model_name, std::string onnx_file_name, int start_index, int end_index) {
+void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *network, std::string model_name, std::string onnx_file_name, int start_index, int end_index, int dequantize_skip_index) {
 	int result = -1;
 	std::string cmd = "polygraphy surgeon extract " + model_name + " -o " + onnx_file_name;
 	std::string inputs = " --inputs ";
@@ -418,8 +429,8 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 
 
 	//getIOTensorNamesOfLayer(network, start_index, input_name_vec, true);
-	fillInputs(device_id, network, start_index, end_index, input_name_vec);
-	getOutputIndexOfStage(device_id, network, start_index, end_index, output_index_vec);
+	fillInputs(device_id, network, start_index, end_index, input_name_vec, dequantize_skip_index);
+	getOutputIndexOfStage(device_id, network, start_index, end_index, output_index_vec, dequantize_skip_index);
 	std::cerr<<"output_index_vec size: "<<output_index_vec.size()<<std::endl;
 	for(int output_index : output_index_vec) {
 		std::cerr<<"\toutput_index: "<<output_index<<std::endl;
@@ -441,24 +452,83 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 	}
 }
 
-void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_name, std::vector<std::string>& onnx_file_name_vec) {
+static int convertCutpointIndexFromOriginalToQuantizedModel(INetworkDefinition *network, INetworkDefinition *quantized_network, int cut_point) {
+	ILayer *original_layer = network->getLayer(cut_point);
+	int cut_index = -1;
+	std::string layer_name = original_layer->getName();
+	int quantized_layer_num = 0;
+
+	quantized_layer_num = quantized_network->getNbLayers();
+	// assume that the quantized layer num is greater than original layer num
+	for (int index = 0; index < quantized_layer_num; index++) {
+		cut_index = (cut_point + index) % quantized_layer_num;
+		ILayer *layer = quantized_network->getLayer(cut_index);
+		//printf("layer name: %s\n", layer->getName());
+		if (layer_name.compare(layer->getName()) == 0) {
+			printf("layer name: %s\n", layer->getName());
+			break;
+		}
+	}
+
+	return cut_index;
+}
+
+void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_name, std::string quantized_model_name, std::vector<std::string>& onnx_file_name_vec) {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int prev_cut_point = 0, curr_cut_point = 0;
+	INetworkDefinition *quantized_network = nullptr;
+	IBuilder *quant_builder = nullptr;
+	int error_num = 0;
+	int dequantize_skip_index = 0;
+
+	if (quantized_model_name.length() > 0) {
+		quant_builder = createInferBuilder(onnx_logger);
+		quantized_network =  quant_builder->createNetworkV2(0);
+		IParser* parser = createParser(*quantized_network, onnx_logger);
+		parser->parseFromFile(quantized_model_name.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
+		error_num = parser->getNbErrors();
+		for (int32_t i = 0; i < error_num; ++i)
+		{
+			std::cout << "TENSORRT ONNX ERROR: "  << parser->getError(i)->desc() << std::endl;
+		}
+
+		if(error_num > 0) {
+			FatalError("Onnx parsing failed");
+		}
+		dequantize_skip_index = convertCutpointIndexFromOriginalToQuantizedModel(network, quantized_network, 0);
+	}
+	else {
+		dequantize_skip_index = convertCutpointIndexFromOriginalToQuantizedModel(network, network, 0);
+	}
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
 		std::string onnx_file_name;
+		int data_type = config_data->instances.at(instance_id).data_types.at(iter1);
+		int device = config_data->instances.at(instance_id).devices.at(iter1);
 
-		getModelFileName(iter1, onnx_file_name, network, ".onnx", false);
+		getModelFileName(iter1, onnx_file_name, network, ".onnx", false, isQuantizedModel(device, data_type, quantized_model_name.length() > 0));
 
 		onnx_file_name_vec.push_back(onnx_file_name);
 		if(iter1 > 0) {
 			prev_cut_point = curr_cut_point + 1;
 		}
+
 		curr_cut_point = config_data->instances.at(instance_id).cut_points.at(iter1);
 		curr_cut_point = std::min(curr_cut_point, network->getNbLayers()-1);
 
 		if(fileExist(onnx_file_name) == false)  {
-			surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point);
+			if (quantized_model_name.length() > 0 && data_type == TYPE_INT8 && device == DEVICE_GPU) {
+				int prev_cut_point_changed = 0, curr_cut_point_changed;
+				if (prev_cut_point > 0) {
+					prev_cut_point_changed = convertCutpointIndexFromOriginalToQuantizedModel(network, quantized_network, prev_cut_point);
+				}
+				if (curr_cut_point > 0) {
+					curr_cut_point_changed = convertCutpointIndexFromOriginalToQuantizedModel(network, quantized_network, curr_cut_point);
+				}
+				surgeonOnnxByPolygraphy(iter1, quantized_network, quantized_model_name, onnx_file_name, prev_cut_point_changed, curr_cut_point_changed, dequantize_skip_index);
+			} else {
+				surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point, dequantize_skip_index);
+			}
 		}
 	}
 }
@@ -478,7 +548,7 @@ static void updateLayerAndOutputType(ILayer *layer, nvinfer1::DataType updatedTy
 }
 
 
-IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
+IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, bool is_quantized_onnx, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
 	int device = config_data->instances.at(instance_id).devices.at(cur_iter);
 	std::vector<LayerRange> gpu_ranges = config_data->instances.at(instance_id).gpu_ranges;
@@ -502,7 +572,6 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 
 	parser = createParser(*network, logger);
 
-	// TODO: onnx file path
 	(parser)->parseFromFile(onnx_file_name.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
 	for (int32_t i = 0; i < (parser)->getNbErrors(); ++i)
 	{
@@ -521,19 +590,21 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 
 	for(int index = 0 ; index < layer_num ; index++) {
 		ILayer *layer = network->getLayer(index);
-		if(valueInRange(gpu_ranges, start_cut_point + index) == true) {
+		if(device == DEVICE_DLA && valueInRange(gpu_ranges, start_cut_point + index) == true) {
 			config->setDeviceType(layer, nvinfer1::DeviceType::kGPU);
 		}
-		if(data_type == TYPE_INT8 && valueInRange(fp16_ranges, start_cut_point + index) == true) {
-			if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
-			layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3 /* && layer->getType() != LayerType::kSHUFFLE*/) {
-				updateLayerAndOutputType(layer, nvinfer1::DataType::kHALF);
+		if (is_quantized_onnx == false) {
+			if(data_type == TYPE_INT8 && valueInRange(fp16_ranges, start_cut_point + index) == true) {
+				if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
+				layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3 /* && layer->getType() != LayerType::kSHUFFLE*/) {
+					updateLayerAndOutputType(layer, nvinfer1::DataType::kHALF);
+				}
 			}
-		}
-		if((data_type == TYPE_INT8 || data_type == TYPE_FP16) && valueInRange(fp32_ranges, start_cut_point + index) == true) {
-			if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
-			layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3/* && layer->getType() != LayerType::kSHUFFLE*/) {
-				updateLayerAndOutputType(layer, nvinfer1::DataType::kFLOAT);
+			if((data_type == TYPE_INT8 || data_type == TYPE_FP16) && valueInRange(fp32_ranges, start_cut_point + index) == true) {
+				if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
+				layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3/* && layer->getType() != LayerType::kSHUFFLE*/) {
+					updateLayerAndOutputType(layer, nvinfer1::DataType::kFLOAT);
+				}
 			}
 		}
 	}
@@ -740,7 +811,7 @@ void OnnxModel::initializeModel() {
 	}
 
 	std::vector<std::string> onnx_file_name_vec;	
-	separateOnnxFile(network, tensorrt_network->onnx_file_path, onnx_file_name_vec);
+	separateOnnxFile(network, tensorrt_network->onnx_file_path, tensorrt_network->quantized_onnx_file_path, onnx_file_name_vec);
 
 	libconfig::Config cfg;
 	libconfig::Setting* setting_ptr = nullptr;
@@ -758,14 +829,15 @@ void OnnxModel::initializeModel() {
 		int dla_sram_size = config_data->instances.at(instance_id).dla_sram_sizes.at(iter1);
 		bool save_layer_info = config_data->instances.at(instance_id).save_layer_info;
 		bool engineBuilt = false;
+		bool is_quantized_onnx = isQuantizedModel(device, data_type, tensorrt_network->quantized_onnx_file_path.length() > 0);
 		std::string plan_file_name;
-		getModelFileName(iter1, plan_file_name, network, ".rt", true);
+		getModelFileName(iter1, plan_file_name, network, ".rt", true, is_quantized_onnx);
 
 		if(fileExist(plan_file_name) == false)  {
 			IBuilder *partial_builder;
 			INetworkDefinition *partial_network;
 			IParser *partial_parser;
-			IBuilderConfig* config = createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], partial_builder, partial_network, partial_parser);
+			IBuilderConfig* config = createEngineFromOnnxFile(iter1, onnx_file_name_vec[iter1], is_quantized_onnx, partial_builder, partial_network, partial_parser);
 
 			config->setAvgTimingIterations(8);
 			config->setMaxAuxStreams(aux_stream_num);

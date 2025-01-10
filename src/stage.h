@@ -26,10 +26,14 @@ class Stage {
 		//std::vector<std::vector<std::vector<TensorAllocator *>>> tensor_allocators;
 
 		std::vector<std::vector<void *>> stage_buffers;
+		std::map<std::string, nvinfer1::Dims> input_size_map;
+		std::map<std::string, nvinfer1::Dims> output_size_map;
+		std::map<std::string, nvinfer1::DataType> input_type_map;
+		std::map<std::string, nvinfer1::DataType> output_type_map;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> input_size_vec;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> output_size_vec;
-		std::vector<std::pair<std::string, nvinfer1::DataType>> input_type_vec;
-		std::vector<std::pair<std::string, nvinfer1::DataType>> output_type_vec;
+		//std::vector<std::pair<std::string, nvinfer1::DataType>> input_type_vec;
+		//std::vector<std::pair<std::string, nvinfer1::DataType>> output_type_vec;
 
 		int binding_num;
 

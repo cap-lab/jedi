@@ -2,6 +2,8 @@
 #include <vector>
 #include <cassert>
 #include <cctype>
+#include <sstream>
+#include <set>
 
 #include <NvInfer.h>
 
@@ -12,6 +14,27 @@
 
 NetworkModelRegistry g_NetworkModelRegistry = NetworkModelRegistry();
 
+#ifndef FatalError
+#define FatalError(s) {                                                \
+    std::stringstream _where, _message;                                \
+    _where << __FILE__ << ':' << __LINE__;                             \
+    _message << std::string(s) + "\n" << __FILE__ << ':' << __LINE__;\
+    std::cerr << _message.str() << "\nAborting...\n";                  \
+    cudaDeviceReset();                                                 \
+    exit(EXIT_FAILURE);                                                \
+}
+#endif
+
+static int getAllocationSizeByDims(nvinfer1::Dims dims) {
+	int size = 1;
+	for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
+		size = size * dims.d[iter2];
+
+	if(size % ALIGNMENT != 0) {
+		size = (size / ALIGNMENT + 1) * ALIGNMENT;
+	}
+	return size;
+}
 
 Model::Model(ConfigData *config_data, int instance_id, IInferenceApplication *app) {
 	this->config_data = config_data;
@@ -42,60 +65,107 @@ void Model::deallocateStream() {
 	}
 }
 
-void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::vector<std::pair<std::string, nvinfer1::DataType>> type_vec, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals) {
-	for(unsigned int iter1 = 0; iter1 < size_vec.size(); iter1++) {
-		std::string tensor_name = size_vec[iter1].first;
-		nvinfer1::Dims dims = size_vec[iter1].second;
-		int size = 1;
+void Model::allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals) {
+	for(auto iter = size_vec.begin(); iter != size_vec.end(); iter++) {
+		std::string tensor_name = iter->first;
+		nvinfer1::Dims dims = iter->second;
+		int size = getAllocationSizeByDims(dims);
 		void *space = nullptr;
 		bool *signal = new bool(false);
 
-		for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
-			size = size * dims.d[iter2];
-
-		if(size % ALIGNMENT != 0) {
-			size = (size / ALIGNMENT + 1) * ALIGNMENT;
-		}
-
-		void *buf = cuda_make_generic_array_host(size, getDataTypeSize(type_vec[iter1].second));
+		void *buf = cuda_make_generic_array_host(size, getDataTypeSize(type_map.find(iter->first)->second));
 		cudaHostGetDevicePointer((void **) &(space), buf, 0); 
 		buffers.push_back(buf);
+
 		stream_buffers_map.insert(std::make_pair(tensor_name, space));
 		// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p, host space: %p, size: %d\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space, buf, size);
 
 		signals.push_back(signal);
 		signals_map.insert(std::make_pair(tensor_name, signal));
-	}   
+	}
 }
 
 
-void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::vector<std::pair<std::string, nvinfer1::DataType>> type_vec, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map) {
-	for(unsigned int iter1 = 0; iter1 < size_vec.size(); iter1++) {
-		std::string tensor_name = size_vec[iter1].first;
+void Model::allocateStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> size_map, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map) {
+
+	// skip the first stage's input and the last stage's output
+	if(stage_id == 0 && is_input_size_map)
+		return;
+	if(stage_id == int(stages.size()-1) && !is_input_size_map)
+		return;
+
+	for(auto iter = size_map.begin(); iter != size_map.end(); iter++) {
+		std::string tensor_name = iter->first;
 
 		if(stream_buffers_map.find(tensor_name) == stream_buffers_map.end()) {
-			// skip the first stage's input and the last stage's output
-			if(stage_id == 0 && is_input_size_map)
-				continue;
-			if(stage_id == int(stages.size()-1) && !is_input_size_map)
-				continue;
-
-			nvinfer1::Dims dims = size_vec[iter1].second;
-			int size = 1;
-			for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
-				size = size * dims.d[iter2];
+			nvinfer1::Dims dims = iter->second;
+			int size = getAllocationSizeByDims(dims);
 			void *space = nullptr;
 			bool *signal = new bool(false);
 
-			if(size % ALIGNMENT != 0) {
-				size = (size / ALIGNMENT + 1) * ALIGNMENT;
-			}
-
-			space = cuda_make_generic_array(nullptr, size, getDataTypeSize(type_vec[iter1].second));
+			space = cuda_make_generic_array(nullptr, size, getDataTypeSize(type_map.find(iter->first)->second));
 			// fprintf(stderr, "[%s:%s:%d] tensor name: %s, space: %p\n", __FILE__, __func__, __LINE__, tensor_name.c_str(), space);
-
 			stream_buffers_map.insert(std::make_pair(tensor_name, space));
 			signals_map.insert(std::make_pair(tensor_name, signal));
+		}
+	}
+}
+
+static bool isPrefixRelation(const std::string& str1, const std::string& str2) {
+	std::string prefix;
+	std::string main_str;
+
+	if (str1.length() < str2.length()) {
+		prefix = str1;
+		main_str = str2;
+	} else {
+		prefix = str2;
+		main_str = str1;
+	}
+
+	return main_str.compare(0, prefix.size(), prefix) == 0;
+}
+
+void Model::allocateMissingStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> input_size_map, std::map<std::string, nvinfer1::DataType> input_type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map) {
+	// skip the first stage's input and the last stage's output
+	if(stage_id == 0 && is_input_size_map)
+		return;
+	if(stage_id == int(stages.size()-1) && !is_input_size_map)
+		return;
+
+	for(auto iter = input_size_map.begin(); iter != input_size_map.end(); iter++) {
+		std::string tensor_name = iter->first;
+
+		if(stream_buffers_map.find(tensor_name) == stream_buffers_map.end()) {
+			nvinfer1::Dims dims = iter->second;
+			int size = getAllocationSizeByDims(dims);
+			void *space = nullptr;
+			bool *signal = nullptr;
+
+			for (auto iter2 = stream_buffers_map.begin() ; iter2 != stream_buffers_map.end() ; iter2++) {
+				if (input_size_map.find(iter2->first) == input_size_map.end() && isPrefixRelation(tensor_name, iter2->first)) {
+					for(unsigned int prev_stage_id = 0; prev_stage_id < stage_id; prev_stage_id++) {
+						Stage *stage = stages[prev_stage_id];
+						if (stage->output_size_map.find(iter2->first) != stage->output_size_map.end()) {
+							if(size == getAllocationSizeByDims(stage->output_size_map[iter2->first]) && input_type_map[iter->first] == stage->output_type_map[iter2->first]) {
+								space = stream_buffers_map.find(iter2->first)->second;
+								signal = signals_map.find(iter2->first)->second;
+								break;
+							}
+						}
+					}
+
+					if(space != nullptr && signal != nullptr)
+						break;
+				}
+			}
+
+			if (space == nullptr || signal == nullptr) {
+				FatalError("invalid input tensor name: " + tensor_name);
+			}
+
+			stream_buffers_map[tensor_name] = space;
+			signals_map[tensor_name] = signal;
 		}
 	}
 }
@@ -111,16 +181,16 @@ void Model::allocateBuffer() {
 		std::vector<bool*> input_signal;
 		std::vector<bool*> output_signal;
 
-		allocateIOStreamBuffer(stages[0]->input_size_vec, stages[0]->input_type_vec, stream_buffers_map, input_buffer, signals_map, input_signal);
+		allocateIOStreamBuffer(stages[0]->input_size_vec, stages[0]->input_type_map, stream_buffers_map, input_buffer, signals_map, input_signal);
 
 		for(unsigned int stage_id = 0; stage_id < stages.size(); stage_id++) {
 			Stage *stage = stages[stage_id];
 
-			allocateStreamBuffer(stage_id, true, stage->input_size_vec, stage->input_type_vec, stream_buffers_map, signals_map);
-			allocateStreamBuffer(stage_id, false, stage->output_size_vec, stage->input_type_vec, stream_buffers_map, signals_map);
+			allocateStreamBuffer(stage_id, false, stage->output_size_map, stage->output_type_map, stream_buffers_map, signals_map);
+			allocateMissingStreamBuffer(stage_id, true, stage->input_size_map, stage->input_type_map, stream_buffers_map, signals_map);
 		}
 
-		allocateIOStreamBuffer(stages[stages.size()-1]->output_size_vec, stages[stages.size()-1]->output_type_vec, stream_buffers_map, output_buffer, signals_map, output_signal);
+		allocateIOStreamBuffer(stages[stages.size()-1]->output_size_vec, stages[stages.size()-1]->output_type_map, stream_buffers_map, output_buffer, signals_map, output_signal);
 
 		net_input_buffers.push_back(input_buffer);
 		net_output_buffers.push_back(output_buffer);
@@ -159,15 +229,24 @@ void Model::deallocateBuffer() {
 
 		auto stream_buffers_map = all_stream_buffers[buffer_id];
 		auto signals_map = all_signals[buffer_id];
+		std::set<void *> buffer_removed;
 
 		for(auto iter = stream_buffers_map.begin(); iter != stream_buffers_map.end(); iter++) {
 			void *buffer = iter->second;
-			if(buffer != nullptr)
+
+			if(buffer_removed.find(buffer) == buffer_removed.end() && buffer != nullptr) {
 				cudaFree(buffer);
+				buffer_removed.insert(buffer);
+			}
 		}
 
+		std::set<void *> signal_removed;
+
 		for(auto iter = signals_map.begin(); iter != signals_map.end(); iter++) {
-			delete iter->second;
+			if (signal_removed.find(iter->second) == signal_removed.end()) {
+				delete iter->second;
+				signal_removed.insert(iter->second);
+			}
 		}
 	}
 }

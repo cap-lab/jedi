@@ -26,8 +26,6 @@ Stage::Stage(ConfigData *config_data, int instance_id, int stage_id, int start_i
 
 	this->input_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
 	this->output_size_vec = std::vector<std::pair<std::string, nvinfer1::Dims>>();
-	this->input_type_vec = std::vector<std::pair<std::string, nvinfer1::DataType>>();
-	this->output_type_vec = std::vector<std::pair<std::string, nvinfer1::DataType>>();
 
 	this->batch = this->config_data->instances.at(instance_id).batch;
 
@@ -72,8 +70,9 @@ void Stage::createExecutionContext() {
 				}
 				if(iter1 == 0) {
 					std::string _name(name);
+					input_size_map[_name] = dims;
+					input_type_map[_name] = context->getEngine().getTensorDataType(name);
 					input_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
-					input_type_vec.push_back(std::pair<std::string, nvinfer1::DataType>(_name, context->getEngine().getTensorDataType(name)));
 					input_binding_num++;
 				}
 			}
@@ -82,8 +81,9 @@ void Stage::createExecutionContext() {
 
 				if(iter1 == 0) {
 					std::string _name(name);
+					output_size_map[_name] = dims;
+					output_type_map[_name] = context->getEngine().getTensorDataType(name);
 					output_size_vec.push_back(std::pair<std::string, nvinfer1::Dims>(_name, dims));
-					output_type_vec.push_back(std::pair<std::string, nvinfer1::DataType>(_name, context->getEngine().getTensorDataType(name)));
 					output_binding_num++;
 				}
 			}
@@ -155,29 +155,27 @@ uint64_t Stage::getSizeByTensorName(bool isInput, std::string name) {
 	uint64_t size = 1;
 
 	if(isInput) {
-		for(unsigned int iter1 = 0; iter1 < input_size_vec.size(); iter1++) {
-			if(name.compare(input_size_vec[iter1].first) == 0) {
-				dims = input_size_vec[iter1].second;
+		for(auto iter = input_size_map.begin(); iter != input_size_map.end(); iter++) {
+			if(name.compare(iter->first) == 0) {
+				dims = iter->second;
 
 				for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 					size = size * dims.d[iter2];
-
-				size = size * getDataTypeSize(input_type_vec[iter1].second);
+				size = size * getDataTypeSize(input_type_map.find(iter->first)->second);
 				break;
-			}	
+			}
 		}
 	}
 	else {
-		for(unsigned int iter1 = 0; iter1 < output_size_vec.size(); iter1++) {
-			if(name.compare(output_size_vec[iter1].first) == 0) {
-				dims = output_size_vec[iter1].second;
+		for(auto iter = output_size_map.begin(); iter != output_size_map.end(); iter++) {
+			if(name.compare(iter->first) == 0) {
+				dims = iter->second;
 
 				for(int iter2 = 0; iter2 < dims.nbDims; iter2++)
 					size = size * dims.d[iter2];
-
-				size = size * getDataTypeSize(output_type_vec[iter1].second);
+				size = size * getDataTypeSize(output_type_map.find(iter->first)->second);
 				break;
-			}	
+			}
 		}
 	}
 

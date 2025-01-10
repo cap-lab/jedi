@@ -24,7 +24,6 @@ using namespace nvonnxparser;
 
 REGISTER_JEDI_APPLICATION(YoloEnd2EndOnnxApplication);
 
-
 #ifndef FatalError
 #define FatalError(s) {                                                \
     std::stringstream _where, _message;                                \
@@ -139,10 +138,10 @@ IJediNetwork *YoloEnd2EndOnnxApplication::createNetwork(ConfigInstance *basic_co
 #endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
+	jedi_network->quantized_onnx_file_path = onnxAppConfig.quantized_onnx_file_path;
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
-	// TODO: onnx file path
 	parser->parseFromFile(onnxAppConfig.onnx_file_path.c_str(), static_cast<int32_t>(ILogger::Severity::kWARNING));
 	for (int32_t i = 0; i < parser->getNbErrors(); ++i)
 	{

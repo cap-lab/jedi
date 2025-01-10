@@ -59,8 +59,9 @@ class Model {
 		void deallocateBuffer();
 		void deallocateStream();
 
-		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::vector<std::pair<std::string, nvinfer1::DataType>> type_map, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
-		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::vector<std::pair<std::string, nvinfer1::Dims>> size_map, std::vector<std::pair<std::string, nvinfer1::DataType>> type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
+		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
+		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> size_map, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
+		void allocateMissingStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> input_size_map, std::map<std::string, nvinfer1::DataType> input_type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
 		void setBindingForContext(Stage *stage, int stream_id, int buffer_id);
 		void setStreamBuffers(Stage *stage, int stream_id, int buffer_id);
 };
