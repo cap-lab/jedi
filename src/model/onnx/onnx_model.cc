@@ -520,7 +520,13 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 			if (quantized_model_name.length() > 0 && data_type == TYPE_INT8 && device == DEVICE_GPU) {
 				int prev_cut_point_changed = 0, curr_cut_point_changed;
 				if (prev_cut_point > 0) {
+					// Since the +1 value of the cutpoint from the original onnx file and the +1 value of the cutpoint from quantized onnx file can be different, 
+					// we convert the last cutpoint first, and then add 1 to the converted cutpoint.
+					// minus 1 to become the last cutpoint of previous stage
+					prev_cut_point--;
 					prev_cut_point_changed = convertCutpointIndexFromOriginalToQuantizedModel(network, quantized_network, prev_cut_point);
+					// add 1 to become the first cutpoint of the current stage
+					prev_cut_point_changed++;
 				}
 				if (curr_cut_point > 0) {
 					curr_cut_point_changed = convertCutpointIndexFromOriginalToQuantizedModel(network, quantized_network, curr_cut_point);
@@ -881,8 +887,10 @@ void OnnxModel::initializeModel() {
 				for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
 					ITensor *tensor = partial_network->getInput(iter2);
 					Dims tensor_dim = tensor->getDimensions();
-					// change batch size of a dynamic onnx model
-					tensor_dim.d[0] = batch;
+					// change batch size of a dynamic onnx model (this change is only applied at the first stage)
+					if (iter1 == 0) {
+						tensor_dim.d[0] = batch;
+					}
 
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kMIN, tensor_dim);
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kOPT, tensor_dim);

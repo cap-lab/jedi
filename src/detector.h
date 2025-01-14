@@ -19,7 +19,7 @@ void doPostProcessing(void *d);
 
 void doInference(void *d);
 
-void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model);
+void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model, int instance_id, std::vector<long> *latency);
 
 long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<long> latency);
 

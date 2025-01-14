@@ -66,9 +66,8 @@ static int getNewSampleIndex(std::mutex *mu, int *sample_index_global, int sampl
 	return sample_index;
 }
 
-void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model)
+void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model, int instance_id, std::vector<long> *latency)
 {
-	int instance_id = 0;
 	int tid = 0;
 	int sample_index = 0;
 	int sample_offset = config_data.instances.at(instance_id).offset;
@@ -86,6 +85,9 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 
 		auto input_size_vec = model->stages[0]->input_size_vec;
 		int input_tensor_index = 0;
+
+		(*latency)[sample_index - sample_offset] = getTime();
+
 		for (auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++)
 		{
 			int input_size = 1;
@@ -95,7 +97,7 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 				input_size = input_size * dims.d[iter2];
 
 			// input tensor index is needed
-			readData(tid, input_tensor_index, iter->first.c_str(), model->net_input_buffers[0][input_tensor_index], app, input_size, batch, 1, index);
+			readData(0, input_tensor_index, iter->first.c_str(), model->net_input_buffers[0][input_tensor_index], app, input_size, batch, 1, index);
 			input_tensor_index++;
 		}
 
@@ -110,13 +112,12 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 		}
 
 		// no use signals (tmp1) in this version
-		app->postprocessing1(tid, sample_index, output_pointers, model->network_output_number, batch);
-		app->postprocessing2(tid, sample_index, batch);
+		app->postprocessing1(0, sample_index, output_pointers, model->network_output_number, batch);
+		app->postprocessing2(0, sample_index, batch);
 
-		if (tid == 0 && instance_id == 0)
-		{
-			std::cerr << "[TEST | " << (sample_index + 1) << " / " << sample_size << "]\r";
-		}
+		(*latency)[sample_index - sample_offset] = getTime() - (*latency)[sample_index - sample_offset];
+
+		std::cerr << "[TEST | " << (sample_index + 1) << " / " << sample_size << "]\r";
 
 		sample_index += 1;
 	}
@@ -226,15 +227,15 @@ void doPostProcessing(void *d) {
 
 		app->postprocessing1(tid, sample_index, output_pointers, data->model->network_output_number, batch);
 
-		data->model->updateOutputSignals(buffer_index, false);	
+		data->model->updateOutputSignals(buffer_index, false);
 
 		app->postprocessing2(tid, sample_index, batch);
+
+		(*latency)[sample_index - sample_offset] = getTime() - (*latency)[sample_index - sample_offset];
 
 		if(tid == 0 && instance_id == 0) {
 			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
 		}
-
-		(*latency)[sample_index - sample_offset] = getTime() - (*latency)[sample_index - sample_offset];
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 	}

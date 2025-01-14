@@ -24,10 +24,11 @@ bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-P] [-n]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-P] [-n] [-b]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log -b (run as a baseline)"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -P (print layers of the network) "<<std::endl;
 }
 
@@ -139,6 +140,40 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 	inferenceThreads.clear();
 }
 
+static void runBaseline(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name,
+							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
+	long start_time = 0;
+	double inference_time = 0;
+	std::vector<long> latencies[instance_num];
+
+	if(power_file_name.length() != 0) {
+		turnOnTegrastats(std::string(power_file_name));
+	}
+
+	start_time = getTime();
+
+	for(int iter = 0; iter < instance_num; iter++) {
+		int sample_size = config_data.instances.at(iter).sample_size;
+		latencies[iter].assign(sample_size, 0);
+		doInferenceAll(config_data, apps[iter], models[iter], iter, &(latencies[iter]));
+	}
+
+	inference_time = (double)(getTime() - start_time) / 1000000;
+	std::cout<< std::endl <<"inference time: "<<inference_time<<std::endl;
+
+	if(power_file_name.length() != 0) {
+		turnOffTegrastats();
+	}
+
+	if(time_file_name.length() != 0) {
+		writeTimeResultFile(time_file_name, inference_time);
+	}
+
+	for(int iter = 0; iter < instance_num; iter++) {
+		std::cout<< "average latency ("<< iter <<"): " << getAverageLatency(iter, &config_data, latencies[iter]) << std::endl;
+	}
+}
+
 static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name,
 							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
@@ -230,6 +265,7 @@ int main(int argc, char *argv[]) {
 	std::string time_file_name;
 	bool print_network = false;
 	bool load_default_plugins = true;
+	bool run_baseline = false;
 	cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	if(argc == 1) {
@@ -237,7 +273,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "c:r:p:t:h:P")) != -1) {
+	while((option = getopt(argc, argv, "c:r:p:t:h:P:n:b")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
@@ -256,6 +292,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'n':
 				load_default_plugins = false;
+				break;
+			case 'b':
+				run_baseline = true;
 				break;
 			case 'h':
 				printHelpMessage();
@@ -283,7 +322,11 @@ int main(int argc, char *argv[]) {
 		initializePreAndPostprocessing(instance_num, config_data, apps);
 
 		// make threads
-		generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
+		if (run_baseline == false) {
+			generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
+		} else {
+			runBaseline(instance_num, config_data, power_file_name, time_file_name, models, apps);
+		}
 
 		// write file
 		for(int iter = 0; iter < instance_num; iter++)
