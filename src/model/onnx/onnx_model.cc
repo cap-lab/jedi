@@ -546,7 +546,11 @@ static void updateLayerAndOutputType(ILayer *layer, nvinfer1::DataType updatedTy
 	int output_num = layer->getNbOutputs();
 	for(int output_index = 0 ; output_index < output_num  ; output_index++) {
 		nvinfer1::DataType output_type = layer->getOutputType(output_index);
+#if NV_TENSORRT_MAJOR > 8
 		if (output_type != nvinfer1::DataType::kINT64) {
+#else
+		if (output_type != nvinfer1::DataType::kINT32) {
+#endif
 			layer->setOutputType(output_index, updatedType);
 			//layer->getOutput(output_index)->setType(updatedType);
 		}
@@ -601,14 +605,24 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 		}
 		if (is_quantized_onnx == false) {
 			if(data_type == TYPE_INT8 && valueInRange(fp16_ranges, start_cut_point + index) == true) {
+#if NV_TENSORRT_MAJOR > 8
 				if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
 				layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3 /* && layer->getType() != LayerType::kSHUFFLE*/) {
+#else
+				if(layer->getOutputType(0) != nvinfer1::DataType::kINT32 && layer->getType() != LayerType::kPLUGIN &&
+				layer->getType() != LayerType::kPLUGIN_V2) {
+#endif
 					updateLayerAndOutputType(layer, nvinfer1::DataType::kHALF);
 				}
 			}
 			if((data_type == TYPE_INT8 || data_type == TYPE_FP16) && valueInRange(fp32_ranges, start_cut_point + index) == true) {
+#if NV_TENSORRT_MAJOR > 8
 				if(layer->getOutputType(0) != nvinfer1::DataType::kINT64 && layer->getType() != LayerType::kPLUGIN &&
-				layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3/* && layer->getType() != LayerType::kSHUFFLE*/) {
+				layer->getType() != LayerType::kPLUGIN_V2 && layer->getType() != LayerType::kPLUGIN_V3 /* && layer->getType() != LayerType::kSHUFFLE*/) {
+#else
+				if(layer->getOutputType(0) != nvinfer1::DataType::kINT32 && layer->getType() != LayerType::kPLUGIN &&
+				layer->getType() != LayerType::kPLUGIN_V2) {
+#endif
 					updateLayerAndOutputType(layer, nvinfer1::DataType::kFLOAT);
 				}
 			}
