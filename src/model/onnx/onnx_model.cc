@@ -6,6 +6,7 @@
 #include <sstream>
 #include <set>
 #include <algorithm>
+#include <thread>
 #include <libconfig.h++>
 
 #include <NvInfer.h>
@@ -944,6 +945,8 @@ void OnnxModel::initializeModel() {
 				config->setCalibrationProfile(profile);
 				config->setInt8Calibrator(tensorrt_network->calibrator);
 			}
+			unsigned int n = std::thread::hardware_concurrency();
+			partial_builder->setMaxThreads(std::max((unsigned int) 1, n/2));
 
 			IHostMemory *serializedModel = partial_builder->buildSerializedNetwork(*partial_network, *config);
 			assert(serializedModel != nullptr);
