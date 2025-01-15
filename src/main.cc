@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "c:r:p:t:h:P:n:b")) != -1) {
+	while((option = getopt(argc, argv, "Pnbc:r:p:t:h")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
