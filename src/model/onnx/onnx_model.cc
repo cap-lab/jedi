@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <thread>
 #include <libconfig.h++>
+#include <unordered_map>
 
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
@@ -702,6 +703,7 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 
 	if (data_type == TYPE_INT8 && device == DEVICE_GPU) {
 		int net_output_num = network->getNbOutputs();
+		std::unordered_map<ITensor *, ITensor *> tensorsTobeChanged;
 
 		for (int index = 0 ; index < net_output_num ; index++) {
 			printf("output(%d): %s\n", index, network->getOutput(index)->getName());
@@ -716,20 +718,33 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 					for(int output_index = 0 ; output_index < output_num  ; output_index++) {
 						if(layer->getOutput(output_index)->isNetworkOutput()) {
 							ITensor *tensor = layer->getOutput(output_index);
-							IActivationLayer *iMulLayer = network->addActivation(*tensor, nvinfer1::ActivationType::kLEAKY_RELU);
-							iMulLayer->setAlpha(1.0f);
+							IActivationLayer *iActLayer = network->addActivation(*tensor, nvinfer1::ActivationType::kLEAKY_RELU);
+							iActLayer->setAlpha(1.0f);
 
 							std::string old_output = tensor->getName();
 							std::string new_output = tensor->getName();
 							new_output += "_old";
 							tensor->setName(new_output.c_str());
-							//iMulLayer->setPrecision(nvinfer1::DataType::kHALF);
-							iMulLayer->getOutput(0)->setName(old_output.c_str());
-							network->markOutput(*(iMulLayer->getOutput(0)));
+							//iActLayer->setPrecision(nvinfer1::DataType::kHALF);
+							iActLayer->getOutput(0)->setName(old_output.c_str());
+							network->markOutput(*(iActLayer->getOutput(0)));
 							network->unmarkOutput(*(layer->getOutput(output_index)));
+							tensorsTobeChanged[tensor] = iActLayer->getOutput(0);
 							std::cout << "mark output old: " << new_output << std::endl;
 						}
 					}
+				}
+			}
+		}
+
+		for(int index = 0 ; index < layer_num ; index++) {
+			ILayer *layer = network->getLayer(index);
+			int input_num = layer->getNbInputs();
+			for(int input_index = 0 ; input_index < input_num  ; input_index++) {
+				ITensor *tensor = layer->getInput(input_index);
+				if(tensorsTobeChanged.find(tensor) != tensorsTobeChanged.end()) {
+					layer->setInput(input_index, *(tensorsTobeChanged.find(tensor)->second));
+					break;
 				}
 			}
 		}
