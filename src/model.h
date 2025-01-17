@@ -16,8 +16,6 @@
 class Model {
 	public:
 		//InputDim input_dim;
-		int total_input_size;
-
 		std::vector<Stage *> stages;
         std::vector<std::map<std::string, void*>> all_stream_buffers;
         std::vector<std::map<std::string, bool*>> all_signals;

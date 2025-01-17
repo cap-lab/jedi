@@ -825,7 +825,6 @@ void OnnxModel::printModel() {
 
 void OnnxModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
-	int batch = config_data->instances.at(instance_id).batch;
 	TensorRTNetwork *tensorrt_network = nullptr;
 	IBuilder *builder = nullptr;
 	INetworkDefinition *network = nullptr;
@@ -837,14 +836,6 @@ void OnnxModel::initializeModel() {
 	network = tensorrt_network->network;
 	setUnnamedLayerAndTensorName(network, 0);
 	tensorrt_network->printNetwork();
-
-	ITensor *tensor = network->getInput(0);
-	Dims tensor_dim = tensor->getDimensions();
-	
-	total_input_size = 1;
-	for(int iter1 = 0 ; iter1 < tensor_dim.nbDims ; iter1++) {
-		total_input_size *= tensor_dim.d[iter1];
-	}
 
 	std::vector<std::string> onnx_file_name_vec;	
 	separateOnnxFile(network, tensorrt_network->onnx_file_path, tensorrt_network->quantized_onnx_file_path, onnx_file_name_vec);
@@ -917,11 +908,6 @@ void OnnxModel::initializeModel() {
 				for(int iter2 = 0; iter2 < partial_network->getNbInputs(); iter2++) {
 					ITensor *tensor = partial_network->getInput(iter2);
 					Dims tensor_dim = tensor->getDimensions();
-					// change batch size of a dynamic onnx model (this change is only applied at the first stage)
-					if (iter1 == 0) {
-						tensor_dim.d[0] = batch;
-					}
-
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kMIN, tensor_dim);
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kOPT, tensor_dim);
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);

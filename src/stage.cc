@@ -51,7 +51,11 @@ void Stage::createExecutionContext() {
 	for(int iter1 = 0; iter1 < stream_num; iter1++) {
 		int size = engines.size();
 		int index = size == 1 ? 0 : iter1 % DLA_NUM;
+#if NV_TENSORRT_MAJOR > 9
+		bool isImplicit = false;
+#else
 		bool isImplicit = engines[index]->hasImplicitBatchDimension();
+#endif
 
 		nvinfer1::IExecutionContext *context = engines[index]->createExecutionContext();
 		assert(context);

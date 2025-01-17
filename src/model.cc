@@ -144,7 +144,7 @@ void Model::allocateMissingStreamBuffer(int stage_id, int is_input_size_map, std
 
 			for (auto iter2 = stream_buffers_map.begin() ; iter2 != stream_buffers_map.end() ; iter2++) {
 				if (input_size_map.find(iter2->first) == input_size_map.end() && isPrefixRelation(tensor_name, iter2->first)) {
-					for(unsigned int prev_stage_id = 0; prev_stage_id < stage_id; prev_stage_id++) {
+					for(int prev_stage_id = 0; prev_stage_id < stage_id; prev_stage_id++) {
 						Stage *stage = stages[prev_stage_id];
 						if (stage->output_size_map.find(iter2->first) != stage->output_size_map.end()) {
 							if(size == getAllocationSizeByDims(stage->output_size_map[iter2->first]) && input_type_map[iter->first] == stage->output_type_map[iter2->first]) {
@@ -331,7 +331,7 @@ bool Model::checkInputConsumed(int device_id, int stream_id) {
 void Model::initializeStreams(int device_id) {
 	Stage *stage = stages[device_id];
 
-	for(int iter = 0 ; iter < stage->streams.size() ; iter++) {
+	for(size_t iter = 0 ; iter < stage->streams.size() ; iter++) {
 		cudaStreamSynchronize(stage->streams[iter]);
 	}
 }

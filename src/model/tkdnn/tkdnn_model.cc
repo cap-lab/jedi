@@ -209,7 +209,6 @@ void TkdnnModel::printModel() {
 void TkdnnModel::initializeModel() {
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int start_index = 0;
-	int batch = config_data->instances.at(instance_id).batch;
 
 	// parse a network using tkDNN darknetParser
 	tkdnn_network = dynamic_cast<TkdnnNetwork *>(app->createNetwork(&(config_data->instances.at(instance_id))));
@@ -219,8 +218,6 @@ void TkdnnModel::initializeModel() {
 	//input_dim.width = net->input_dim.w;
 	//input_dim.height = net->input_dim.h;
 	//input_dim.channel = net->input_dim.c;
-	//
-	total_input_size = net->input_dim.w * net->input_dim.h * net->input_dim.c * batch;
 	setMaxBatchSize();
 
 	for(int iter1 = 0; iter1 < device_num; iter1++) {
