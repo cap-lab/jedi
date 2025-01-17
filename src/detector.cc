@@ -68,7 +68,6 @@ static int getNewSampleIndex(std::mutex *mu, int *sample_index_global, int sampl
 
 void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model, int instance_id, std::vector<long> *latency)
 {
-	int tid = 0;
 	int sample_index = 0;
 	int sample_offset = config_data.instances.at(instance_id).offset;
 	int sample_size = config_data.instances.at(instance_id).sample_size;
@@ -104,6 +103,7 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 		for (int iter = 0; iter < device_num; iter++)
 		{
 			model->infer(iter, 0, 0);
+			model->waitUntilInferenceDone(0, 0);
 		}
 
 		for (int iter = 0; iter < model->network_output_number; iter++)
@@ -173,7 +173,6 @@ void doPreProcessing(void *d) {
 			readData(tid, input_tensor_index, iter->first.c_str(), data->model->net_input_buffers[buffer_index][input_tensor_index], app, input_size, batch, batch_thread_num, index);
 			input_tensor_index++;
 		}
-		//readData(tid, data->model->net_input_buffers[buffer_index][0], app, data->model->total_input_size, batch, batch_thread_num, index);
 		data->model->updateInputSignals(buffer_index, true);	
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
