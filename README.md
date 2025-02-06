@@ -5,6 +5,22 @@ JEDI is a simple framework to apply various parallelization techniques on tkDNN-
 
 The main goal of this tool is applying various parallelization techniques to maximize the throughput of deep learning applications. 
 
+If you use JEDI in your research, please cite the [following paper](https://dl.acm.org/doi/10.1145/3508391).
+
+```
+@article{10.1145/3508391,
+author = {Jeong, EunJin and Kim, Jangryul and Ha, Soonhoi},
+title = {TensorRT-Based Framework and Optimization Methodology for Deep Learning Inference on Jetson Boards},
+year = {2022},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+issn = {1539-9087},
+url = {https://doi.org/10.1145/3508391},
+doi = {10.1145/3508391},
+journal = {ACM Trans. Embed. Comput. Syst.},
+}
+```
+
 ## Applied Deep Learning Acceleration Techniques
 - Preprocessing parallelization
 - Postprocessing parallelization
@@ -15,38 +31,39 @@ The main goal of this tool is applying various parallelization techniques to max
 - INT8 quantization on pipelined networks
 - Batch
 
-## FPS Results
+## FPS Results (Latest)
 
 - Test environment: NVIDIA Jetson AGX Xavier (MAXN mode with jetson_clocks), Jetpack 4.3
 - Input image size: 416x416
+- The recent experiments are tested with opencv_parallel_num = 0 option. 
 
 ### FP16
 
 | Network |  Baseline GPU | GPU with JEDI |  GPU + DLA with JEDI | 
 | :------:  | :-----:  | :-----:  | :-----:  |
-| Yolov2 relu | 78  | 177 | **289** |
-| Yolov2tiny relu | 97 | 566 | **618** |
-| Yolov3 relu | 51 | 87 | **132** |
-| Yolov3tiny relu | 110 | 580 | **670** |
-| Yolov4 relu | 46 | 83 | **123** |
-| Yolov4tiny relu | 111 | **596** | **602** |
-| Yolov4csp relu | 42 | 94 | **142** |
-| CSPNet relu | 41 | 64 | **80** |
-| Densenet+Yolo relu | 46 | 86 | **119** |
+| Yolov2 relu | 74  | 187 | **295** |
+| Yolov2tiny relu | 91 | 625 | **701** |
+| Yolov3 relu | 50 | 85 | **128** |
+| Yolov3tiny relu | 102 | 614 | **729** |
+| Yolov4 relu | 45 | 81 | **128** |
+| Yolov4tiny relu | 103 | **620** | **598** |
+| Yolov4csp relu | 41 | 94 | **141** |
+| CSPNet relu | 40 | 65 | **80** |
+| Densenet+Yolo relu | 44 | 86 | **118** |
 
 ### INT8
 
 | Network |  Baseline GPU | GPU with JEDI |  GPU + DLA with JEDI | 
 | :------:  | :-----:  | :-----:  | :-----:  |
-| Yolov2 relu | 97 | 395 | **485** |
-| Yolov2tiny relu | 103 | **663** | 612 |
-| Yolov3 relu | 70 | 167 | **233** |
-| Yolov3tiny relu | 119 | **762** | 672 |
-| Yolov4 relu | 61 | 158 | **208** |
-| Yolov4tiny relu | 116 | **728** | 672 |
-| Yolov4csp relu | 50 | 177 | **236** |
-| CSPNet relu | 66 | **149** | **150** |
-| Densenet+Yolo relu | 62 | 183 | **225** |
+| Yolov2 relu | 90 | 401 | **502** |
+| Yolov2tiny relu | 96 | **749** | - |
+| Yolov3 relu | 67 | 169 | **222** |
+| Yolov3tiny relu | 110 | **833** | - |
+| Yolov4 relu | 59 | 156 | **216** |
+| Yolov4tiny relu | 108 | **810** | - |
+| Yolov4csp relu | 49 | 180 | **233** |
+| CSPNet relu | 63 | **145** | **147** |
+| Densenet+Yolo relu | 61 | 186 | **230** |
 
 ## FPS Results (Old)
 
