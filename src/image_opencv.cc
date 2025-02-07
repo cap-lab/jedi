@@ -6,6 +6,7 @@
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/video/video.hpp>
+#include <fstream>
 
 // includes for OpenCV >= 3.x
 #ifndef CV_VERSION_EPOCH
@@ -29,6 +30,9 @@ typedef void* mat_cv;
 
 float imagenet_mean[IMAGE_COLOR_NUM] = {0.485, 0.456, 0.406};
 float imagenet_std[IMAGE_COLOR_NUM] = {0.229, 0.224, 0.225};
+
+float imagenet_mean_255[IMAGE_COLOR_NUM] = {123.6750, 116.2800, 103.5300};
+float imagenet_std_255[IMAGE_COLOR_NUM] = {58.3950, 57.1200, 57.3750};
 
 static mat_cv *load_image_mat_cv(const char *filename, int flag)
 {
@@ -377,21 +381,60 @@ void loadImageResizeNorm(std::string filename, int w, int h, int c, int *orig_wi
 	}
 }
 
+void _compute_resized_output_size(int *height, int *width, int size)
+{
+	// Torchvision style: torchvision/transforms/functional.py:353
+	// int short_ = std::min(height, width);
+	// int long_ = std::max(height, width);
+	// int requested_new_short = 256;
+	// int new_short = requested_new_short;
+	// int new_long = (int)((requested_new_short * long_) / (float)short_);
+
+	// *new_width = width <= height ? new_short : new_long;
+	// *new_height = width <= height ? new_long : new_short;
+
+	int orig_height = *height;
+	int orig_width = *width;
+	if (orig_width > orig_height) {
+		*height = size;
+		*width = (size * orig_width) / orig_height;
+	}
+	else {
+		*width = size;
+		*height = (size * orig_height) / orig_width;
+	}
+}
+
 void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input, float mean[IMAGE_COLOR_NUM], float std[IMAGE_COLOR_NUM])
 {
 	try {
 		cv::Mat input_image = cv::imread(filename);
 
 		cv::Mat output_image;    
-		cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_LINEAR);
-		//cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_CUBIC);
-		cv::cvtColor(output_image, output_image, cv::COLOR_BGR2RGB);
+		cv::cvtColor(input_image, output_image, cv::COLOR_BGR2RGB); // PIL style
 		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
 
-		int offsetW = (output_image.cols - crop_size) / 2;
-		int offsetH = (output_image.rows - crop_size) / 2;
+		// save output_image as a binary file
+		// std::string filename = "output_image.bin";
+		// std::ofstream out(filename, std::ios::binary);
+		// out.write((char *)output_image.data, output_image.total() * output_image.elemSize());
+		// out.close();
+
+		int image_height = input_image.rows;
+		int image_width = input_image.cols;
+		int size = w; // 256
+		_compute_resized_output_size(&image_height, &image_width, size);
+
+		cv::resize(output_image, output_image, cv::Size(image_width, image_height), 0, 0, cv::INTER_LINEAR);
+		//cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_CUBIC);
+
+		// Center crop
+		int offsetW = (image_width - crop_size) / 2;  // crop_left
+		int offsetH = (image_height - crop_size) / 2; // crop_top
 		const cv::Rect roi(offsetW, offsetH, crop_size, crop_size);
 		output_image = output_image(roi).clone();
+
+		// Convert to float
 		output_image.convertTo(output_image, CV_32FC3, 1.0 / 255.0);
 
 		int height = output_image.rows;
