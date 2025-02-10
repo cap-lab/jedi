@@ -77,7 +77,6 @@ void ImageClsOnnxApplication::readImagePreprocessingOption(libconfig::Setting &s
 		}
 		else if (data == "letterbox") {
 			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_LETTERBOX;
-
 		}
 		else if(data == "resize_norm") {
 			imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE_NORM;
@@ -100,6 +99,34 @@ void ImageClsOnnxApplication::readImagePreprocessingOption(libconfig::Setting &s
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		std::cerr << "No 'image_preprocessing' setting in configuration file. Set resize as a default." << std::endl;
 		imageClsOnnxAppConfig.preprocessing_option = LOAD_IMAGE_RESIZE;
+	}
+}
+
+void ImageClsOnnxApplication::readInterpolationOption(libconfig::Setting &setting) {
+	try{
+		const char *tmp = setting["resize_interpolation"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+
+		if (data == "opencv_linear") {
+			imageClsOnnxAppConfig.interpolation = RESIZE_OPENCV_LINEAR;
+		}
+		else if (data == "pillow_bilinear") {
+			imageClsOnnxAppConfig.interpolation = RESIZE_PILLOW_BILINEAR;
+		}
+		else if(data == "pillow_bicubic") {
+			imageClsOnnxAppConfig.interpolation = RESIZE_PILLOW_BICUBIC;
+		}
+		else if(data == "opencv_area") {
+			imageClsOnnxAppConfig.interpolation = RESIZE_OPENCV_AREA;
+		}
+
+		std::cerr<<"resize_interpolation: "<< data <<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'resize_interpolation' setting in configuration file. Set opencv_linear resize as a default." << std::endl;
+		imageClsOnnxAppConfig.interpolation = RESIZE_OPENCV_LINEAR;
 	}
 }
 
@@ -212,6 +239,7 @@ void ImageClsOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readCalibImagePath(setting);
 	readCalibImagesNum(setting);
 	readImagePreprocessingOption(setting);
+	readInterpolationOption(setting);
 	readImageNormalizeMeanOption(setting);
 	readImageNormalizeStdOption(setting);
 }
@@ -266,7 +294,8 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	//dataDim_t dim(basic_config_data->batch,tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE,
 											imageClsOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_image_path,
-											imageClsOnnxAppConfig.preprocessing_option, imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
+											imageClsOnnxAppConfig.preprocessing_option, imageClsOnnxAppConfig.interpolation,
+											imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
 	jedi_network->calibrator = calibrator;
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
@@ -310,8 +339,8 @@ void ImageClsOnnxApplication::preprocessing(int thread_id, int input_tensor_inde
 									imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 			break;
 		case LOAD_IMAGE_RESIZE_CROP_NORM:
-			loadImageResizeCropNorm((char *)(image_data->path.c_str()), input_dim.width + 32, input_dim.height + 32, input_dim.channel, input_dim.width, input_buffer,
-									imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std); // efficient former
+			loadImageResizeCropNorm((char *)(image_data->path.c_str()), input_dim.width + 32, input_dim.height + 32, input_dim.channel, input_dim.width,
+									imageClsOnnxAppConfig.interpolation, input_buffer, imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std); // efficient former
 			break;
 		case LOAD_IMAGE_RESIZE_CROP:
 			loadImageResizeCrop((char *)(image_data->path.c_str()), input_dim.width, input_dim.height, input_dim.channel, input_buffer); // efficient net

@@ -22,6 +22,8 @@
 #include <opencv2/core/version.hpp>
 #endif
 
+#include <PillowResize/PillowResize.hpp>
+
 #include "variable.h"
 #include "image.h"
 #include "image_opencv.h"
@@ -405,28 +407,34 @@ void _compute_resized_output_size(int *height, int *width, int size)
 	}
 }
 
-void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, float *input, float mean[IMAGE_COLOR_NUM], float std[IMAGE_COLOR_NUM])
+void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop_size, ResizeInterpolationOption interpolation, float *input, float mean[IMAGE_COLOR_NUM], float std[IMAGE_COLOR_NUM])
 {
 	try {
 		cv::Mat input_image = cv::imread(filename);
-
-		cv::Mat output_image;    
-		cv::cvtColor(input_image, output_image, cv::COLOR_BGR2RGB); // PIL style
+		cv::Mat output_image_temp;
+		cv::Mat output_image;
+		cv::cvtColor(input_image, output_image_temp, cv::COLOR_BGR2RGB); // PIL style
 		//cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
-
-		// save output_image as a binary file
-		// std::string filename = "output_image.bin";
-		// std::ofstream out(filename, std::ios::binary);
-		// out.write((char *)output_image.data, output_image.total() * output_image.elemSize());
-		// out.close();
 
 		int image_height = input_image.rows;
 		int image_width = input_image.cols;
 		int size = w; // 256
 		_compute_resized_output_size(&image_height, &image_width, size);
 
-		cv::resize(output_image, output_image, cv::Size(image_width, image_height), 0, 0, cv::INTER_LINEAR);
-		//cv::resize(input_image, output_image, cv::Size(w, h), 0, 0, cv::INTER_CUBIC);
+		switch(interpolation) {
+			case RESIZE_OPENCV_AREA:
+				cv::resize(output_image_temp, output_image, cv::Size(image_width, image_height), 0, 0, cv::INTER_AREA);
+				break;
+			case RESIZE_OPENCV_LINEAR:
+				cv::resize(output_image_temp, output_image, cv::Size(image_width, image_height), 0, 0, cv::INTER_LINEAR);
+				break;
+			case RESIZE_PILLOW_BILINEAR:
+				output_image = PillowResize::resize(output_image_temp, cv::Size(image_width, image_height), PillowResize::INTERPOLATION_BILINEAR);
+				break;
+			case RESIZE_PILLOW_BICUBIC:
+				output_image = PillowResize::resize(output_image_temp, cv::Size(image_width, image_height), PillowResize::INTERPOLATION_BICUBIC);
+				break;
+		}
 
 		// Center crop
 		int offsetW = (image_width - crop_size) / 2;  // crop_left
@@ -448,6 +456,12 @@ void loadImageResizeCropNorm(std::string filename, int w, int h, int c, int crop
 				}
 			}
 		}
+
+		// save output_image as a binary file
+		// std::string filename = "output_image.bin";
+		// std::ofstream out(filename, std::ios::binary);
+		// out.write((char *)input, output_image.total() * output_image.elemSize());
+		// out.close();
 	}
 	catch (...) {
 		std::cerr << " OpenCV exception: loadImageResizeCropNorm() can't load image %s " << filename << std::endl;

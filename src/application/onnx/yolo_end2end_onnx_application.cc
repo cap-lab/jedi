@@ -17,7 +17,7 @@
 
 #include "yolo_end2end_onnx_application.h"
 
-#define CALIBRATION_BATCH_SIZE (16)
+#define CALIBRATION_BATCH_SIZE (1)
 
 using namespace nvinfer1;
 using namespace nvonnxparser; 

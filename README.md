@@ -93,15 +93,16 @@ This result is based on the old version of this software. (The target version is
 
 ## Supported Platforms
 
-- NVIDIA Jetson boards are supported. (Tested on NVIDIA Jetson AGX Xavier and NVIDIA Jetson Xavier NX)
+- NVIDIA Jetson boards are supported. (Tested on NVIDIA Jetson AGX Orin)
 
 ## Prerequisite
 
 - Forked [tkDNN](https://github.com/urmydata/tkDNN)
 - All dependencies required by tkDNN
-- Jetpack 4.3 or higher
+- Jetpack 6.1 or higher (Tested with TensorRT 10.7)
 - libconfig++
 - OpenMP
+- [PillowResize](https://github.com/zurutech/pillow-resize)
 
 ## How to Compile JEDI
 
