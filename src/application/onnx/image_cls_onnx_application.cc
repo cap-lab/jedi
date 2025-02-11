@@ -151,7 +151,7 @@ void ImageClsOnnxApplication::readImageNormalizeMeanOption(libconfig::Setting &s
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		std::cerr << "No 'image_norm_mean' setting in configuration file. Set "
-		<< imagenet_mean[0] << "," << imagenet_mean[1] << "," << imagenet_mean[2] << "as a default." << std::endl;
+		<< imagenet_mean[0] << "," << imagenet_mean[1] << "," << imagenet_mean[2] << " as a default." << std::endl;
 		memcpy(imageClsOnnxAppConfig.mean, imagenet_mean, IMAGE_COLOR_NUM * sizeof(float));
 	}
 }
@@ -178,7 +178,7 @@ void ImageClsOnnxApplication::readImageNormalizeStdOption(libconfig::Setting &se
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		std::cerr << "No 'image_norm_std' setting in configuration file. Set "
-		<< imagenet_std[0] << "," << imagenet_std[1] << "," << imagenet_std[2] << "as a default." << std::endl;
+		<< imagenet_std[0] << "," << imagenet_std[1] << "," << imagenet_std[2] << " as a default." << std::endl;
 		memcpy(imageClsOnnxAppConfig.std, imagenet_std, IMAGE_COLOR_NUM * sizeof(float));
 	}
 }
