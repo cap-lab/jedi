@@ -14,8 +14,16 @@
 #include <fstream>
 #include <iomanip>
 
-#include "utils.h"
+#include "cuda_jedi.h"
 #include "lidar_dataset.h"
+
+#ifndef NOEXCEPT
+	#if NV_TENSORRT_MAJOR > 7
+		#define NOEXCEPT noexcept
+	#else
+		#define NOEXCEPT
+	#endif
+#endif
 
 /*
  * Int8PillarEntropyCalibrator implements the INT8 calibrator to achieve the
@@ -28,7 +36,7 @@ public:
                             const std::string calibTableFilePath, bool readCache = true);
 	virtual ~Int8PillarEntropyCalibrator() { 
 		for (auto iter = bindingMap.begin() ; iter !=  bindingMap.end(); iter++) {
-			checkCuda(cudaFree(iter->second)); 
+			check_error(cudaFree(iter->second)); 
 		}
 		if(calibLidarSet != nullptr) {
 			delete calibLidarSet;

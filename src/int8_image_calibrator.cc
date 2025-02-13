@@ -10,14 +10,14 @@ Int8ImageEntropyCalibrator::Int8ImageEntropyCalibrator(ImageBatchStream& stream,
     mReadCache(readCache) {
     nvinfer1::Dims4 dims = mStream.getDims();
     mInputCount = mStream.getBatchSize()*dims.d[1]*dims.d[2]*dims.d[3];
-    checkCuda(cudaMalloc(&mDeviceInput, mInputCount * sizeof(float)));
+    check_error(cudaMalloc(&mDeviceInput, mInputCount * sizeof(float)));
 }
 
 bool Int8ImageEntropyCalibrator::getBatch(void* bindings[], const char* names[], int nbBindings) NOEXCEPT {
     if (!mStream.next())
         return false;
 
-    checkCuda(cudaMemcpy(mDeviceInput, mStream.getBatch(), mInputCount * sizeof(float), cudaMemcpyHostToDevice));
+    check_error(cudaMemcpy(mDeviceInput, mStream.getBatch(), mInputCount * sizeof(float), cudaMemcpyHostToDevice));
     assert(!strcmp(names[0], mInputBlobName.c_str()));
 	//std::cout << "left: " << names[0] << ", right: " << mInputBlobName << std::endl;
 	bindings[0] = mDeviceInput;

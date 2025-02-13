@@ -8,14 +8,21 @@
 #include <stdint.h>
 #include <iostream>
 #include <string>
-#include "NvInfer.h"
+#include <NvInfer.h>
 
 #include <fstream>
 #include <iomanip>
 
+#include "cuda_jedi.h"
 #include "int8_image_batch_stream.h"
 
-#include "utils.h"
+#ifndef NOEXCEPT
+	#if NV_TENSORRT_MAJOR > 7
+		#define NOEXCEPT noexcept
+	#else
+		#define NOEXCEPT
+	#endif
+#endif
 
 /*
  * Int8ImageEntropyCalibrator implements the INT8 calibrator to achieve the
@@ -28,7 +35,7 @@ class Int8ImageEntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator2 {
 public:
 	Int8ImageEntropyCalibrator(ImageBatchStream& stream, int firstBatch, const std::string& calibTableFilePath, 
 							const std::string& inputBlobName, bool readCache = true);
-	virtual ~Int8ImageEntropyCalibrator() { checkCuda(cudaFree(mDeviceInput)); }
+	virtual ~Int8ImageEntropyCalibrator() { check_error(cudaFree(mDeviceInput)); }
 	int getBatchSize() const NOEXCEPT override { return mStream.getBatchSize(); }
 	bool getBatch(void* bindings[], const char* names[], int nbBindings) NOEXCEPT override;
 	const void* readCalibrationCache(size_t& length) NOEXCEPT override;

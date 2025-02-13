@@ -30,7 +30,7 @@ Int8PillarEntropyCalibrator::Int8PillarEntropyCalibrator(nvinfer1::INetworkDefin
             input_size *= sizeof(short);
         }
 
-        checkCuda(cudaMalloc(&bufPtr, input_size * mBatch));
+        check_error(cudaMalloc(&bufPtr, input_size * mBatch));
 
         std::cout << "calib tensor print: " << tensor_input->getName() << ", buf_ptr: " << bufPtr << ", size: " << input_size << std::endl;
 
@@ -80,12 +80,12 @@ bool Int8PillarEntropyCalibrator::getBatch(void* bindings[], const char* names[]
 
     for(int i = 0 ; i < nbBindings ; i++) {
         if(strcmp(names[i], "onnx::MatMul_0") == 0) {
-            checkCuda(cudaMemcpy(bindingMap[names[i]], featureBuf, featureSize * mBatch, cudaMemcpyHostToDevice));
+            check_error(cudaMemcpy(bindingMap[names[i]], featureBuf, featureSize * mBatch, cudaMemcpyHostToDevice));
             std::cout << "calib feature print("<< i <<"): " << names[i] << ", binding_ptr: " << bindingMap[names[i]] << ", size: " << featureSize << std::endl;
             bindings[i] = bindingMap[names[i]];
         }
         else if(strcmp(names[i], "indices_input") == 0) {
-            checkCuda(cudaMemcpy(bindingMap[names[i]], indiceBuf, indiceSize * mBatch, cudaMemcpyHostToDevice));
+            check_error(cudaMemcpy(bindingMap[names[i]], indiceBuf, indiceSize * mBatch, cudaMemcpyHostToDevice));
             std::cout << "calib indices print("<< i <<"): " << names[i] << ", binding_ptr: " << bindingMap[names[i]] << ", size: " << indiceSize << std::endl;
             bindings[i] = bindingMap[names[i]];
         }
