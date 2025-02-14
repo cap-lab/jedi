@@ -738,11 +738,6 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 				if(prevlayer->getType() == nvinfer1::LayerType::kACTIVATION) {
 					addNetworkOutputNodeToLeakyRelu(layer, network, tensorsTobeChanged);
 				}
-			} else if (layer->getType() == nvinfer1::LayerType::kACTIVATION && index > 0) {
-				IActivationLayer *actLayer = (IActivationLayer *) layer;
-				if(actLayer->getActivationType() == nvinfer1::ActivationType::kSIGMOID) {
-					addNetworkOutputNodeToLeakyRelu(layer, network, tensorsTobeChanged);
-				}
 			}
 		}
 
