@@ -559,6 +559,28 @@ static void updateLayerAndOutputType(ILayer *layer, nvinfer1::DataType updatedTy
 	}
 }
 
+static void addNetworkOutputNodeToLeakyRelu(ILayer *layer, INetworkDefinition *network, std::unordered_map<ITensor *, ITensor *> &tensorsTobeChanged) {
+	int output_num = layer->getNbOutputs();
+	for(int output_index = 0 ; output_index < output_num  ; output_index++) {
+		if(layer->getOutput(output_index)->isNetworkOutput()) {
+			ITensor *tensor = layer->getOutput(output_index);
+			IActivationLayer *iActLayer = network->addActivation(*tensor, nvinfer1::ActivationType::kLEAKY_RELU);
+			iActLayer->setAlpha(1.0f);
+
+			std::string old_output = tensor->getName();
+			std::string new_output = tensor->getName();
+			new_output += "_old";
+			tensor->setName(new_output.c_str());
+			//iActLayer->setPrecision(nvinfer1::DataType::kHALF);
+			iActLayer->getOutput(0)->setName(old_output.c_str());
+			network->markOutput(*(iActLayer->getOutput(0)));
+			network->unmarkOutput(*(layer->getOutput(output_index)));
+			tensorsTobeChanged[tensor] = iActLayer->getOutput(0);
+			std::cout << "mark output old: " << new_output << std::endl;
+		}
+	}
+}
+
 
 IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string onnx_file_name, bool is_quantized_onnx, IBuilder* &builder, INetworkDefinition* &network, IParser* &parser) {
 	int data_type = config_data->instances.at(instance_id).data_types.at(cur_iter);
@@ -714,25 +736,12 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 			if(layer->getType() == nvinfer1::LayerType::kELEMENTWISE && index > 0){
 				ILayer *prevlayer = network->getLayer(index-1);
 				if(prevlayer->getType() == nvinfer1::LayerType::kACTIVATION) {
-					int output_num = layer->getNbOutputs();
-					for(int output_index = 0 ; output_index < output_num  ; output_index++) {
-						if(layer->getOutput(output_index)->isNetworkOutput()) {
-							ITensor *tensor = layer->getOutput(output_index);
-							IActivationLayer *iActLayer = network->addActivation(*tensor, nvinfer1::ActivationType::kLEAKY_RELU);
-							iActLayer->setAlpha(1.0f);
-
-							std::string old_output = tensor->getName();
-							std::string new_output = tensor->getName();
-							new_output += "_old";
-							tensor->setName(new_output.c_str());
-							//iActLayer->setPrecision(nvinfer1::DataType::kHALF);
-							iActLayer->getOutput(0)->setName(old_output.c_str());
-							network->markOutput(*(iActLayer->getOutput(0)));
-							network->unmarkOutput(*(layer->getOutput(output_index)));
-							tensorsTobeChanged[tensor] = iActLayer->getOutput(0);
-							std::cout << "mark output old: " << new_output << std::endl;
-						}
-					}
+					addNetworkOutputNodeToLeakyRelu(layer, network, tensorsTobeChanged);
+				}
+			} else if (layer->getType() == nvinfer1::LayerType::kACTIVATION && index > 0) {
+				IActivationLayer *actLayer = (IActivationLayer *) layer;
+				if(actLayer->getActivationType() == nvinfer1::ActivationType::kSIGMOID) {
+					addNetworkOutputNodeToLeakyRelu(layer, network, tensorsTobeChanged);
 				}
 			}
 		}
