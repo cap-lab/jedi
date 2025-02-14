@@ -9,7 +9,9 @@
 
 #include "variable.h"
 #include "config.h"
+#include "buffer_signal.h"
 #include "stage.h"
+
 
 #include "inference_application.h"
 
@@ -18,13 +20,13 @@ class Model {
 		//InputDim input_dim;
 		std::vector<Stage *> stages;
         std::vector<std::map<std::string, void*>> all_stream_buffers;
-        std::vector<std::map<std::string, bool*>> all_signals;
+        std::vector<std::map<std::string, BufferSignal*>> all_signals;
 
 
 		std::vector<std::vector<void *>> net_input_buffers;
 		std::vector<std::vector<void *>> net_output_buffers;
-		std::vector<std::vector<bool *>> net_input_signals;
-		std::vector<std::vector<bool *>> net_output_signals;
+		std::vector<std::vector<BufferSignal *>> net_input_signals;
+		std::vector<std::vector<BufferSignal *>> net_output_signals;
 		int network_output_number;
 
 		Model(ConfigData *config_data, int instance_id, IInferenceApplication *app);
@@ -57,9 +59,9 @@ class Model {
 		void deallocateBuffer();
 		void deallocateStream();
 
-		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, bool*>& signals_map, std::vector<bool*>& signals);
-		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> size_map, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
-		void allocateMissingStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> input_size_map, std::map<std::string, nvinfer1::DataType> input_type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, bool*>& signals_map);
+		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, BufferSignal*>& signals_map, std::vector<BufferSignal*>& signals);
+		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> size_map, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, BufferSignal*>& signals_map);
+		void allocateMissingStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> input_size_map, std::map<std::string, nvinfer1::DataType> input_type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, BufferSignal*>& signals_map);
 		void setBindingForContext(Stage *stage, int stream_id, int buffer_id);
 		void setStreamBuffers(Stage *stage, int stream_id, int buffer_id);
 };

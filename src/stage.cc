@@ -216,9 +216,9 @@ void Stage::setTensorAllocators(int buffer_id, std::map<std::string, void*> stre
 		this->tensor_allocators[buffer_id] = tensor_allocator;
 }
 
-void Stage::setSignals(int buffer_id, std::map<std::string, bool*> signals_map) {
-	std::vector<bool *> input_signals;
-	std::vector<bool *> output_signals;
+void Stage::setSignals(int buffer_id, std::map<std::string, BufferSignal*> signals_map) {
+	std::vector<BufferSignal *> input_signals;
+	std::vector<BufferSignal *> output_signals;
 
 	for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
 		std::string tensor_name = iter->first;
@@ -243,16 +243,16 @@ void Stage::setSignals(int buffer_id, std::map<std::string, bool*> signals_map) 
 }
 
 bool Stage::isRunnable(int buffer_id) {
-	std::vector<bool *> input_signals = stage_input_signals[buffer_id];
-	std::vector<bool *> output_signals = stage_output_signals[buffer_id];
+	std::vector<BufferSignal *> input_signals = stage_input_signals[buffer_id];
+	std::vector<BufferSignal *> output_signals = stage_output_signals[buffer_id];
 
 	for(unsigned int iter = 0; iter < input_signals.size(); iter++) {
-		if(*(input_signals[iter]) == false)	
+		if(input_signals[iter]->isSignalSet() == false)
 			return false;
 	}
 
 	for(unsigned int iter = 0; iter < output_signals.size(); iter++) {
-		if(*(output_signals[iter]) == true)
+		if(output_signals[iter]->isSignalSet() == true)
 			return false;	
 	}
 
@@ -260,18 +260,18 @@ bool Stage::isRunnable(int buffer_id) {
 }
 
 void Stage::updateInputSignals(int buffer_id, bool value) {
-	std::vector<bool *> input_signals = stage_input_signals[buffer_id];
+	std::vector<BufferSignal *> input_signals = stage_input_signals[buffer_id];
 
 	for(unsigned int iter = 0; iter < input_signals.size(); iter++) {
-		*(input_signals[iter]) = value;	
+		input_signals[iter]->updateSignal(value);
 	}
 }
 
 void Stage::updateOutputSignals(int buffer_id, bool value) {
-	std::vector<bool *> output_signals = stage_output_signals[buffer_id];
+	std::vector<BufferSignal *> output_signals = stage_output_signals[buffer_id];
 
 	for(unsigned int iter = 0; iter < output_signals.size(); iter++) {
-		*(output_signals[iter]) = value;
+		output_signals[iter]->updateSignal(value);
 	}
 }
 

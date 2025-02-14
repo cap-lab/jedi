@@ -14,6 +14,7 @@
 
 #include "cuda_jedi.h"
 #include "binding.h"
+#include "buffer_signal.h"
 
 class Stage {
 	public:
@@ -46,7 +47,7 @@ class Stage {
 		void setBuffers(int buffer_id, std::map<std::string, void*> stream_buffers_map);
 		uint64_t getSizeByTensorName(bool isInput, std::string name);
 		void setTensorAllocators(int buffer_id, std::map<std::string, void*> stream_buffers_map, std::vector<void *> input_buffers, std::vector<void *> output_buffers);
-		void setSignals(int buffer_id, std::map<std::string, bool*> signals_map);
+		void setSignals(int buffer_id, std::map<std::string, BufferSignal*> signals_map);
 		bool isRunnable(int buffer_id);
 		void updateInputSignals(int buffer_id, bool value);
 		void updateOutputSignals(int buffer_id, bool value);
@@ -67,8 +68,8 @@ class Stage {
 		int output_binding_num;
 		int data_type;
 
-		std::vector<std::vector<bool *>> stage_input_signals;
-		std::vector<std::vector<bool *>> stage_output_signals;
+		std::vector<std::vector<BufferSignal *>> stage_input_signals;
+		std::vector<std::vector<BufferSignal *>> stage_output_signals;
 };
 
 #endif

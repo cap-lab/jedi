@@ -520,7 +520,7 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 
 		if(fileExist(onnx_file_name) == false)  {
 			if (quantized_model_name.length() > 0 && data_type == TYPE_INT8 && device == DEVICE_GPU) {
-				int prev_cut_point_changed = 0, curr_cut_point_changed;
+				int prev_cut_point_changed = 0, curr_cut_point_changed = 0;
 				if (prev_cut_point > 0) {
 					// Since the +1 value of the cutpoint from the original onnx file and the +1 value of the cutpoint from quantized onnx file can be different, 
 					// we convert the last cutpoint first, and then add 1 to the converted cutpoint.
