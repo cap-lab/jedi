@@ -215,6 +215,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	std::vector<LayerRange> gpu_ranges = config_data->instances.at(instance_id).gpu_ranges;
 	std::vector<LayerRange> fp16_ranges = config_data->instances.at(instance_id).fp16_ranges;
 	std::vector<LayerRange> fp32_ranges = config_data->instances.at(instance_id).fp32_ranges;
+	std::string rt_post_fix = "";
 	
 	if(curr > 0) {
 		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr-1) + 1;
@@ -223,24 +224,29 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 
 	cut_points_name = std::to_string(prev_cut_point) + "." + std::to_string(curr_cut_point);
 
-	if(device == DEVICE_DLA) {
-		device_name = "DLA";
-	}
-	else {
-		device_name = "GPU";
+
+	if (for_rt_build == true) {
+		if(device == DEVICE_DLA) {
+			device_name = "DLA";
+		}
+		else {
+			device_name = "GPU";
+		}
+
+		if(data_type == TYPE_FP32) {
+			data_type_name = "FP32";
+		}
+		else if(data_type == TYPE_FP16) {
+			data_type_name = "FP16";
+		}
+		else if(data_type == TYPE_INT8) {
+			data_type_name = "INT8";
+		}
+		rt_post_fix = "_" + device_name + "_" + data_type_name;
 	}
 
-	if(data_type == TYPE_FP32) {
-		data_type_name = "FP32";
-	}
-	else if(data_type == TYPE_FP16) {
-		data_type_name = "FP16";
-	}
-	else if(data_type == TYPE_INT8) {
-		data_type_name = "INT8";
-		if (is_quantized_model == true) {
-			data_type_name += "_QUANT";
-		}
+	if (is_quantized_model == true && data_type == TYPE_INT8) {
+		rt_post_fix += "_QUANT";
 	}
 
 	ITensor *tensor = network->getInput(0);
@@ -253,7 +259,7 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 		input_dim_name += std::to_string(tensor_dim.d[iter1]);
 	}
 
-	plan_file_name = model_dir + "/model_" + network_name + "_onnx_" + input_dim_name  + "_" + cut_points_name + "_" + device_name + "_" + data_type_name;
+	plan_file_name = model_dir + "/model_" + network_name + "_onnx_" + input_dim_name  + "_" + cut_points_name + rt_post_fix;
 	if(for_rt_build == true) {
 		std::string range_string;
 		plan_file_name = plan_file_name + "_aux" + std::to_string(aux_stream_num);
