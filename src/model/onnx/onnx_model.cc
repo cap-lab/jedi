@@ -735,7 +735,7 @@ IBuilderConfig* OnnxModel::createEngineFromOnnxFile(int cur_iter, std::string on
 			ILayer *layer = network->getLayer(index);
 			if(layer->getType() == nvinfer1::LayerType::kELEMENTWISE && index > 0){
 				ILayer *prevlayer = network->getLayer(index-1);
-				if(prevlayer->getType() == nvinfer1::LayerType::kACTIVATION) {
+				if(prevlayer->getType() == nvinfer1::LayerType::kACTIVATION || layer->getType() == nvinfer1::LayerType::kELEMENTWISE) {
 					addNetworkOutputNodeToLeakyRelu(layer, network, tensorsTobeChanged);
 				}
 			}
