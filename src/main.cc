@@ -24,7 +24,7 @@ bool exit_flag = false;
 
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-P] [-n] [-b]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-l stage_profile_file] [-P] [-n] [-b]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
@@ -75,6 +75,16 @@ static void writeTimeResultFile(std::string time_file_name, double inference_tim
 
 	fp.open(time_file_name.c_str());
 	fp<<inference_time<<std::endl;
+	fp.close();
+}
+
+static void writeStageProfileFile(int instance_num, std::string stage_profile_file_name, ConfigData *config_data, std::vector<std::vector<long>> latencies[]) {
+	std::ofstream fp;
+	fp.open(stage_profile_file_name.c_str());
+	for(int iter = 0; iter < instance_num; iter++) {
+		printAverageLatency(iter, config_data, latencies[iter], fp);
+	}
+	fp << std::endl;
 	fp.close();
 }
 
@@ -141,10 +151,10 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 }
 
 static void runBaseline(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name,
-							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
+							std::string stage_profile_file_name, std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
 	long start_time = 0;
 	double inference_time = 0;
-	std::vector<long> latencies[instance_num];
+	std::vector<std::vector<long>> latencies[instance_num];
 
 	if(power_file_name.length() != 0) {
 		turnOnTegrastats(std::string(power_file_name));
@@ -154,8 +164,10 @@ static void runBaseline(int instance_num, ConfigData &config_data, std::string p
 
 	for(int iter = 0; iter < instance_num; iter++) {
 		int sample_size = config_data.instances.at(iter).sample_size;
-		latencies[iter].assign(sample_size, 0);
-		doInferenceAll(config_data, apps[iter], models[iter], iter, &(latencies[iter]));
+		std::vector<long> time_vec;
+		time_vec.assign(sample_size, 0);
+		latencies[iter].push_back(time_vec);
+		doInferenceAll(config_data, apps[iter], models[iter], iter, &(latencies[iter][0]));
 	}
 
 	inference_time = (double)(getTime() - start_time) / 1000000;
@@ -169,26 +181,32 @@ static void runBaseline(int instance_num, ConfigData &config_data, std::string p
 		writeTimeResultFile(time_file_name, inference_time);
 	}
 
-	for(int iter = 0; iter < instance_num; iter++) {
-		std::cout<< "average latency ("<< iter <<"): " << getAverageLatency(iter, &config_data, latencies[iter]) << std::endl;
+	if(stage_profile_file_name.length() != 0) {
+		writeStageProfileFile(instance_num, stage_profile_file_name, &config_data, latencies);
 	}
 }
 
-static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name,
-							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
+static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name, 
+							std::string stage_profile_file_name, std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
 	std::vector<InstanceThreadData> instance_threads_data;
-	std::vector<long> latencies[instance_num];
+	std::vector<std::vector<long>> latencies[instance_num];
 	std::vector<std::thread> instance_threads;
 	long start_time = 0;
 	double inference_time = 0;
 	
 	for(int iter = 0; iter < instance_num; iter++) {
 		int sample_size = config_data.instances.at(iter).sample_size;
+		int stage_num = config_data.instances.at(iter).device_num + 2; // device_num + pre + post
 
-		latencies[iter].assign(sample_size, 0);
+		// for (per stage latency) +  (end-2-end latency)
+		for(int iter2 = 0 ; iter2 < stage_num + 1 ; iter2++) {
+			std::vector<long> time_vec;
+			time_vec.assign(sample_size, 0);
+			latencies[iter].push_back(time_vec);
+		}
 
 		PreProcessingThread *pre_thread = new PreProcessingThread(&config_data, iter);
 		pre_thread->setThreadData(models[iter], apps[iter], &(latencies[iter]));
@@ -199,7 +217,7 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 		postProcessingThreads.push_back(post_thread);
 
 		InferenceThread *infer_thread = new InferenceThread(&config_data, iter);
-		infer_thread->setThreadData(models[iter]);
+		infer_thread->setThreadData(models[iter], &(latencies[iter]));
 		inferenceThreads.push_back(infer_thread);
 
 		InstanceThreadData instance_thread_data;
@@ -233,8 +251,8 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 		writeTimeResultFile(time_file_name, inference_time);
 	}
 
-	for(int iter = 0; iter < instance_num; iter++) {
-		std::cout<< "average latency ("<< iter <<"): " << getAverageLatency(iter, &config_data, latencies[iter]) << std::endl;
+	if(stage_profile_file_name.length() != 0) {
+		writeStageProfileFile(instance_num, stage_profile_file_name, &config_data, latencies);
 	}
 
 	finalizeInstanceThreads(instance_num, preProcessingThreads, postProcessingThreads, inferenceThreads);
@@ -261,6 +279,7 @@ int main(int argc, char *argv[]) {
 	int instance_num = 0;
 	std::string config_file_name = "config.cfg";
 	std::string result_file_name = "coco_results.json";
+	std::string stage_profile_file_name;
 	std::string power_file_name;
 	std::string time_file_name;
 	bool print_network = false;
@@ -273,7 +292,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "Pnbc:r:p:t:h")) != -1) {
+	while((option = getopt(argc, argv, "Pnbc:r:p:t:l:h")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
@@ -286,6 +305,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case 't':
 				time_file_name = std::string(optarg);
+				break;
+			case 'l':
+				stage_profile_file_name = std::string(optarg);
 				break;
 			case 'P':
 				print_network = true;
@@ -323,9 +345,9 @@ int main(int argc, char *argv[]) {
 
 		// make threads
 		if (run_baseline == false) {
-			generateThreads(instance_num, config_data, power_file_name, time_file_name, models, apps);
+			generateThreads(instance_num, config_data, power_file_name, time_file_name, stage_profile_file_name, models, apps);
 		} else {
-			runBaseline(instance_num, config_data, power_file_name, time_file_name, models, apps);
+			runBaseline(instance_num, config_data, power_file_name, time_file_name, stage_profile_file_name, models, apps);
 		}
 
 		// write file

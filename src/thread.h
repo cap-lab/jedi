@@ -19,7 +19,7 @@ typedef struct _PreProcessingThreadData {
 	int tid;
 	Model *model;
 	IInferenceApplication *app;
-	std::vector<long> *latency;
+	std::vector<std::vector<long>> *latency;
 	int *sample_index;
 	std::vector<int> *cur_running_index;
 	std::mutex *mu;
@@ -31,7 +31,7 @@ typedef struct _PostProcessingThreadData {
 	int tid;
 	Model *model;
 	IInferenceApplication *app;
-	std::vector<long> *latency;
+	std::vector<std::vector<long>> *latency;
 	int *sample_index;
 	std::mutex *mu;
 	std::vector<int> *cur_running_index;
@@ -42,6 +42,7 @@ typedef struct _InferenceThreadData {
 	int instance_id;
 	int tid;
 	Model *model;
+	std::vector<std::vector<long>> *latency;
 } InferenceThreadData;
 
 class Thread {
@@ -65,7 +66,7 @@ class PreProcessingThread : public Thread {
 
 		PreProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {this->sample_index = 0;};
 		~PreProcessingThread();
-		void setThreadData(Model *model, IInferenceApplication *app, std::vector<long> *latency);
+		void setThreadData(Model *model, IInferenceApplication *app, std::vector<std::vector<long>> *latency);
 		void runThreads();
 		void joinThreads();
 };
@@ -79,7 +80,7 @@ class PostProcessingThread : public Thread {
 
 		PostProcessingThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {this->sample_index = 0;};
 		~PostProcessingThread();
-		void setThreadData(Model *model, IInferenceApplication *app, std::vector<long> *latency);
+		void setThreadData(Model *model, IInferenceApplication *app, std::vector<std::vector<long>> *latency);
 		void runThreads();
 		void joinThreads();
 };
@@ -90,7 +91,7 @@ class InferenceThread : public Thread {
 
 		InferenceThread(ConfigData *config_data, int instance_id) : Thread(config_data, instance_id) {};
 		~InferenceThread();
-		void setThreadData(Model *model);
+		void setThreadData(Model *model, std::vector<std::vector<long>> *latency);
 		void runThreads();
 		void joinThreads();
 };

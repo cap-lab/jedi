@@ -30,7 +30,7 @@ InferenceThread::~InferenceThread() {
 	threads_data.clear();
 }
 
-void PreProcessingThread::setThreadData(Model *model, IInferenceApplication *app, std::vector<long> *latency) {
+void PreProcessingThread::setThreadData(Model *model, IInferenceApplication *app, std::vector<std::vector<long>> *latency) {
 	thread_num = config_data->instances.at(instance_id).pre_thread_num;	
 	this->cur_running_index.assign(thread_num, 0);
 
@@ -62,7 +62,7 @@ void PreProcessingThread::joinThreads() {
 	}
 }
 
-void PostProcessingThread::setThreadData(Model *model, IInferenceApplication *app, std::vector<long> *latency) {
+void PostProcessingThread::setThreadData(Model *model, IInferenceApplication *app, std::vector<std::vector<long>> *latency) {
 	thread_num = config_data->instances.at(instance_id).post_thread_num;	
 	this->cur_running_index.assign(thread_num, 0);
 
@@ -94,13 +94,14 @@ void PostProcessingThread::joinThreads() {
 	}
 }
 
-void InferenceThread::setThreadData(Model *model) {
-	thread_num = config_data->instances.at(instance_id).device_num;	
+void InferenceThread::setThreadData(Model *model, std::vector<std::vector<long>> *latency) {
+	thread_num = config_data->instances.at(instance_id).device_num;
 
 	for(int iter = 0; iter < thread_num; iter++) {
 		InferenceThreadData thread_data;		
 		thread_data.config_data = config_data;
 		thread_data.instance_id = instance_id;
+		thread_data.latency = latency;
 		thread_data.tid = iter;
 		thread_data.model = model;
 

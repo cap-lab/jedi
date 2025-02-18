@@ -19,7 +19,7 @@
 
 #define MAX_TIMEOUT (100000)
 
-long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<long> latency)
+static long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<long> latency)
 {
 	long sum  = 0;
 	int nSize = latency.size(); 
@@ -29,6 +29,20 @@ long getAverageLatency(int instance_id, ConfigData *config_data, std::vector<lon
 	}
 
 	return sum / (long) nSize;
+}
+
+void printAverageLatency(int instance_id, ConfigData *config_data, std::vector<std::vector<long>> latencies, std::ofstream &fp) {
+	int latency_type_size = latencies.size();
+	//stage_profile_file_name
+	for(int iter = 0 ; iter < latency_type_size ; iter++) {
+		long average_latency = getAverageLatency(iter, config_data, latencies[iter]);
+		fp << average_latency << std::endl;
+		if (iter == latency_type_size - 1) {
+			std::cout<< "end2end average latency ("<< instance_id <<"): " << average_latency << std::endl;
+		} else {
+			std::cout<< "average latency ("<< instance_id <<", stage: "<<iter<<"): " << average_latency << std::endl;
+		}
+	}
 }
 
 static void readData(int thread_id, int input_tensor_index, const char *input_name, void *input_buffer, IInferenceApplication *app, int input_tensor_size, int batch, int batch_thread_num, int index)
@@ -128,7 +142,7 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 void doPreProcessing(void *d) {
 	PreProcessingThreadData *data = (PreProcessingThreadData *)d;
 	ConfigData *config_data = data->config_data;
-	std::vector<long> *latency = data->latency;
+	std::vector<std::vector<long>> *latency = data->latency;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
 	IInferenceApplication *app = data->app;
@@ -142,6 +156,7 @@ void doPreProcessing(void *d) {
 	int index = 0;
 	long stuckWhile = 0;
 	int batch_thread_num = config_data->instances.at(instance_id).batch_thread_num;
+	int total_latency_index = (*latency).size() - 1;
 	std::vector<int> *cur_running_index_list = data->cur_running_index;
 
 	sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
@@ -158,7 +173,10 @@ void doPreProcessing(void *d) {
 			is_runnable = data->model->isPreprocessingRunnable(buffer_index);
 		}
 
-		(*latency)[sample_index - sample_offset] = getTime();
+#ifndef DISABLE_PROFILE
+		(*latency)[0][sample_index - sample_offset] = getTime();
+#endif
+		(*latency)[total_latency_index][sample_index - sample_offset] = (*latency)[0][sample_index - sample_offset];
 
 		auto input_size_vec = data->model->stages[0]->input_size_vec;
 		int input_tensor_index = 0;
@@ -173,7 +191,11 @@ void doPreProcessing(void *d) {
 			readData(tid, input_tensor_index, iter->first.c_str(), data->model->net_input_buffers[buffer_index][input_tensor_index], app, input_size, batch, batch_thread_num, index);
 			input_tensor_index++;
 		}
-		data->model->updateInputSignals(buffer_index, true);	
+		data->model->updateInputSignals(buffer_index, true);
+
+#ifndef DISABLE_PROFILE
+		(*latency)[0][sample_index - sample_offset] = getTime() - (*latency)[0][sample_index - sample_offset];
+#endif
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 		index = sample_index * batch;
@@ -186,7 +208,7 @@ void doPreProcessing(void *d) {
 void doPostProcessing(void *d) {
 	PostProcessingThreadData *data = (PostProcessingThreadData *)d;
 	ConfigData *config_data = data->config_data;
-	std::vector<long> *latency = data->latency;
+	std::vector<std::vector<long>> *latency = data->latency;
 	int instance_id = data->instance_id;
 	int tid = data->tid;
 	IInferenceApplication *app = data->app;
@@ -202,6 +224,7 @@ void doPostProcessing(void *d) {
 	int *sample_index_global = data->sample_index;
 	std::mutex *mu = data->mu;
 	std::vector<int> *cur_running_index_list = data->cur_running_index;
+	int total_latency_index = (*latency).size() - 1;
 	void **output_pointers;
 
 	output_pointers = (void **) calloc(data->model->network_output_number, sizeof(void *));
@@ -223,14 +246,20 @@ void doPostProcessing(void *d) {
 		for(int iter = 0 ; iter < data->model->network_output_number; iter++) {
 			output_pointers[iter] = data->model->net_output_buffers[buffer_id][iter];
 		}
-
+#ifndef DISABLE_PROFILE
+		(*latency)[total_latency_index-1][sample_index - sample_offset] = getTime();
+#endif
 		app->postprocessing1(tid, sample_index, output_pointers, data->model->network_output_number, batch);
 
 		data->model->updateOutputSignals(buffer_index, false);
 
 		app->postprocessing2(tid, sample_index, batch);
 
-		(*latency)[sample_index - sample_offset] = getTime() - (*latency)[sample_index - sample_offset];
+		long end_time = getTime();
+		(*latency)[total_latency_index][sample_index - sample_offset] = end_time - (*latency)[total_latency_index][sample_index - sample_offset];
+#ifndef DISABLE_PROFILE
+		(*latency)[total_latency_index-1][sample_index - sample_offset] = end_time - (*latency)[total_latency_index-1][sample_index - sample_offset];
+#endif
 
 		if(tid == 0 && instance_id == 0) {
 			std::cerr<<"[TEST | "<<(sample_index+1)*instance_num<<" / "<<sample_size*instance_num<<"]\r";	
@@ -248,6 +277,7 @@ void doInference(void *d) {
 	InferenceThreadData *data = (InferenceThreadData *)d;
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
+	std::vector<std::vector<long>> *latency = data->latency;
 	int device_id = data->tid;
 	Model *model = data->model;
 
@@ -291,6 +321,9 @@ void doInference(void *d) {
 			for(int iter = 0; iter < stream_num; iter++) {
 				if(ready[iter] == 0) {
 					if(model->checkInferenceDone(device_id, iter)) {
+#ifndef DISABLE_PROFILE
+						(*latency)[device_id+1][assignedSampleId[iter] - sample_offset] = getTime() - (*latency)[device_id+1][assignedSampleId[iter] - sample_offset];
+#endif
 						assigned_buffer_id = assignedSampleId[iter] % buffer_num;
 
 						model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
@@ -326,6 +359,9 @@ void doInference(void *d) {
 		
 		sleep_time = 0;
 		assignedSampleId[next_stream_index] = sample_index;
+#ifndef DISABLE_PROFILE
+		(*latency)[device_id+1][sample_index - sample_offset] = getTime();
+#endif
 		model->infer(device_id, next_stream_index, next_buffer_index);
 		stream_balance[next_stream_index]++;
 		ready[next_stream_index] = 0;
@@ -338,6 +374,9 @@ void doInference(void *d) {
 			if(exit_flag == false) 
 			{
 				model->waitUntilInferenceDone(device_id, iter);
+#ifndef DISABLE_PROFILE
+				(*latency)[device_id+1][assignedSampleId[iter] - sample_offset] = getTime() - (*latency)[device_id+1][assignedSampleId[iter] - sample_offset];
+#endif
 			}
 			assigned_buffer_id = assignedSampleId[iter] % buffer_num;
 			model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
