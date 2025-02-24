@@ -22,6 +22,11 @@ class Stage {
 		std::vector<nvinfer1::IExecutionContext *> contexts;
 		std::vector<cudaStream_t> streams;
 		std::vector<cudaEvent_t> events;
+#ifdef STRING_PER_BUFFER
+		std::vector<cudaGraphExec_t> instances;
+#else
+		std::vector<std::vector<cudaGraphExec_t>> instances;
+#endif
 
 		std::vector<std::vector<TensorAllocator *>> tensor_allocators;
 		//std::vector<std::vector<std::vector<TensorAllocator *>>> tensor_allocators;
@@ -33,8 +38,6 @@ class Stage {
 		std::map<std::string, nvinfer1::DataType> output_type_map;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> input_size_vec;
 		std::vector<std::pair<std::string, nvinfer1::Dims>> output_size_vec;
-		//std::vector<std::pair<std::string, nvinfer1::DataType>> input_type_vec;
-		//std::vector<std::pair<std::string, nvinfer1::DataType>> output_type_vec;
 
 		int binding_num;
 
@@ -53,6 +56,7 @@ class Stage {
 		void updateOutputSignals(int buffer_id, bool value);
 		void finalizeStage();
 		void getBindingsDataType();
+		void initializeCudaGraphs(std::vector<std::map<std::string, void*>> all_stream_buffers);
 	
 	private:
 		ConfigData *config_data;

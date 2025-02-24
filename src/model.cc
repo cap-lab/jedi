@@ -307,10 +307,21 @@ void Model::updateOutputSignals(int buffer_id, bool value) {
 	}
 }
 
+void Model::initializeCudaGraphs() {
+	for(unsigned int iter1 = 0; iter1 < stages.size(); iter1++) {
+		Stage *stage = stages[iter1];
+		if(config_data->instances.at(instance_id).devices.at(iter1) == DEVICE_GPU &&
+			config_data->instances.at(instance_id).cuda_graphs.at(iter1) == true) {
+			stage->initializeCudaGraphs(all_stream_buffers);
+		}
+	}
+}
+
 void Model::initializeBuffers() {
 	allocateStream();
 	allocateBuffer();
 	setBufferForStage();
+	initializeCudaGraphs();
 }
 
 void Model::finalizeBuffers() {
@@ -391,6 +402,24 @@ void Model::setStreamBuffers(Stage *stage, int stream_id, int buffer_id) {
 		auto const& name = context->getEngine().getIOTensorName(iter);
 		std::string _name(name);
 		stage->stage_buffers[buffer_id][iter] = all_stream_buffers[buffer_id][_name];
+	}
+}
+
+
+void Model::graphLaunch(int device_id, int stream_id, int buffer_id) {
+	Stage *stage = stages[device_id];
+	cudaError_t cudaError;
+
+	stage->contexts[stream_id]->setOptimizationProfileAsync(0, stage->streams[stream_id]);
+	setBindingForContext(stage, stream_id, buffer_id);
+#ifdef STRING_PER_BUFFER
+	//cudaError = cudaGraphLaunch(stage->instances[buffer_id], stage->streams[stream_id]);
+#else
+	cudaError = cudaGraphLaunch(stage->instances[stream_id][buffer_id], stage->streams[stream_id]);
+#endif
+	if (cudaError != cudaSuccess) {
+		printf("graph launch error happened: %d, %d\n", device_id, buffer_id);
+		exit_flag = true;
 	}
 }
 

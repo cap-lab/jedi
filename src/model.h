@@ -42,6 +42,7 @@ class Model {
 		void waitUntilInferenceDone(int device_id, int stream_id);
 		void waitUntilInputConsumed(int device_id, int stream_id);
 		bool checkInputConsumed(int device_id, int stream_id);
+		void graphLaunch(int device_id, int stream_id, int buffer_id);
 
 		bool isPreprocessingRunnable(int buffer_id);
 		bool isPostprocessingRunnable(int buffer_id);
@@ -58,6 +59,7 @@ class Model {
 		void setBufferForStage();
 		void deallocateBuffer();
 		void deallocateStream();
+		void initializeCudaGraphs();
 
 		void allocateIOStreamBuffer(std::vector<std::pair<std::string, nvinfer1::Dims>> size_vec, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::vector<void *>& buffers, std::map<std::string, BufferSignal*>& signals_map, std::vector<BufferSignal*>& signals);
 		void allocateStreamBuffer(int stage_id, int is_input_size_map, std::map<std::string, nvinfer1::Dims> size_map, std::map<std::string, nvinfer1::DataType> type_map, std::map<std::string, void*>& stream_buffers_map, std::map<std::string, BufferSignal*>& signals_map);

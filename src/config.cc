@@ -447,6 +447,29 @@ void ConfigData::readDlaSRAMSizes(Setting &setting, ConfigInstance &config_insta
 	}
 }
 
+void ConfigData::readCudaGraphs(Setting &setting, ConfigInstance &config_instance) {
+	try{
+		const char *data = setting["cuda_graphs"];
+		std::stringstream ss(data);
+		std::string temp;
+
+		while( getline(ss,temp,',')) {
+			config_instance.cuda_graphs.push_back(std::stoi(temp) > 0);
+		}
+
+		while(config_instance.device_num > (int) config_instance.cuda_graphs.size()) {
+			config_instance.cuda_graphs.push_back(false);
+		}
+	}
+	catch(const SettingNotFoundException &nfex) {
+		std::cerr << "No 'cuda_graphs' setting in configuration file. Set false as a default." << std::endl;
+		for(int iter2 = 0 ; iter2 < config_instance.device_num ; iter2++) {
+			config_instance.cuda_graphs.push_back(false);
+		}
+
+	}
+}
+
 void ConfigData::readCalibTable(Setting &setting, ConfigInstance &config_instance) {
 	try{	
 		// if(config_instance.data_type == TYPE_INT8)
@@ -535,6 +558,7 @@ ConfigData::ConfigData(std::string config_file_path, std::vector<IInferenceAppli
 			readFP32Ranges(settings[iter], instances.at(iter));
 			readDlaSRAMSizes(settings[iter], instances.at(iter));
 			readSaveLayerInfo(settings[iter], instances.at(iter));
+			readCudaGraphs(settings[iter], instances.at(iter));
 		}
 
 		for(int iter = 0; iter < instance_num; iter++) {

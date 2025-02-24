@@ -19,6 +19,10 @@ void doPostProcessing(void *d);
 
 void doInference(void *d);
 
+#ifdef STRING_PER_BUFFER
+void doInferenceGraph(void *d);
+#endif
+
 void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *model, int instance_id, std::vector<long> *latency);
 
 void printAverageLatency(int instance_id, ConfigData *config_data, std::vector<std::vector<long>> latencies, std::ofstream &fp);

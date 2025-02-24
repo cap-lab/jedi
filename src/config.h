@@ -44,6 +44,7 @@ class ConfigData {
 		void readFP32Ranges(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readDlaSRAMSizes(libconfig::Setting &setting, ConfigInstance &config_instance);
 		void readSaveLayerInfo(libconfig::Setting &setting, ConfigInstance &config_instance);
+		void readCudaGraphs(libconfig::Setting &setting, ConfigInstance &config_instance);
 };
 
 #endif

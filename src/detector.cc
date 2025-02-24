@@ -173,13 +173,13 @@ void doPreProcessing(void *d) {
 			is_runnable = data->model->isPreprocessingRunnable(buffer_index);
 		}
 
-#ifndef DISABLE_PROFILE
-		(*latency)[0][sample_index - sample_offset] = getTime();
-#endif
-		(*latency)[total_latency_index][sample_index - sample_offset] = (*latency)[0][sample_index - sample_offset];
-
 		auto input_size_vec = data->model->stages[0]->input_size_vec;
 		int input_tensor_index = 0;
+
+		(*latency)[total_latency_index][sample_index - sample_offset] = getTime();
+#ifndef DISABLE_PROFILE
+		(*latency)[0][sample_index - sample_offset] = (*latency)[total_latency_index][sample_index - sample_offset];
+#endif
 		for(auto iter = input_size_vec.begin(); iter != input_size_vec.end(); iter++) {
 			int input_size = 1;
 			nvinfer1::Dims dims = iter->second;
@@ -191,11 +191,10 @@ void doPreProcessing(void *d) {
 			readData(tid, input_tensor_index, iter->first.c_str(), data->model->net_input_buffers[buffer_index][input_tensor_index], app, input_size, batch, batch_thread_num, index);
 			input_tensor_index++;
 		}
-		data->model->updateInputSignals(buffer_index, true);
-
 #ifndef DISABLE_PROFILE
 		(*latency)[0][sample_index - sample_offset] = getTime() - (*latency)[0][sample_index - sample_offset];
 #endif
+		data->model->updateInputSignals(buffer_index, true);
 
 		sample_index = getNewSampleIndex(mu, sample_index_global, sample_offset, tid, cur_running_index_list);
 		index = sample_index * batch;
@@ -217,7 +216,6 @@ void doPostProcessing(void *d) {
 	int sample_size = config_data->instances.at(instance_id).sample_size;
 	int batch = config_data->instances.at(instance_id).batch;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
-	std::string network_name = config_data->instances.at(instance_id).network_name;
 	int sample_index = sample_offset + tid;
 	int buffer_id = 0;
 	long stuckWhile = 0;
@@ -273,7 +271,9 @@ void doPostProcessing(void *d) {
 	free(output_pointers);
 }
 
-void doInference(void *d) {
+
+#ifdef STRING_PER_BUFFER
+void doInferenceGraph(void *d) {
 	InferenceThreadData *data = (InferenceThreadData *)d;
 	ConfigData *config_data = data->config_data;
 	int instance_id = data->instance_id;
@@ -285,7 +285,117 @@ void doInference(void *d) {
 	int sample_size = config_data->instances.at(instance_id).sample_size;
 	int buffer_num = config_data->instances.at(instance_id).buffer_num;
 	int stream_num = config_data->instances.at(instance_id).stream_numbers.at(device_id);
-	std::string network_name = config_data->instances.at(instance_id).network_name;
+	int sample_index = sample_offset;
+	std::vector<int> ready(stream_num, 1);
+	std::vector<int> assignedSampleId(stream_num, -1);
+	int sleep_time = 0;
+	long stuckWhile = 0;
+	int next_buffer_index = 0;
+	int assigned_buffer_id = 0;
+	int next_stream_index = 0;
+	int min_sample_index = 0;
+	std::vector<int> stream_balance(stream_num, 0);
+	std::vector<bool> stream_available(stream_num, true);
+	int available_stream_num = stream_num;
+
+	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
+		while(exit_flag == false) {
+			int buffer_index = sample_index % buffer_num;
+			bool is_runnable = model->stages[device_id]->isRunnable(buffer_index);
+			int stream_index = buffer_index % stream_num;
+
+			if(is_runnable && sample_index < min_sample_index + buffer_num && stream_available[stream_index] == true) {
+				next_buffer_index = sample_index % buffer_num;
+				next_stream_index = stream_index;
+				stream_available[stream_index] = false;
+				available_stream_num--;
+				break;
+			}
+			min_sample_index = sample_offset + sample_size;
+			for(int iter = 0; iter < stream_num; iter++) {
+				if(ready[iter] == 0) {
+					if(model->checkInferenceDone(device_id, iter)) {
+#ifndef DISABLE_PROFILE
+						(*latency)[device_id+1][assignedSampleId[iter] - sample_offset] = getTime() - (*latency)[device_id+1][assignedSampleId[iter] - sample_offset];
+#endif
+						assigned_buffer_id = assignedSampleId[iter] % buffer_num;
+
+						model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
+						model->stages[device_id]->updateOutputSignals(assigned_buffer_id, true);
+						ready[iter] = 1;
+						assignedSampleId[iter] = -1;
+						stream_available[iter] = true;
+						available_stream_num++;
+					}
+					if(min_sample_index > assignedSampleId[iter] && assignedSampleId[iter] >= 0) {
+						min_sample_index = assignedSampleId[iter];
+					}
+				}
+			}
+
+			if(available_stream_num > 0) {
+				stuckWhile++;
+			}
+			usleep(SLEEP_TIME);
+			sleep_time++;
+
+			if(sleep_time > MAX_TIMEOUT) {
+				if(sleep_time > MAX_TIMEOUT * 10) {
+					printf("timeout is reached. program will be terminated.\n");
+					exit_flag = true;
+				}
+				if((sleep_time % MAX_TIMEOUT) == 1) {
+					printf("timeout check.\n");
+				}
+			}
+		}
+
+		sleep_time = 0;
+		assignedSampleId[next_stream_index] = sample_index;
+#ifndef DISABLE_PROFILE
+		(*latency)[device_id+1][sample_index - sample_offset] = getTime();
+#endif
+		model->graphLaunch(device_id, next_stream_index, next_buffer_index);
+		stream_balance[next_stream_index]++;
+		ready[next_stream_index] = 0;
+
+		sample_index++;
+	}
+
+	for(int iter = 0; iter < stream_num; iter++) {
+		if(ready[iter] == 0) {
+			if(exit_flag == false)
+			{
+				model->waitUntilInferenceDone(device_id, iter);
+#ifndef DISABLE_PROFILE
+				(*latency)[device_id+1][assignedSampleId[iter] - sample_offset] = getTime() - (*latency)[device_id+1][assignedSampleId[iter] - sample_offset];
+#endif
+			}
+			assigned_buffer_id = assignedSampleId[iter] % buffer_num;
+			model->stages[device_id]->updateInputSignals(assigned_buffer_id, false);
+			model->stages[device_id]->updateOutputSignals(assigned_buffer_id, true);
+			ready[iter] = 1;
+		}
+		fprintf(stderr, "device id: %d, stream_id: %d, executed_num: %d\n", device_id, iter, stream_balance[iter]);
+	}
+
+	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
+}
+#endif
+
+void doInference(void *d) {
+	InferenceThreadData *data = (InferenceThreadData *)d;
+	ConfigData *config_data = data->config_data;
+	int instance_id = data->instance_id;
+	std::vector<std::vector<long>> *latency = data->latency;
+	int device_id = data->tid;
+	Model *model = data->model;
+	void (Model::*funcPtr)(int, int, int);
+
+	int sample_offset = config_data->instances.at(instance_id).offset;
+	int sample_size = config_data->instances.at(instance_id).sample_size;
+	int buffer_num = config_data->instances.at(instance_id).buffer_num;
+	int stream_num = config_data->instances.at(instance_id).stream_numbers.at(device_id);
 	int sample_index = sample_offset;
 	std::vector<int> ready(stream_num, 1);
 	std::vector<int> assignedSampleId(stream_num, -1);
@@ -298,10 +408,15 @@ void doInference(void *d) {
 	std::vector<int> stream_balance(stream_num, 0);
 	std::list<int> available_streams;
 
-	//model->initializeStreams(device_id);
-
 	for(int iter = 0; iter < stream_num ; iter++) {
 		available_streams.push_back(iter);
+	}
+
+	if (config_data->instances.at(instance_id).devices.at(instance_id) == DEVICE_GPU &&
+		config_data->instances.at(instance_id).cuda_graphs.at(device_id) == true) {
+		funcPtr = &Model::graphLaunch;
+	} else {
+		funcPtr = &Model::infer;
 	}
 
 	while((sample_size == 0 || (sample_size > 0 && sample_index < sample_offset + sample_size)) && exit_flag == false) {
@@ -309,13 +424,11 @@ void doInference(void *d) {
 			int buffer_index = sample_index % buffer_num;
 			bool is_runnable = model->stages[device_id]->isRunnable(buffer_index);
 
-			if(is_runnable && sample_index < min_sample_index + buffer_num) {
-				if(available_streams.size() > 0) {
-					next_buffer_index = sample_index % buffer_num;
-					next_stream_index = available_streams.front();
-					available_streams.pop_front();
-					break;
-				}
+			if(is_runnable && sample_index < min_sample_index + buffer_num && available_streams.size() > 0) {
+				next_buffer_index = sample_index % buffer_num;
+				next_stream_index = available_streams.front();
+				available_streams.pop_front();
+				break;
 			}
 			min_sample_index = sample_offset + sample_size;
 			for(int iter = 0; iter < stream_num; iter++) {
@@ -335,7 +448,6 @@ void doInference(void *d) {
 					if(min_sample_index > assignedSampleId[iter] && assignedSampleId[iter] >= 0) {
 						min_sample_index = assignedSampleId[iter];	
 					}
-
 				}
 			}
 
@@ -344,7 +456,6 @@ void doInference(void *d) {
 			}
 			usleep(SLEEP_TIME);
 			sleep_time++;
-
 
 			if(sleep_time > MAX_TIMEOUT) {
 				if(sleep_time > MAX_TIMEOUT * 10) {
@@ -362,10 +473,9 @@ void doInference(void *d) {
 #ifndef DISABLE_PROFILE
 		(*latency)[device_id+1][sample_index - sample_offset] = getTime();
 #endif
-		model->infer(device_id, next_stream_index, next_buffer_index);
+		(model->*funcPtr)(device_id, next_stream_index, next_buffer_index);
 		stream_balance[next_stream_index]++;
 		ready[next_stream_index] = 0;
-
 		sample_index++;
 	}
 
@@ -401,6 +511,5 @@ void doInference(void *d) {
 		}	
 		fprintf(stderr, "device id: %d, stream_id: %d, executed_num: %d\n", device_id, iter, stream_balance[iter]);
 	}
-
 	fprintf(stderr, "stuckWhile(device id: %d): %ld\n", device_id, stuckWhile);
 }

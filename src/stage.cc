@@ -104,7 +104,7 @@ void Stage::allocateStream() {
 	for(int iter1 = 0; iter1 < stream_num; iter1++) {
 		cudaStream_t stream;
 		cudaEvent_t event;
-		check_error(cudaStreamCreate(&stream));
+		check_error(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
 		check_error(cudaEventCreate(&event));
 		streams.push_back(stream);
 		events.push_back(event);
@@ -291,6 +291,107 @@ void Stage::finalizeStage() {
 	for(unsigned int iter1 = 0; iter1 < engines.size(); iter1++) {
 		delete engines[iter1];
 	}
+
+	for(unsigned int iter1 = 0; iter1 < instances.size(); iter1++) {
+#ifdef STRING_PER_BUFFER
+		cudaGraphExecDestroy(instances[iter1]);
+#else
+		for(unsigned int iter2 = 0; iter2 < instances[iter1].size(); iter2++) {
+			cudaGraphExecDestroy(instances[iter1][iter2]);
+		}
+#endif
+	}
+}
+
+void Stage::initializeCudaGraphs(std::vector<std::map<std::string, void*>> all_stream_buffers) {
+
+#ifdef STRING_PER_BUFFER
+	cudaStream_t stream;
+	cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+	for(unsigned int iter1 = 0; iter1 < tensor_allocators.size(); iter1++) {
+		int stream_index = iter1 % stream_num;
+		auto context = this->contexts[stream_index];
+		int binding_num = context->getEngine().getNbIOTensors();
+		cudaGraph_t graph;
+		cudaGraphExec_t instance;
+
+		for(int iter2 = 0; iter2 < binding_num; iter2++) {
+			auto const& name = context->getEngine().getIOTensorName(iter2);
+			auto const& mode = context->getEngine().getTensorIOMode(name);
+			bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
+			bool result = false;
+			std::string _name(name);
+			TensorAllocator *allocator = this->tensor_allocators[iter1][iter2];
+
+			if(!isInput) {
+				result = context->setOutputAllocator(name, allocator);
+				assert(result);
+			}
+			else {
+				result = context->setTensorAddress(name, allocator->getBuf());
+				assert(result);
+			}
+
+			if(allocator->getIsReallocated()) {
+				all_stream_buffers[iter1][_name] = allocator->getBuf();
+			}
+		}
+
+		check_error(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
+		context->enqueueV3(stream);
+		check_error(cudaStreamEndCapture(stream, &graph));
+		check_error(cudaGraphInstantiate(&instance, graph, 0));
+		check_error(cudaGraphDestroy(graph));
+		//stream_instances.push_back(instance);
+		this->instances.push_back(instance);
+	}
+
+	cudaStreamDestroy(stream);
+#else
+	cudaStream_t stream;
+	cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+	for(int iter = 0 ; iter < stream_num ; iter++) {
+		auto context = this->contexts[iter];
+		std::vector<cudaGraphExec_t> stream_instances;
+
+		for(unsigned int iter1 = 0; iter1 < tensor_allocators.size(); iter1++) {
+			int binding_num = context->getEngine().getNbIOTensors();
+			cudaGraph_t graph;
+			cudaGraphExec_t instance;
+
+			for(int iter2 = 0; iter2 < binding_num; iter2++) {
+				auto const& name = context->getEngine().getIOTensorName(iter2);
+				auto const& mode = context->getEngine().getTensorIOMode(name);
+				bool isInput = (mode == nvinfer1::TensorIOMode::kINPUT) ? true : false;
+				bool result = false;
+				std::string _name(name);
+				TensorAllocator *allocator = this->tensor_allocators[iter1][iter2];
+
+				if(!isInput) {
+					result = context->setOutputAllocator(name, allocator);
+					assert(result);
+				}
+				else {
+					result = context->setTensorAddress(name, allocator->getBuf());
+					assert(result);
+				}
+
+				if(allocator->getIsReallocated()) {
+					all_stream_buffers[iter1][_name] = allocator->getBuf();
+				}
+			}
+
+			check_error(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
+			context->enqueueV3(stream);
+			check_error(cudaStreamEndCapture(stream, &graph));
+			check_error(cudaGraphInstantiate(&instance, graph, 0));
+			check_error(cudaGraphDestroy(graph));
+			stream_instances.push_back(instance);
+		}
+		this->instances.push_back(stream_instances);
+	}
+	cudaStreamDestroy(stream);
+#endif
 }
 
 void Stage::getBindingsDataType() {
