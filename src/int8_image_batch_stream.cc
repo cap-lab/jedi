@@ -28,11 +28,12 @@ ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBat
 }
 
 ImageBatchStream::ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist,
-                                ImagePreprocessingOption preprocessingOption, ResizeInterpolationOption interpolation, float *image_norm_mean, float *image_norm_std) :
+                                ImagePreprocessingOption preprocessingOption, ResizeInterpolationOption interpolation, int crop_base_size, float *image_norm_mean, float *image_norm_std) :
                                 ImageBatchStream(dim, batchSize, maxBatches, fileimglist, preprocessingOption) {
     mInterpolationOption = interpolation;
     mImageNormMean = image_norm_mean;
     mImageNormStd = image_norm_std;
+    mCropBaseSize = crop_base_size;
 }
 
 
@@ -99,7 +100,7 @@ void ImageBatchStream::readCVimage(std::string inputFileName, float *input, bool
 			loadImageResizeNorm((char *)inputFileName.c_str(), mWidth, mHeight, mDims.d[1], &original_width, &original_height, input, mImageNormMean, mImageNormStd);
 			break;
 		case LOAD_IMAGE_RESIZE_CROP_NORM:
-			loadImageResizeCropNorm((char *)(inputFileName.c_str()), mWidth + 32, mHeight + 32, mDims.d[1], mWidth, mInterpolationOption, input, mImageNormMean, mImageNormStd); // efficient former
+			loadImageResizeCropNorm((char *)(inputFileName.c_str()), std::max(mCropBaseSize, mWidth), std::max(mCropBaseSize, mHeight), mDims.d[1], mWidth, mInterpolationOption, input, mImageNormMean, mImageNormStd); // efficient former
 			break;
 		case LOAD_IMAGE_RESIZE_CROP:
 			loadImageResizeCrop((char *) (inputFileName.c_str()), mWidth, mHeight, mDims.d[1], input); // efficient net

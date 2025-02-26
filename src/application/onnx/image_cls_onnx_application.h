@@ -22,6 +22,7 @@ typedef struct _ImageClsOnnxAppConfig {
 	ResizeInterpolationOption interpolation;
 	float mean[IMAGE_COLOR_NUM];
 	float std[IMAGE_COLOR_NUM];
+	int crop_base_size;
 } ImageClsOnnxAppConfig;
 
 
@@ -55,6 +56,7 @@ class ImageClsOnnxApplication : public BasicOnnxApplication {
 		void readImageNormalizeMeanOption(libconfig::Setting &setting);
 		void readImageNormalizeStdOption(libconfig::Setting &setting);
 		void readInterpolationOption(libconfig::Setting &setting);
+		void readCropSizeOption(libconfig::Setting &setting);
 
 		char* nolibStrStr(const char *s1, const char *s2);
 		int generateTruths(std::string path);

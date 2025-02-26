@@ -25,8 +25,9 @@
 class ImageBatchStream {
 public:
 	ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist, ImagePreprocessingOption preprocessing_option);
-	ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist, ImagePreprocessingOption preprocessingOption, 
-					ResizeInterpolationOption interpolation, float *image_norm_mean, float *image_norm_std);
+	ImageBatchStream(nvinfer1::Dims dim, int batchSize, int maxBatches, const std::string& fileimglist,
+					ImagePreprocessingOption preprocessingOption, ResizeInterpolationOption interpolation, int crop_base_size,
+					float *image_norm_mean, float *image_norm_std);
 	virtual ~ImageBatchStream() { free(mBatch); }
 	bool next();
 	float *getBatch() { return mBatch; }
@@ -43,6 +44,7 @@ private:
 	int mBatchCount{ 0 };
 	int mFileCount{ 0 };
 	int mImageSize{ 0 };
+	int mCropBaseSize{ 0 };
 
 	nvinfer1::Dims4 mDims;
 	float *mBatch{nullptr};

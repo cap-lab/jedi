@@ -130,6 +130,19 @@ void ImageClsOnnxApplication::readInterpolationOption(libconfig::Setting &settin
 	}
 }
 
+void ImageClsOnnxApplication::readCropSizeOption(libconfig::Setting &setting) {
+	try{
+		const char *data = setting["crop_base_size"];
+		imageClsOnnxAppConfig.crop_base_size = atoi(data);
+
+		std::cerr<<"crop_base_size: "<<imageClsOnnxAppConfig.crop_base_size<<std::endl;
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		std::cerr << "No 'crop_base_size' setting in configuration file. Set 256 as a Default." << std::endl;
+		imageClsOnnxAppConfig.crop_base_size = 256;
+	}
+}
+
 void ImageClsOnnxApplication::readImageNormalizeMeanOption(libconfig::Setting &setting) {
 	try{
 		const char *tmp = setting["image_norm_mean"];
@@ -240,6 +253,7 @@ void ImageClsOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readCalibImagesNum(setting);
 	readImagePreprocessingOption(setting);
 	readInterpolationOption(setting);
+	readCropSizeOption(setting);
 	readImageNormalizeMeanOption(setting);
 	readImageNormalizeStdOption(setting);
 }
@@ -294,7 +308,7 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	//dataDim_t dim(basic_config_data->batch,tensor_dim.d[1], tensor_dim.d[2], tensor_dim.d[3]);
 	ImageBatchStream *calibrationStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE,
 											imageClsOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_image_path,
-											imageClsOnnxAppConfig.preprocessing_option, imageClsOnnxAppConfig.interpolation,
+											imageClsOnnxAppConfig.preprocessing_option, imageClsOnnxAppConfig.interpolation, imageClsOnnxAppConfig.crop_base_size,
 											imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
 	jedi_network->calibrator = calibrator;
@@ -340,7 +354,8 @@ void ImageClsOnnxApplication::preprocessing(int thread_id, int input_tensor_inde
 									imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 			break;
 		case LOAD_IMAGE_RESIZE_CROP_NORM:
-			loadImageResizeCropNorm((char *)(image_data->path.c_str()), input_dim.width + 32, input_dim.height + 32, input_dim.channel, input_dim.width,
+			loadImageResizeCropNorm((char *)(image_data->path.c_str()), std::max(input_dim.width, imageClsOnnxAppConfig.crop_base_size), 
+									std::max(input_dim.height, imageClsOnnxAppConfig.crop_base_size), input_dim.channel, input_dim.width,
 									imageClsOnnxAppConfig.interpolation, input_buffer, imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std); // efficient former
 			break;
 		case LOAD_IMAGE_RESIZE_CROP:
@@ -378,7 +393,7 @@ void ImageClsOnnxApplication::initializePostprocessing(std::string network_name,
 
 char* ImageClsOnnxApplication::nolibStrStr(const char *s1, const char *s2) {
 	//fprintf(stderr, "s1: |%s|, s2: |%s|\n", s1, s2);
-	int i;
+	size_t i;
 	if (*s2 == '\0') {
 		return (char *)s1;
 	} else {
