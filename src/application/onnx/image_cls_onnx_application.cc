@@ -244,7 +244,7 @@ void ImageClsOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readImageNormalizeStdOption(setting);
 }
 
-#define CALIBRATION_BATCH_SIZE (16)
+#define CALIBRATION_BATCH_SIZE (1)
 
 IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_config_data)
 {
@@ -303,6 +303,7 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 	ITensor *tensor_output = jedi_network->network->getOutput(0);
 	tensor_dim = tensor_output->getDimensions();
 	class_num = tensor_dim.d[1];
+	jedi_network->quantized_onnx_file_path = onnxAppConfig.quantized_onnx_file_path;
 
 	return jedi_network;
 }

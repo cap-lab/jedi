@@ -164,6 +164,7 @@ static std::string makeRangeString(int prev_cut_point, int curr_cut_point, std::
 	bool continueValue = false;
 	bool first = true;
 	std::string rangeString = "";
+	int start_value = 0;
 
 	for (unsigned int iter = 0 ; iter < layerNum  ; iter++) {
 		bool valueIsIncluded = valueInRange(ranges, prev_cut_point + iter);
@@ -173,12 +174,15 @@ static std::string makeRangeString(int prev_cut_point, int curr_cut_point, std::
 					rangeString += ",";
 				}
 				rangeString += std::to_string(prev_cut_point + iter);
+				start_value = prev_cut_point + iter;
 				first = true;
 				continueValue = true;
 			}
 		} else {
 			if (continueValue == true) {
-				rangeString += "-" + std::to_string(prev_cut_point + iter);
+				if (start_value != prev_cut_point + iter - 1) {
+					rangeString += "-" + std::to_string(prev_cut_point + iter - 1);
+				}
 				continueValue = false;
 				first = false;
 			}
