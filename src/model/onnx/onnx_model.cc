@@ -466,22 +466,27 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 
 static int convertCutpointIndexFromOriginalToQuantizedModel(INetworkDefinition *network, INetworkDefinition *quantized_network, int cut_point) {
 	ILayer *original_layer = network->getLayer(cut_point);
+	int original_layer_num = network->getNbLayers();
 	int cut_index = -1;
 	std::string layer_name = original_layer->getName();
 	int quantized_layer_num = 0;
 
 	quantized_layer_num = quantized_network->getNbLayers();
-	// assume that the quantized layer num is greater than original layer num
-	for (int index = 0; index < quantized_layer_num; index++) {
-		cut_index = (cut_point + index) % quantized_layer_num;
-		ILayer *layer = quantized_network->getLayer(cut_index);
-		//printf("layer name: %s\n", layer->getName());
-		if (layer_name.compare(layer->getName()) == 0) {
-			printf("layer name: %s\n", layer->getName());
-			break;
+
+	if (cut_point == original_layer_num - 1) {
+		cut_index = quantized_layer_num - 1;
+	} else {
+		// assume that the quantized layer num is greater than original layer num
+		for (int index = 0; index < quantized_layer_num; index++) {
+			cut_index = (cut_point + index) % quantized_layer_num;
+			ILayer *layer = quantized_network->getLayer(cut_index);
+			//printf("layer name: %s\n", layer->getName());
+			if (layer_name.compare(layer->getName()) == 0) {
+				printf("layer name: %s\n", layer->getName());
+				break;
+			}
 		}
 	}
-
 	return cut_index;
 }
 
