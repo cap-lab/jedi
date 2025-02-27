@@ -89,6 +89,14 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 	int index = sample_index * batch;
 	int device_num = config_data.instances.at(instance_id).device_num;
 	void **output_pointers;
+	void (Model::*funcPtr)(int, int, int);
+
+	if (config_data.instances.at(instance_id).devices.at(instance_id) == DEVICE_GPU &&
+	config_data.instances.at(instance_id).cuda_graphs.at(0) == true) {
+		funcPtr = &Model::graphLaunch;
+	} else {
+		funcPtr = &Model::infer;
+	}
 
 	output_pointers = (void **)calloc(model->network_output_number, sizeof(void *));
 
@@ -116,7 +124,7 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 
 		for (int iter = 0; iter < device_num; iter++)
 		{
-			model->infer(iter, 0, 0);
+			(model->*funcPtr)(iter, 0, 0);
 			model->waitUntilInferenceDone(0, 0);
 		}
 
