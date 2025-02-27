@@ -932,7 +932,7 @@ void OnnxModel::initializeModel() {
 					profile->setDimensions(tensor->getName(), OptProfileSelector::kMAX, tensor_dim);
 				}
 			}
-			//config->setBuilderOptimizationLevel(3);
+			config->setBuilderOptimizationLevel(4);
 			config->addOptimizationProfile(profile);
 
 			// DLA options	
