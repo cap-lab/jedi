@@ -22,12 +22,21 @@ typedef struct _InstanceThreadData {
 
 bool exit_flag = false;
 
+
+class Logger : public nvinfer1::ILogger
+{
+    void log(Severity severity, const char* msg) noexcept override
+    {
+		std::cout <<"TENSORRT LOG: "<< msg << std::endl;
+    }
+} default_logger;
+
 static void printHelpMessage() {
 	std::cout<<"usage:"<<std::endl;
-	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-l stage_profile_file] [-P] [-n] [-b]" <<std::endl;
+	std::cout<<"	./proc -c config_file [-r result_file] [-p power_log_file] [-t latency_log_file] [-l stage_profile_file] [-u dla_util_log_file] [-P] [-n] [-b]" <<std::endl;
 	std::cout<<"example:"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg"<<std::endl;
-	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log"<<std::endl;
+	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log -l profile.log -u dla_util.log"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -r results/coco_results.json -p power.log -t latency.log -b (run as a baseline)"<<std::endl;
 	std::cout<<"	./proc -c yolov2.cfg -P (print layers of the network) "<<std::endl;
 }
@@ -43,13 +52,16 @@ static void turnOffTegrastats() {
 	}
 }
 
-class Logger : public nvinfer1::ILogger
-{
-    void log(Severity severity, const char* msg) noexcept override
-    {
-		std::cout <<"TENSORRT LOG: "<< msg << std::endl;
-    }
-} default_logger;
+static void turnOffDLAUtilMonitor(std::string binary_file_dir_path) {
+	int result = -1;
+	std::string cmd;
+
+	cmd = binary_file_dir_path + "/dla_util_monitor stop";
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;
+	}
+}
 
 static void turnOnTegrastats(std::string power_file_name) {
 	int result = -1;
@@ -60,15 +72,37 @@ static void turnOnTegrastats(std::string power_file_name) {
 	cmd = std::string("rm -f ") + power_file_name;
 	result = system(cmd.c_str());
 	if(result == -1 || result == 127) {
-		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;
 	}
 
 	cmd = "tegrastats --start --logfile " + power_file_name + " --interval " + std::to_string(LOG_INTERVAL);
 	result = system(cmd.c_str());
 	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;
+	}
+}
+
+static void turnOnDLAUtilMonitor(std::string binary_file_dir_path, std::string dla_util_file_name) {
+	int result = -1;
+	std::string cmd;
+
+	turnOffDLAUtilMonitor(binary_file_dir_path);
+
+	cmd = std::string("rm -f ") + dla_util_file_name;
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
+		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
+	}
+
+	cmd = binary_file_dir_path + "/dla_util_monitor start " + std::to_string(LOG_INTERVAL) + " " +  dla_util_file_name;
+	result = system(cmd.c_str());
+	if(result == -1 || result == 127) {
 		std::cerr<<"ERROR occurs at "<<__func__<<":"<<__LINE__<<std::endl;	
 	}
 }
+
+
+
 
 static void writeTimeResultFile(std::string time_file_name, double inference_time) {
 	std::ofstream fp;
@@ -151,13 +185,18 @@ static void finalizeInstanceThreads(int instance_num, std::vector<PreProcessingT
 }
 
 static void runBaseline(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name,
-							std::string stage_profile_file_name, std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
+							std::string stage_profile_file_name, std::string dla_util_file_name, std::string binary_file_dir_path,
+							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
 	long start_time = 0;
 	double inference_time = 0;
 	std::vector<std::vector<long>> latencies[instance_num];
 
 	if(power_file_name.length() != 0) {
 		turnOnTegrastats(std::string(power_file_name));
+	}
+
+	if(dla_util_file_name.length() != 0 ) {
+		turnOnDLAUtilMonitor(binary_file_dir_path, dla_util_file_name);
 	}
 
 	start_time = getTime();
@@ -173,6 +212,10 @@ static void runBaseline(int instance_num, ConfigData &config_data, std::string p
 	inference_time = (double)(getTime() - start_time) / 1000000;
 	std::cout<< std::endl <<"inference time: "<<inference_time<<std::endl;
 
+	if(dla_util_file_name.length() != 0 ) {
+		turnOffDLAUtilMonitor(binary_file_dir_path);
+	}
+
 	if(power_file_name.length() != 0) {
 		turnOffTegrastats();
 	}
@@ -187,7 +230,8 @@ static void runBaseline(int instance_num, ConfigData &config_data, std::string p
 }
 
 static void generateThreads(int instance_num, ConfigData &config_data, std::string power_file_name, std::string time_file_name, 
-							std::string stage_profile_file_name, std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
+							std::string stage_profile_file_name, std::string dla_util_file_name, std::string binary_file_dir_path,
+							std::vector<Model *> models, std::vector<IInferenceApplication *> &apps) {
 	std::vector<PreProcessingThread *> preProcessingThreads;
 	std::vector<PostProcessingThread *> postProcessingThreads;
 	std::vector<InferenceThread *> inferenceThreads;
@@ -231,6 +275,10 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 		turnOnTegrastats(std::string(power_file_name));
 	}
 
+	if(dla_util_file_name.length() != 0) {
+		turnOnDLAUtilMonitor(binary_file_dir_path, dla_util_file_name);
+	}
+
 	start_time = getTime();
 
 	for(int iter = 0; iter < instance_num; iter++) {
@@ -242,6 +290,10 @@ static void generateThreads(int instance_num, ConfigData &config_data, std::stri
 	}
 	inference_time = (double)(getTime() - start_time) / 1000000;
 	std::cout<< std::endl <<"inference time: "<<inference_time<<std::endl;
+
+	if(dla_util_file_name.length() != 0) {
+		turnOffDLAUtilMonitor(binary_file_dir_path);
+	}
 
 	if(power_file_name.length() != 0) {
 		turnOffTegrastats();
@@ -274,6 +326,17 @@ static void finalizeData(int instance_num, std::vector<Model *> &models, std::ve
 	apps.clear();
 }
 
+static std::string getExecutablePath(const char* argv0) {
+    char result[PATH_MAX];
+    if (realpath(argv0, result) == NULL) {
+        std::cerr << "Error resolving the real path." << std::endl;
+        exit(1);
+    }
+    std::string fullPath(result);
+    size_t pos = fullPath.find_last_of("\\/");
+    return (std::string::npos == pos) ? "" : fullPath.substr(0, pos);
+}
+
 int main(int argc, char *argv[]) {
 	int option;
 	int instance_num = 0;
@@ -282,6 +345,8 @@ int main(int argc, char *argv[]) {
 	std::string stage_profile_file_name;
 	std::string power_file_name;
 	std::string time_file_name;
+	std::string dla_util_file_name;
+	std::string binary_file_dir_path;
 	bool print_network = false;
 	bool load_default_plugins = true;
 	bool run_baseline = false;
@@ -292,7 +357,9 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	while((option = getopt(argc, argv, "Pnbc:r:p:t:l:h")) != -1) {
+	binary_file_dir_path = getExecutablePath(argv[0]);
+
+	while((option = getopt(argc, argv, "Pnbc:r:p:t:l:u:h")) != -1) {
 		switch(option) {
 			case 'c':
 				config_file_name = std::string(optarg);	
@@ -308,6 +375,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'l':
 				stage_profile_file_name = std::string(optarg);
+				break;
+			case 'u':
+				dla_util_file_name = std::string(optarg);
 				break;
 			case 'P':
 				print_network = true;
@@ -345,9 +415,9 @@ int main(int argc, char *argv[]) {
 
 		// make threads
 		if (run_baseline == false) {
-			generateThreads(instance_num, config_data, power_file_name, time_file_name, stage_profile_file_name, models, apps);
+			generateThreads(instance_num, config_data, power_file_name, time_file_name, stage_profile_file_name, dla_util_file_name, binary_file_dir_path, models, apps);
 		} else {
-			runBaseline(instance_num, config_data, power_file_name, time_file_name, stage_profile_file_name, models, apps);
+			runBaseline(instance_num, config_data, power_file_name, time_file_name, stage_profile_file_name, dla_util_file_name, binary_file_dir_path, models, apps);
 		}
 
 		// write file

@@ -47,3 +47,7 @@ TARGET_LINK_LIBRARIES(network_analyzer m config++ nvinfer tkDNN stdc++ ${CUDA_LI
 
 ADD_EXECUTABLE(compute_coco_map coco_map.cc)
 TARGET_LINK_LIBRARIES(compute_coco_map json-c jpeg nvinfer tkDNN kernels ${CUDA_LIBRARIES} ${OpenCV_LIBS} PillowResize)
+
+
+add_subdirectory (dla_util_monitor)
+
