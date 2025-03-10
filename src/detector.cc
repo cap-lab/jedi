@@ -89,14 +89,18 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 	int index = sample_index * batch;
 	int device_num = config_data.instances.at(instance_id).device_num;
 	void **output_pointers;
-	void (Model::*funcPtr)(int, int, int);
+	void (Model::*funcPtr[device_num])(int, int, int);
 
-	if (config_data.instances.at(instance_id).devices.at(instance_id) == DEVICE_GPU &&
-	config_data.instances.at(instance_id).cuda_graphs.at(0) == true) {
-		funcPtr = &Model::graphLaunch;
-	} else {
-		funcPtr = &Model::infer;
+	for (int iter = 0; iter < device_num; iter++) {
+		if (config_data.instances.at(instance_id).devices.at(iter) == DEVICE_GPU &&
+		config_data.instances.at(instance_id).cuda_graphs.at(iter) == true) {
+			funcPtr[iter] = &Model::graphLaunch;
+		} else {
+			funcPtr[iter] = &Model::infer;
+		}
 	}
+
+	
 
 	output_pointers = (void **)calloc(model->network_output_number, sizeof(void *));
 
@@ -124,8 +128,8 @@ void doInferenceAll(ConfigData &config_data, IInferenceApplication *app, Model *
 
 		for (int iter = 0; iter < device_num; iter++)
 		{
-			(model->*funcPtr)(iter, 0, 0);
-			model->waitUntilInferenceDone(0, 0);
+			(model->*funcPtr[iter])(iter, 0, 0);
+			model->waitUntilInferenceDone(iter, 0);
 		}
 
 		for (int iter = 0; iter < model->network_output_number; iter++)
@@ -420,7 +424,7 @@ void doInference(void *d) {
 		available_streams.push_back(iter);
 	}
 
-	if (config_data->instances.at(instance_id).devices.at(instance_id) == DEVICE_GPU &&
+	if (config_data->instances.at(instance_id).devices.at(device_id) == DEVICE_GPU &&
 		config_data->instances.at(instance_id).cuda_graphs.at(device_id) == true) {
 		funcPtr = &Model::graphLaunch;
 	} else {

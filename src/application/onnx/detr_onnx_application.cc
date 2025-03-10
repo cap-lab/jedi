@@ -21,7 +21,7 @@
 
 #include "detr_onnx_application.h"
 
-#define CALIBRATION_BATCH_SIZE (16)
+#define CALIBRATION_BATCH_SIZE (1)
 
 #define NMS 0.45
 
@@ -148,6 +148,7 @@ IJediNetwork *DETROnnxApplication::createNetwork(ConfigInstance *basic_config_da
 #endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
+	jedi_network->quantized_onnx_file_path = onnxAppConfig.quantized_onnx_file_path;
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
