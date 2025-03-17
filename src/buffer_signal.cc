@@ -14,8 +14,10 @@ BufferSignal::~BufferSignal()
 void BufferSignal::produceSignal()
 {
     std::lock_guard<std::mutex> lock(this->mutex);
-    this->current_reference_count = this->max_reference_count;
-    this->signal = true;
+	if(this->max_reference_count > 0) {
+	    this->current_reference_count = this->max_reference_count;
+		this->signal = true;
+	}
 }
 
 void BufferSignal::consumeSignal()

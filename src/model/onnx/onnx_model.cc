@@ -393,8 +393,29 @@ void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network
 	}
 }
 
+static ITensor *getPreviousQuantizeInputTensor(INetworkDefinition *network, int current_layer_index) {
+	ILayer *current_layer = network->getLayer(current_layer_index);
+	ITensor *quantize_layer_input = nullptr;
+	for (int index = current_layer_index - 1 ; index >= 0 ; index--) {
+		ILayer *previous_layer = network->getLayer(index);
+		if(previous_layer->getType() == nvinfer1::LayerType::kQUANTIZE) {
+			//int prev_tensor_num = previous_layer->getNbOutputs();
+			ITensor *cur_tensor = current_layer->getInput(0); // the first input is the IDequantize layer input (second: scale, third: zeroPt)
+			ITensor *tensor = previous_layer->getOutput(0); // IQuantizeLayer only provides a single output
+			if (cur_tensor == tensor && previous_layer->getNbInputs() > 0) {
+				quantize_layer_input = previous_layer->getInput(0); // the first input is the IQuantize layer input (second: scale, third: zeroPt)
+				break;
+			}
+		}
+	}
+
+	return quantize_layer_input;
+}
+
 void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec, int dequantize_skip_index) {
 	std::set<ITensor *> output_set;
+	std::map<ITensor *, int> tensor_layer_map;
+	std::set<std::string> input_set;
 	for(int iter1 = 0 ; iter1 < start_index ; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
 		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && (layer->getType() != nvinfer1::LayerType::kDEQUANTIZE || iter1 >= dequantize_skip_index)) {
@@ -402,6 +423,7 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 				ITensor *tensor = layer->getOutput(iter2);
 				if (output_set.find(tensor) == output_set.end()) {
 					output_set.insert(tensor);
+					tensor_layer_map[tensor] = iter1;
 				}
 			}
 		}
@@ -412,22 +434,32 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 		for(int iter2 = 0 ; iter2 < layer->getNbInputs() ; iter2++) {
 			ITensor *tensor = layer->getInput(iter2);
 			if(output_set.find(tensor) != output_set.end()) {
-				std::cout << "add tensor1: " << tensor->getName() << std::endl;
-				input_name_vec.push_back(tensor->getName());
+				ILayer *previous_output_layer = network->getLayer(tensor_layer_map[tensor]);
+				if (previous_output_layer->getType() == nvinfer1::LayerType::kDEQUANTIZE) {
+					ITensor *quantizeBeforeTensor = getPreviousQuantizeInputTensor(network, tensor_layer_map[tensor]);
+					if(quantizeBeforeTensor != nullptr) {
+						input_set.insert(quantizeBeforeTensor->getName());
+					}
+				} else {
+					std::cout << "add tensor1: " << tensor->getName() << std::endl;
+					input_set.insert(tensor->getName());
+				}
 				output_set.erase(tensor);
 			}
 			else if(tensor != NULL && tensor->isNetworkInput() == true) {
-				auto it = std::find(input_name_vec.begin(), input_name_vec.end(), tensor->getName());
-				if (it == input_name_vec.end()) {
+				auto it = input_set.find(tensor->getName());
+				if (it == input_set.end()) {
 					std::cout << "add tensor2: " << tensor->getName() << std::endl;
-
-					input_name_vec.push_back(tensor->getName());
+					input_set.insert(tensor->getName());
 				}
 			}
 			//std::cout << "merong: " << iter1 << ", " << iter2 << std::endl;
 		}
 	}
 
+	for (auto it = input_set.begin(); it != input_set.end(); ++it) {
+        input_name_vec.push_back(*it);
+	}
 }
 
 void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *network, std::string model_name, std::string onnx_file_name, int start_index, int end_index, int dequantize_skip_index) {
