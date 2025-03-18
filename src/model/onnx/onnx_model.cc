@@ -375,6 +375,35 @@ bool OnnxModel::checkTensorIsUsedInNextStages(int device_id, INetworkDefinition 
 	return false;
 }
 
+static int getPreviousOutputIndex(INetworkDefinition *network, int current_layer_index) {
+	ILayer *current_layer = network->getLayer(current_layer_index);
+	int index = current_layer_index - 1;
+	bool matched = false;
+
+	// Assume the layer order is shuffled,
+	// so we need to find the previous layer by iterating from the current layer to the first layer.
+	for (; index >= 0 ; index--) {
+		ILayer *previous_layer = network->getLayer(index);
+		if (matched) {
+			ITensor *cur_tensor = current_layer->getInput(0);
+			ITensor *tensor = previous_layer->getOutput(0);
+			if (cur_tensor == tensor && previous_layer->getNbInputs() > 0) {
+				break;
+			}
+		}
+		else if(previous_layer->getType() == nvinfer1::LayerType::kQUANTIZE) {
+			ITensor *cur_tensor = current_layer->getInput(0);
+			ITensor *tensor = previous_layer->getOutput(0); // IQuantizeLayer only provides a single output
+			if (cur_tensor == tensor && previous_layer->getNbInputs() > 0) {
+				current_layer = network->getLayer(index);
+				matched = true;
+			}
+		}
+	}
+
+	return index;
+}
+
 void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<int>& output_index_vec, int dequantize_skip_index) {
 	for (int iter1 = start_index ; iter1 <= end_index; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
@@ -385,7 +414,11 @@ void OnnxModel::getOutputIndexOfStage(int device_id, INetworkDefinition *network
 				std::string tensor_name = tensor->getName();
 
 				if (inserted == false && checkTensorIsUsedInNextStages(device_id, network, end_index, iter1, tensor_name)) {
-					output_index_vec.push_back(iter1);
+					int output_index = iter1;
+					if (layer->getType() == nvinfer1::LayerType::kDEQUANTIZE) {
+						output_index = getPreviousOutputIndex(network, iter1);
+					}
+					output_index_vec.push_back(output_index);
 					inserted = true;
 				}
 			}
