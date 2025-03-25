@@ -445,13 +445,13 @@ static ITensor *getPreviousQuantizeInputTensor(INetworkDefinition *network, int 
 	return quantize_layer_input;
 }
 
-void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec, int dequantize_skip_index) {
+void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec) {
 	std::set<ITensor *> output_set;
 	std::map<ITensor *, int> tensor_layer_map;
 	std::set<std::string> input_set;
 	for(int iter1 = 0 ; iter1 < start_index ; iter1++) {
 		ILayer *layer = network->getLayer(iter1);
-		if (layer->getType() != nvinfer1::LayerType::kCONSTANT && (layer->getType() != nvinfer1::LayerType::kDEQUANTIZE || iter1 >= dequantize_skip_index)) {
+		if (layer->getType() != nvinfer1::LayerType::kCONSTANT) {
 			for (int iter2 = 0; iter2 < layer->getNbOutputs(); iter2++) {
 				ITensor *tensor = layer->getOutput(iter2);
 				if (output_set.find(tensor) == output_set.end()) {
@@ -472,6 +472,7 @@ void OnnxModel::fillInputs(int device_id, INetworkDefinition *network, int start
 					ITensor *quantizeBeforeTensor = getPreviousQuantizeInputTensor(network, tensor_layer_map[tensor]);
 					if(quantizeBeforeTensor != nullptr) {
 						input_set.insert(quantizeBeforeTensor->getName());
+						std::cout << "add tensor3: " << quantizeBeforeTensor->getName() << std::endl;
 					}
 				} else {
 					std::cout << "add tensor1: " << tensor->getName() << std::endl;
@@ -506,7 +507,7 @@ void OnnxModel::surgeonOnnxByPolygraphy(int device_id, INetworkDefinition *netwo
 
 
 	//getIOTensorNamesOfLayer(network, start_index, input_name_vec, true);
-	fillInputs(device_id, network, start_index, end_index, input_name_vec, dequantize_skip_index);
+	fillInputs(device_id, network, start_index, end_index, input_name_vec);
 	getOutputIndexOfStage(device_id, network, start_index, end_index, output_index_vec, dequantize_skip_index);
 	std::cerr<<"output_index_vec size: "<<output_index_vec.size()<<std::endl;
 	for(int output_index : output_index_vec) {

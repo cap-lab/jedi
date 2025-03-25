@@ -36,7 +36,7 @@ class OnnxModel : public Model {
 		std::vector<nvinfer1::IRuntime *> runtimes;
 		void getModelFileName(int curr, std::string &plan_file_name, nvinfer1::INetworkDefinition *network, std::string postfix, bool for_rt_build, bool quantized_model_avaiable);
 		void getOutputIndexOfStage(int device_id, nvinfer1::INetworkDefinition *network, int start_index, int end_index, std::vector<int>& output_index_vec, int dequantize_skip_index);
-		void fillInputs(int device_id, nvinfer1::INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec, int dequantize_skip_index);
+		void fillInputs(int device_id, nvinfer1::INetworkDefinition *network, int start_index, int end_index, std::vector<std::string>& input_name_vec);
 		void loadTimingCache(nvinfer1::IBuilderConfig* config, nvinfer1::ITimingCache* &cache);
 		void saveTimingCache(nvinfer1::ITimingCache *cache);
 		bool saveLayerInfoFile(std::string filename, const char *layerInfo);
