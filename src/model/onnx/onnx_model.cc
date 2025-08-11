@@ -437,6 +437,24 @@ static ITensor *getPreviousQuantizeInputTensor(INetworkDefinition *network, int 
 			ITensor *tensor = previous_layer->getOutput(0); // IQuantizeLayer only provides a single output
 			if (cur_tensor == tensor && previous_layer->getNbInputs() > 0) {
 				quantize_layer_input = previous_layer->getInput(0); // the first input is the IQuantize layer input (second: scale, third: zeroPt)
+				bool found = false;
+				for (int prev_index = index - 1; prev_index >= 0; prev_index --) {
+					ILayer *prev_previous_layer = network->getLayer(prev_index);
+					for (int iter2 = 0; iter2 < prev_previous_layer->getNbOutputs(); iter2++) {
+						ITensor *out_tensor = prev_previous_layer->getOutput(iter2);
+						if(quantize_layer_input == out_tensor) {
+							if (prev_previous_layer->getType() != nvinfer1::LayerType::kCONSTANT) {
+								found = true;
+							} else {
+								quantize_layer_input = nullptr;
+							}
+							break;
+						}
+					}
+					if(quantize_layer_input == nullptr || found == true) {
+						break;
+					}
+				}
 				break;
 			}
 		}
