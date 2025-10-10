@@ -8,6 +8,7 @@
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
 
+#include "util.h"
 #include "image_opencv.h"
 
 #include "tensorrt_network.h"
@@ -139,6 +140,10 @@ IJediNetwork *YoloEnd2EndOnnxApplication::createNetwork(ConfigInstance *basic_co
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
 	jedi_network->quantized_onnx_file_path = onnxAppConfig.quantized_onnx_file_path;
+	if ((!onnxAppConfig.secondary_onnx_file_path.empty()) && fileExist(onnxAppConfig.secondary_onnx_file_path))
+	{
+		jedi_network->secondary_onnx_file_path = onnxAppConfig.secondary_onnx_file_path;
+	}
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
@@ -181,7 +186,13 @@ IJediNetwork *YoloEnd2EndOnnxApplication::createNetwork(ConfigInstance *basic_co
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table, tensor->getName());
 
 	jedi_network->calibrator = calibrator;
-	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
+	if ((!onnxAppConfig.secondary_calib_table.empty()) && fileExist(onnxAppConfig.secondary_calib_table))
+	{
+		ImageBatchStream *secondaryBatchStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE, yoloOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, yoloOnnxAppConfig.calib_image_path, LOAD_IMAGE_LETTERBOX);
+		Int8ImageEntropyCalibrator *secondary_calibrator = new Int8ImageEntropyCalibrator(*secondaryBatchStream, 1, onnxAppConfig.secondary_calib_table, tensor->getName());
+		jedi_network->secondary_calibrator = secondary_calibrator;
+	}
+	std::cerr << "calibration algorithm selected: " << std::to_string((int)jedi_network->calibrator->getAlgorithm()) << std::endl;
 
 	// second input is det_boxes
 	ITensor *detBoxTensor = jedi_network->network->getOutput(1); // det_boxes

@@ -204,7 +204,13 @@ static bool isQuantizedModel(int device, int data_type, bool hasQuantizedModel) 
 	}
 }
 
-void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix, bool for_rt_build, bool is_quantized_model) {
+static bool useSecondaryOnnxModel(int device, int data_type, bool use_quantized_model, std::string secondary_model_name)
+{
+	return !(secondary_model_name.empty() || (device == DEVICE_GPU && data_type == TYPE_INT8 && use_quantized_model == true) || data_type == TYPE_FP16);
+}
+
+void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetworkDefinition *network, std::string postfix, bool for_rt_build, bool is_quantized_model, bool use_secondary)
+{
 	std::string model_dir = config_data->instances.at(instance_id).model_dir;
 	std::string cut_points_name;
 	std::string device_name;
@@ -220,37 +226,49 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 	std::vector<LayerRange> fp16_ranges = config_data->instances.at(instance_id).fp16_ranges;
 	std::vector<LayerRange> fp32_ranges = config_data->instances.at(instance_id).fp32_ranges;
 	std::string rt_post_fix = "";
-	
-	if(curr > 0) {
-		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr-1) + 1;
+
+	if (curr > 0)
+	{
+		prev_cut_point = config_data->instances.at(instance_id).cut_points.at(curr - 1) + 1;
 	}
 	curr_cut_point = config_data->instances.at(instance_id).cut_points.at(curr);
 
 	cut_points_name = std::to_string(prev_cut_point) + "." + std::to_string(curr_cut_point);
 
-
-	if (for_rt_build == true) {
-		if(device == DEVICE_DLA) {
+	if (for_rt_build == true)
+	{
+		if (device == DEVICE_DLA)
+		{
 			device_name = "DLA";
 		}
-		else {
+		else
+		{
 			device_name = "GPU";
 		}
 
-		if(data_type == TYPE_FP32) {
+		if (data_type == TYPE_FP32)
+		{
 			data_type_name = "FP32";
 		}
-		else if(data_type == TYPE_FP16) {
+		else if (data_type == TYPE_FP16)
+		{
 			data_type_name = "FP16";
 		}
-		else if(data_type == TYPE_INT8) {
+		else if (data_type == TYPE_INT8)
+		{
 			data_type_name = "INT8";
 		}
 		rt_post_fix = "_" + device_name + "_" + data_type_name;
 	}
 
-	if (is_quantized_model == true && data_type == TYPE_INT8) {
+	if (is_quantized_model == true && data_type == TYPE_INT8)
+	{
 		rt_post_fix += "_QUANT";
+	}
+
+	if (use_secondary == true)
+	{
+		rt_post_fix += "_SECONDARY";
 	}
 
 	ITensor *tensor = network->getInput(0);
@@ -296,7 +314,6 @@ void OnnxModel::getModelFileName(int curr, std::string &plan_file_name, INetwork
 
 	std::cerr<<"plan_file_name: "<< plan_file_name<<std::endl;
 }
-
 
 bool OnnxModel::saveLayerInfoFile(std::string filename, const char *layerInfo){
     std::ofstream p(filename);
@@ -574,7 +591,10 @@ static int convertCutpointIndexFromOriginalToQuantizedModel(INetworkDefinition *
 	return cut_index;
 }
 
-void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_name, std::string quantized_model_name, std::vector<std::string>& onnx_file_name_vec) {
+void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_name,
+								 std::string quantized_model_name,
+								 std::string secondary_model_name, std::vector<std::string> &onnx_file_name_vec)
+{
 	int device_num = config_data->instances.at(instance_id).device_num;
 	int prev_cut_point = 0, curr_cut_point = 0;
 	INetworkDefinition *quantized_network = nullptr;
@@ -606,8 +626,10 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 		std::string onnx_file_name;
 		int data_type = config_data->instances.at(instance_id).data_types.at(iter1);
 		int device = config_data->instances.at(instance_id).devices.at(iter1);
+		bool use_quantized_model = isQuantizedModel(device, data_type, quantized_model_name.length() > 0);
+		bool use_secondary = useSecondaryOnnxModel(device, data_type, use_quantized_model, secondary_model_name);
 
-		getModelFileName(iter1, onnx_file_name, network, ".onnx", false, isQuantizedModel(device, data_type, quantized_model_name.length() > 0));
+		getModelFileName(iter1, onnx_file_name, network, ".onnx", false, use_quantized_model, use_secondary);
 
 		onnx_file_name_vec.push_back(onnx_file_name);
 		if(iter1 > 0) {
@@ -634,7 +656,14 @@ void OnnxModel::separateOnnxFile(INetworkDefinition *network, std::string model_
 				}
 				surgeonOnnxByPolygraphy(iter1, quantized_network, quantized_model_name, onnx_file_name, prev_cut_point_changed, curr_cut_point_changed, dequantize_skip_index);
 			} else {
-				surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point, dequantize_skip_index);
+				if (use_secondary == false)
+				{
+					surgeonOnnxByPolygraphy(iter1, network, model_name, onnx_file_name, prev_cut_point, curr_cut_point, dequantize_skip_index);
+				}
+				else // use_secondary = true
+				{
+					surgeonOnnxByPolygraphy(iter1, network, secondary_model_name, onnx_file_name, prev_cut_point, curr_cut_point, dequantize_skip_index);
+				}
 			}
 		}
 	}
@@ -922,6 +951,11 @@ void OnnxModel::printModel() {
 	if(tensorrt_network->calibrator != nullptr ) {
 		delete tensorrt_network->calibrator;
 	}
+
+	if (tensorrt_network->secondary_calibrator != nullptr)
+	{
+		delete tensorrt_network->secondary_calibrator;
+	}
 	delete tensorrt_network;
 }
 
@@ -940,8 +974,9 @@ void OnnxModel::initializeModel() {
 	setUnnamedLayerAndTensorName(network, 0);
 	tensorrt_network->printNetwork();
 
-	std::vector<std::string> onnx_file_name_vec;	
-	separateOnnxFile(network, tensorrt_network->onnx_file_path, tensorrt_network->quantized_onnx_file_path, onnx_file_name_vec);
+	std::vector<std::string> onnx_file_name_vec;
+	separateOnnxFile(network, tensorrt_network->onnx_file_path, tensorrt_network->quantized_onnx_file_path,
+					 tensorrt_network->secondary_onnx_file_path, onnx_file_name_vec);
 
 	libconfig::Config cfg;
 	libconfig::Setting* setting_ptr = nullptr;
@@ -961,7 +996,8 @@ void OnnxModel::initializeModel() {
 		bool engineBuilt = false;
 		bool is_quantized_onnx = isQuantizedModel(device, data_type, tensorrt_network->quantized_onnx_file_path.length() > 0);
 		std::string plan_file_name;
-		getModelFileName(iter1, plan_file_name, network, ".rt", true, is_quantized_onnx);
+		bool use_secondary = useSecondaryOnnxModel(device, data_type, is_quantized_onnx, tensorrt_network->secondary_onnx_file_path);
+		getModelFileName(iter1, plan_file_name, network, ".rt", true, is_quantized_onnx, use_secondary);
 
 		if(fileExist(plan_file_name) == false)  {
 			IBuilder *partial_builder;
@@ -977,6 +1013,8 @@ void OnnxModel::initializeModel() {
 			loadTimingCache(config, cache);
 			config->setTimingCache(*cache, false);
 			config->setFlag(BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
+			// config->setFlag(BuilderFlag::kOBEY_PRECISION_CONSTRAINTS);
+
 			config->setFlag(BuilderFlag::kSPARSE_WEIGHTS);
 			config->setDefaultDeviceType(nvinfer1::DeviceType::kGPU);
 			//config->setFlag(BuilderFlag::kSTRICT_NANS);
@@ -1047,7 +1085,14 @@ void OnnxModel::initializeModel() {
 				}
 				config->setFlag(BuilderFlag::kINT8);
 				config->setCalibrationProfile(profile);
-				config->setInt8Calibrator(tensorrt_network->calibrator);
+				if (!use_secondary)
+				{
+					config->setInt8Calibrator(tensorrt_network->calibrator);
+				}
+				else
+				{
+					config->setInt8Calibrator(tensorrt_network->secondary_calibrator);
+				}
 			}
 			unsigned int n = std::thread::hardware_concurrency();
 			partial_builder->setMaxThreads(std::max((unsigned int) 1, n/2));
@@ -1121,6 +1166,10 @@ void OnnxModel::initializeModel() {
 
 	if(tensorrt_network->calibrator != nullptr ) {
 		delete tensorrt_network->calibrator;
+	}
+
+	if(tensorrt_network->secondary_calibrator != nullptr ) {
+		delete tensorrt_network->secondary_calibrator;
 	}
 
 	delete tensorrt_network;

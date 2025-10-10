@@ -13,6 +13,8 @@ typedef struct _BasicOnnxAppConfig {
 	std::string onnx_file_path;
 	std::string quantized_onnx_file_path;
 	std::string optimization_cfg_path;
+	std::string secondary_onnx_file_path;
+	std::string secondary_calib_table;
 } BasicOnnxAppConfig;
 
 
@@ -27,6 +29,9 @@ class BasicOnnxApplication : public IInferenceApplication {
 		void readOnnxFilePath(libconfig::Setting &setting);
 		void readQuantizedOnnxFilePath(libconfig::Setting &setting);
 		void readOptimizationProfileFilePath(libconfig::Setting &setting);
+
+		void readSecondaryOnnxFilePath(libconfig::Setting &setting);
+		void readSecondaryCalibrationTablePath(libconfig::Setting &setting);
 };
 
 #endif

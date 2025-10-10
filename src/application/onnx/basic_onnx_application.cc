@@ -41,6 +41,46 @@ void BasicOnnxApplication::readQuantizedOnnxFilePath(libconfig::Setting &setting
 	}
 }
 
+void BasicOnnxApplication::readSecondaryOnnxFilePath(libconfig::Setting &setting)
+{
+	try
+	{
+		const char *tmp = setting["secondary_onnx_file_path"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+		onnxAppConfig.secondary_onnx_file_path = data.c_str();
+
+		std::cerr << "secondary_onnx_file_path: " << onnxAppConfig.secondary_onnx_file_path << std::endl;
+	}
+	catch (const libconfig::SettingNotFoundException &nfex)
+	{
+		// Since secondary onnx file path is an optional parameter, do not print waring messages when the option is not set.
+		// std::cerr << "No 'secondary_onnx_file_path' setting in configuration file." << std::endl;
+		onnxAppConfig.secondary_onnx_file_path = "";
+	}
+}
+
+void BasicOnnxApplication::readSecondaryCalibrationTablePath(libconfig::Setting &setting)
+{
+	try
+	{
+		const char *tmp = setting["secondary_calib_table"];
+		std::stringstream ss(tmp);
+		static std::string data;
+		ss >> data;
+		onnxAppConfig.secondary_calib_table = data.c_str();
+
+		std::cerr << "secondary_calib_table: " << onnxAppConfig.secondary_calib_table << std::endl;
+	}
+	catch (const libconfig::SettingNotFoundException &nfex)
+	{
+		// Since secondary calibration table path is an optional parameter, do not print waring messages when the option is not set.
+		// std::cerr << "No 'secondary_calib_table' setting in configuration file." << std::endl;
+		onnxAppConfig.secondary_calib_table = "";
+	}
+}
+
 void BasicOnnxApplication::readOptimizationProfileFilePath(libconfig::Setting &setting) {
 	try{	
 		const char *tmp = setting["optimization_cfg_path"];
@@ -62,4 +102,6 @@ void BasicOnnxApplication::readCustomOptions(libconfig::Setting &setting)
 	readOnnxFilePath(setting);
     readQuantizedOnnxFilePath(setting);
     readOptimizationProfileFilePath(setting);
+	readSecondaryOnnxFilePath(setting);
+	readSecondaryCalibrationTablePath(setting);
 }

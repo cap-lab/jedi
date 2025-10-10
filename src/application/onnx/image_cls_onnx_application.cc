@@ -10,6 +10,7 @@
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
 
+#include "util.h"
 #include "image_opencv.h"
 #include "box.h"
 #include "region_wrapper.h"
@@ -274,6 +275,10 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 #endif
 	jedi_network->network =  jedi_network->builder->createNetworkV2(flag);
 	jedi_network->onnx_file_path = onnxAppConfig.onnx_file_path;
+	if ((!onnxAppConfig.secondary_onnx_file_path.empty()) && fileExist(onnxAppConfig.secondary_onnx_file_path))
+	{
+		jedi_network->secondary_onnx_file_path = onnxAppConfig.secondary_onnx_file_path;
+	}
 
 	IParser* parser = createParser(*(jedi_network->network), onnx_logger);
 
@@ -312,6 +317,15 @@ IJediNetwork *ImageClsOnnxApplication::createNetwork(ConfigInstance *basic_confi
 											imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
 	Int8ImageEntropyCalibrator *calibrator = new Int8ImageEntropyCalibrator(*calibrationStream, 1, calib_table , tensor->getName());
 	jedi_network->calibrator = calibrator;
+	if ((!onnxAppConfig.secondary_calib_table.empty()) && fileExist(onnxAppConfig.secondary_calib_table))
+	{
+		ImageBatchStream *secondaryBatchStream = new ImageBatchStream(tensor_dim, CALIBRATION_BATCH_SIZE,
+																	  imageClsOnnxAppConfig.calib_images_num / CALIBRATION_BATCH_SIZE, imageClsOnnxAppConfig.calib_image_path,
+																	  imageClsOnnxAppConfig.preprocessing_option, imageClsOnnxAppConfig.interpolation, imageClsOnnxAppConfig.crop_base_size,
+																	  imageClsOnnxAppConfig.mean, imageClsOnnxAppConfig.std);
+		Int8ImageEntropyCalibrator *secondary_calibrator = new Int8ImageEntropyCalibrator(*secondaryBatchStream, 1, onnxAppConfig.secondary_calib_table, tensor->getName());
+		jedi_network->secondary_calibrator = secondary_calibrator;
+	}
 	std::cerr<<"calibration algorithm selected: " << std::to_string((int) jedi_network->calibrator->getAlgorithm()) << std::endl;
 
 	ITensor *tensor_output = jedi_network->network->getOutput(0);

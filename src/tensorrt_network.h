@@ -19,6 +19,9 @@ class TensorRTNetwork : public IJediNetwork {
 		std::string quantized_onnx_file_path;
 		std::string optimization_cfg_path;
 		nvinfer1::IInt8Calibrator *calibrator = nullptr;
+
+		std::string secondary_onnx_file_path;
+		nvinfer1::IInt8Calibrator *secondary_calibrator = nullptr;
 		//void createNetwork() override;
 		void printNetwork();
 	private:
